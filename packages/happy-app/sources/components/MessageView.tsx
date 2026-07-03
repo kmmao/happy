@@ -36,25 +36,14 @@ import { CodexDiffView } from "./tools/views/CodexDiffView";
 import type { MessageMeta } from "@/sync/typesMessageMeta";
 import { StreamingTextView } from "./StreamingTextView";
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from "./parseLocalCommandMessage";
+import { getPermissionModeLabel } from "./modelModeOptions";
 
 function buildUserMetaBadgeText(meta: MessageMeta | undefined): string | null {
   if (!meta) return null;
   const parts: string[] = [];
 
-  if (meta.permissionMode && meta.permissionMode !== "default") {
-    const known: Record<string, string> = {
-      acceptEdits: t("agentInput.permissionMode.acceptEdits"),
-      plan: t("agentInput.permissionMode.plan"),
-      dontAsk: t("agentInput.permissionMode.dontAsk"),
-      auto: t("agentInput.permissionMode.auto"),
-      bypassPermissions: t("agentInput.permissionMode.bypassPermissions"),
-      yolo: t("agentInput.permissionMode.bypassPermissions"),
-      readOnly: t("agentInput.codexPermissionMode.readOnly"),
-      safeYolo: t("agentInput.codexPermissionMode.safeYolo"),
-    };
-    const label = known[meta.permissionMode];
-    if (label) parts.push(label);
-  }
+  const permissionModeLabel = getPermissionModeLabel(meta.permissionMode, t);
+  if (permissionModeLabel) parts.push(permissionModeLabel);
 
   if (meta.model) {
     parts.push(formatModelName(meta.model));

@@ -120,6 +120,10 @@ _Avoid_: AI provider (collides with AiBackendProfile, which names the *model/pro
 A generic encrypted data container (header + body) with its own encryption key. Used for Supervisor reports, research documents, and user-created content. Not related to Claude.ai's "Artifact" concept.
 _Avoid_: Document, file, attachment
 
+**Artifact intake**:
+The server-side seam that turns any artifact-create request — HTTP (`POST /v1/artifacts`) or socket (`artifact-create`) — into a created **Artifact**. Owns the invariant-bearing pieces both transports share: the existence check, the conflict rule (id already owned by another Account → reject), idempotent return of an existing same-Account row, the initial row shape (`headerVersion`/`bodyVersion = 1`, `seq = 0`, base64 payloads decoded to bytes), and the `new-artifact` **SyncUpdate** broadcast. Lives in `app/api/artifact/artifactCreate.ts`. Each caller keeps only its own outward shape (HTTP 409 / 200-with-key vs socket callback strings). Sibling to **artifactVersionedUpdate** (the CAS seam for updates); parallels **Task intake**.
+_Avoid_: ArtifactFactory, createArtifact (too narrow — the seam is the whole intake, not one DB call).
+
 **Trigger**:
 A rule that automatically creates Tasks. Umbrella term for TriggerSchedule, WebhookTrigger, and WebhookRoute.
 

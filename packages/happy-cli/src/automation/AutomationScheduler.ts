@@ -9,6 +9,7 @@ import {
   runAutomationJob,
   type AutomationRunnerDeps,
 } from "./AutomationRunner";
+import { evaluateRetry } from "./automationRetryPolicy";
 import type {
   AgentLoopTriggerData,
   AutomationEnqueueResult,
@@ -702,21 +703,27 @@ export class AutomationScheduler {
         return;
       }
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const canRetry = started.attempt < started.maxAttempts;
+      const now = Date.now();
+      // Retry decision + backoff schedule live in the pure automationRetryPolicy seam.
+      const { retry, nextRunAt } = evaluateRetry(
+        now,
+        started.attempt,
+        started.maxAttempts,
+      );
       const failed: AutomationJob = {
         ...started,
-        status: canRetry ? "queued" : "failed",
-        nextRunAt: canRetry ? Date.now() + started.attempt * 5_000 : undefined,
-        updatedAt: Date.now(),
+        status: retry ? "queued" : "failed",
+        nextRunAt,
+        updatedAt: now,
         errorMessage,
       };
       await this.store.upsert(failed);
       this.notifyChange();
-      if (!canRetry) {
+      if (!retry) {
         this.reportTaskStatus(failed);
       }
       logger.debug(
-        `[AUTOMATION] ${canRetry ? "Retrying" : "Failed"} ${job.kind} job ${job.id}: ${errorMessage}`,
+        `[AUTOMATION] ${retry ? "Retrying" : "Failed"} ${job.kind} job ${job.id}: ${errorMessage}`,
       );
     }
   }

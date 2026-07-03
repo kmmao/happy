@@ -16,6 +16,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
+import { resolveToolChildTitle } from "@/components/tools/toolMetadataResolve";
 
 function formatTokenCount(count: number): string {
   if (count >= 1000) {
@@ -65,23 +66,8 @@ export const TaskView = React.memo<ToolViewProps>(
           m.tool.name as keyof typeof knownTools
         ] as any;
 
-        // Extract title using extractDescription if available, otherwise use title
-        let title = m.tool.name;
-        if (knownTool) {
-          if (
-            "extractDescription" in knownTool &&
-            typeof knownTool.extractDescription === "function"
-          ) {
-            title = knownTool.extractDescription({ tool: m.tool, metadata });
-          } else if (knownTool.title) {
-            // Handle optional title and function type
-            if (typeof knownTool.title === "function") {
-              title = knownTool.title({ tool: m.tool, metadata });
-            } else {
-              title = knownTool.title;
-            }
-          }
-        }
+        // Prefer extractDescription, fall back to title — via toolMetadataResolve.
+        const title = resolveToolChildTitle(knownTool, m.tool, metadata);
 
         if (
           m.tool.state === "running" ||

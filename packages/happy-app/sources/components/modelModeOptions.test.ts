@@ -6,6 +6,7 @@ import {
   getCodexModelModes,
   getClaudePermissionModes,
   getDefaultModelKey,
+  getPermissionModeLabel,
   LOCKED_CODEX_MODEL,
   mapMetadataOptions,
   resolveCurrentOption,
@@ -222,6 +223,42 @@ describe("modelModeOptions", () => {
       { key: "build", name: "Build", description: "Do build steps" },
       { key: "plan", name: "Plan", description: "Plan first" },
     ]);
+  });
+
+  describe("getPermissionModeLabel", () => {
+    it("returns null for default / null / undefined / unknown keys", () => {
+      expect(getPermissionModeLabel("default", translate)).toBeNull();
+      expect(getPermissionModeLabel(null, translate)).toBeNull();
+      expect(getPermissionModeLabel(undefined, translate)).toBeNull();
+      expect(getPermissionModeLabel("nonsense", translate)).toBeNull();
+    });
+
+    it("maps Claude mode keys to their label translation key", () => {
+      expect(getPermissionModeLabel("acceptEdits", translate)).toBe(
+        "tr:agentInput.permissionMode.acceptEdits",
+      );
+      expect(getPermissionModeLabel("plan", translate)).toBe(
+        "tr:agentInput.permissionMode.plan",
+      );
+      expect(getPermissionModeLabel("bypassPermissions", translate)).toBe(
+        "tr:agentInput.permissionMode.bypassPermissions",
+      );
+    });
+
+    it("aliases yolo to the bypassPermissions label", () => {
+      expect(getPermissionModeLabel("yolo", translate)).toBe(
+        "tr:agentInput.permissionMode.bypassPermissions",
+      );
+    });
+
+    it("maps Codex mode keys to their codex label translation key", () => {
+      expect(getPermissionModeLabel("readOnly", translate)).toBe(
+        "tr:agentInput.codexPermissionMode.readOnly",
+      );
+      expect(getPermissionModeLabel("safeYolo", translate)).toBe(
+        "tr:agentInput.codexPermissionMode.safeYolo",
+      );
+    });
   });
 
   describe("getClaudeModelModes", () => {

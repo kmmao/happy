@@ -116,6 +116,92 @@ const IMMEDIATE_EXIT_STATES: ReadonlySet<SessionState> = new Set([
 ]);
 
 /**
+ * Pure display derivation: map a (already-debounced) SessionState — plus the
+ * session's apiRetry/activeAt and the caller-computed "vibing" thinking word —
+ * to the rendered SessionStatus (statusText, colors, pulsing, shouldShowStatus).
+ *
+ * This is the render half of `useSessionStatus`, lifted out so the color /
+ * copy / pulsing rules are testable without standing up the debounce timer,
+ * generation counter, and vibing-word hashing the hook owns. The hook computes
+ * `currentState` + `vibingMessage` and calls this; every state→appearance rule
+ * lives here, pinned by `sessionUtils.test.ts`.
+ */
+export function buildSessionStatusDisplay(
+  currentState: SessionState,
+  session: Session,
+  vibingMessage: string,
+): SessionStatus {
+  if (currentState === "disconnected") {
+    return {
+      state: "disconnected",
+      isConnected: false,
+      statusText: t("status.lastSeen", {
+        time: formatLastSeen(session.activeAt, false),
+      }),
+      shouldShowStatus: true,
+      statusColor: "#999",
+      statusDotColor: "#999",
+    };
+  }
+
+  if (currentState === "permission_required") {
+    return {
+      state: "permission_required",
+      isConnected: true,
+      statusText: t("status.permissionRequired"),
+      shouldShowStatus: true,
+      statusColor: "#FF9500",
+      statusDotColor: "#FF9500",
+      isPulsing: true,
+    };
+  }
+
+  if (currentState === "needs_attention") {
+    return {
+      state: "needs_attention",
+      isConnected: true,
+      statusText: t("status.needsAttention"),
+      shouldShowStatus: true,
+      statusColor: "#FF9500",
+      statusDotColor: "#FF9500",
+      isPulsing: true,
+    };
+  }
+
+  if (currentState === "thinking") {
+    if (session.apiRetry) {
+      return {
+        state: "thinking",
+        isConnected: true,
+        statusText: formatApiRetryStatus(session.apiRetry),
+        shouldShowStatus: true,
+        statusColor: "#FF9500",
+        statusDotColor: "#FF9500",
+        isPulsing: true,
+      };
+    }
+    return {
+      state: "thinking",
+      isConnected: true,
+      statusText: vibingMessage,
+      shouldShowStatus: true,
+      statusColor: "#007AFF",
+      statusDotColor: "#007AFF",
+      isPulsing: true,
+    };
+  }
+
+  return {
+    state: "waiting",
+    isConnected: true,
+    statusText: t("status.ready"),
+    shouldShowStatus: false,
+    statusColor: "#34C759",
+    statusDotColor: "#34C759",
+  };
+}
+
+/**
  * Get the current state of a session based on presence and thinking status.
  * Uses centralized session state from storage.ts
  */
@@ -195,74 +281,7 @@ export function useSessionStatus(session: Session): SessionStatus {
     return vibingMessages[index].toLowerCase() + "…";
   }, [session.id, generation]);
 
-  if (currentState === "disconnected") {
-    return {
-      state: "disconnected",
-      isConnected: false,
-      statusText: t("status.lastSeen", {
-        time: formatLastSeen(session.activeAt, false),
-      }),
-      shouldShowStatus: true,
-      statusColor: "#999",
-      statusDotColor: "#999",
-    };
-  }
-
-  if (currentState === "permission_required") {
-    return {
-      state: "permission_required",
-      isConnected: true,
-      statusText: t("status.permissionRequired"),
-      shouldShowStatus: true,
-      statusColor: "#FF9500",
-      statusDotColor: "#FF9500",
-      isPulsing: true,
-    };
-  }
-
-  if (currentState === "needs_attention") {
-    return {
-      state: "needs_attention",
-      isConnected: true,
-      statusText: t("status.needsAttention"),
-      shouldShowStatus: true,
-      statusColor: "#FF9500",
-      statusDotColor: "#FF9500",
-      isPulsing: true,
-    };
-  }
-
-  if (currentState === "thinking") {
-    if (session.apiRetry) {
-      return {
-        state: "thinking",
-        isConnected: true,
-        statusText: formatApiRetryStatus(session.apiRetry),
-        shouldShowStatus: true,
-        statusColor: "#FF9500",
-        statusDotColor: "#FF9500",
-        isPulsing: true,
-      };
-    }
-    return {
-      state: "thinking",
-      isConnected: true,
-      statusText: vibingMessage,
-      shouldShowStatus: true,
-      statusColor: "#007AFF",
-      statusDotColor: "#007AFF",
-      isPulsing: true,
-    };
-  }
-
-  return {
-    state: "waiting",
-    isConnected: true,
-    statusText: t("status.ready"),
-    shouldShowStatus: false,
-    statusColor: "#34C759",
-    statusDotColor: "#34C759",
-  };
+  return buildSessionStatusDisplay(currentState, session, vibingMessage);
 }
 
 /**

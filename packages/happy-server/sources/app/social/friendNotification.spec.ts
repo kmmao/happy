@@ -15,7 +15,33 @@ vi.mock("@/storage/inTx", () => ({
 }));
 
 // Import after mocking
-import { shouldSendNotification } from "./friendNotification";
+import {
+    shouldSendNotification,
+    sendFriendRequestNotification,
+    sendFriendshipEstablishedNotification
+} from "./friendNotification";
+import { feedPost } from "@/app/feed/feedPost";
+
+/** Minimal in-memory `tx.userRelationship` keyed by `from:to`. */
+function makeTx(
+    rels: Record<string, { lastNotifiedAt: Date | null; status: RelationshipStatus }>
+) {
+    const updated: Array<{ from: string; to: string }> = [];
+    const tx = {
+        userRelationship: {
+            findUnique: vi.fn(async ({ where }: any) => {
+                const { fromUserId, toUserId } = where.fromUserId_toUserId;
+                return rels[`${fromUserId}:${toUserId}`] ?? null;
+            }),
+            update: vi.fn(async ({ where }: any) => {
+                const { fromUserId, toUserId } = where.fromUserId_toUserId;
+                updated.push({ from: fromUserId, to: toUserId });
+                return {};
+            })
+        }
+    } as any;
+    return { tx, updated };
+}
 
 describe("friendNotification", () => {
     describe("shouldSendNotification", () => {
@@ -56,6 +82,85 @@ describe("friendNotification", () => {
         it("should work for requested status", () => {
             const result = shouldSendNotification(null, RelationshipStatus.requested);
             expect(result).toBe(true);
+        });
+    });
+
+    describe("sendFriendRequestNotification", () => {
+        it("posts a friend_request feed item + stamps lastNotifiedAt when the gate passes", async () => {
+            vi.mocked(feedPost).mockClear();
+            const { tx, updated } = makeTx({
+                "receiver:sender": { lastNotifiedAt: null, status: RelationshipStatus.requested }
+            });
+
+            await sendFriendRequestNotification(tx, "receiver", "sender");
+
+            expect(feedPost).toHaveBeenCalledTimes(1);
+            expect(feedPost).toHaveBeenCalledWith(
+                tx,
+                expect.anything(),
+                { kind: "friend_request", uid: "sender" },
+                "friend_request_sender"
+            );
+            expect(updated).toEqual([{ from: "receiver", to: "sender" }]);
+        });
+
+        it("does nothing when no relationship record exists", async () => {
+            vi.mocked(feedPost).mockClear();
+            const { tx, updated } = makeTx({});
+
+            await sendFriendRequestNotification(tx, "receiver", "sender");
+
+            expect(feedPost).not.toHaveBeenCalled();
+            expect(updated).toEqual([]);
+        });
+
+        it("does nothing when the relationship is rejected (gate closed)", async () => {
+            vi.mocked(feedPost).mockClear();
+            const { tx, updated } = makeTx({
+                "receiver:sender": { lastNotifiedAt: null, status: RelationshipStatus.rejected }
+            });
+
+            await sendFriendRequestNotification(tx, "receiver", "sender");
+
+            expect(feedPost).not.toHaveBeenCalled();
+            expect(updated).toEqual([]);
+        });
+    });
+
+    describe("sendFriendshipEstablishedNotification", () => {
+        it("notifies BOTH directions with friend_accepted, each gated by its own record", async () => {
+            vi.mocked(feedPost).mockClear();
+            const { tx, updated } = makeTx({
+                "u1:u2": { lastNotifiedAt: null, status: RelationshipStatus.friend },
+                "u2:u1": { lastNotifiedAt: null, status: RelationshipStatus.friend }
+            });
+
+            await sendFriendshipEstablishedNotification(tx, "u1", "u2");
+
+            expect(feedPost).toHaveBeenCalledTimes(2);
+            expect(feedPost).toHaveBeenCalledWith(
+                tx, expect.anything(), { kind: "friend_accepted", uid: "u2" }, "friend_accepted_u2"
+            );
+            expect(feedPost).toHaveBeenCalledWith(
+                tx, expect.anything(), { kind: "friend_accepted", uid: "u1" }, "friend_accepted_u1"
+            );
+            expect(updated).toEqual([
+                { from: "u1", to: "u2" },
+                { from: "u2", to: "u1" }
+            ]);
+        });
+
+        it("skips the direction whose own record is missing or rejected", async () => {
+            vi.mocked(feedPost).mockClear();
+            const { tx, updated } = makeTx({
+                "u1:u2": { lastNotifiedAt: null, status: RelationshipStatus.friend }
+                // u2:u1 missing → that direction is skipped
+            });
+
+            await sendFriendshipEstablishedNotification(tx, "u1", "u2");
+
+            expect(feedPost).toHaveBeenCalledTimes(1);
+            expect(updated).toEqual([{ from: "u1", to: "u2" }]);
         });
     });
 });

@@ -59,6 +59,10 @@ import type { DecryptedArtifact } from "../artifactTypes";
 import type { Profile } from "../profile";
 import type { IngestContext } from "./ingestContext";
 import type { IngestEvent } from "./types";
+import {
+    classifyTurnLifecycle,
+    type RawLifecycleContent,
+} from "./turnLifecycleClassify";
 
 type NewMachineBody = Extract<ApiUpdate, { t: "new-machine" }>;
 type UpdateMachineBody = Extract<ApiUpdate, { t: "update-machine" }>;
@@ -879,44 +883,11 @@ async function ingestNewMessage(
     }
 
     // ----- task lifecycle detection (turn-start / turn-end) ---------------
-    const rawContent = decrypted.content as {
-        role?: string;
-        content?: {
-            type?: string;
-            data?: { type?: string; ev?: { t?: string } };
-            ev?: { t?: string };
-        };
-    } | null;
-    const contentType = rawContent?.content?.type;
-    const dataType = rawContent?.content?.data?.type;
-    const sessionEventType = rawContent?.content?.data?.ev?.t;
-    const envelopeEventType = rawContent?.content?.ev?.t;
-
-    if (
-        dataType === "task_complete" ||
-        dataType === "turn_aborted" ||
-        dataType === "task_started" ||
-        sessionEventType === "turn-start" ||
-        sessionEventType === "turn-end" ||
-        envelopeEventType === "turn-start" ||
-        envelopeEventType === "turn-end"
-    ) {
-        log.log(
-            `🔄 [Sync] Lifecycle event detected: contentType=${contentType}, dataType=${dataType}, sessionEventType=${sessionEventType}, role=${rawContent?.role}, envelopeEventType=${envelopeEventType}`,
-        );
-    }
-
-    const isSessionProtocolEvent = rawContent?.role === "session";
-    const isTaskComplete =
-        ((contentType === "acp" || contentType === "codex") &&
-            (dataType === "task_complete" || dataType === "turn_aborted")) ||
-        (contentType === "session" && sessionEventType === "turn-end") ||
-        (isSessionProtocolEvent && envelopeEventType === "turn-end");
-    const isTaskStarted =
-        ((contentType === "acp" || contentType === "codex") &&
-            dataType === "task_started") ||
-        (contentType === "session" && sessionEventType === "turn-start") ||
-        (isSessionProtocolEvent && envelopeEventType === "turn-start");
+    // The tangled per-Provider discriminator logic lives behind the pure
+    // `classifyTurnLifecycle` seam (turnLifecycleClassify.ts), exhaustively
+    // tested there; this handler only reacts to the verdict.
+    const rawContent = decrypted.content as RawLifecycleContent;
+    const { isTaskStarted, isTaskComplete } = classifyTurnLifecycle(rawContent);
 
     if (isTaskComplete || isTaskStarted) {
         log.log(

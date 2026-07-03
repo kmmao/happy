@@ -44,6 +44,11 @@ import {
 import { getCodexBashIconName } from "./codexBashPresentation";
 import { shouldHideToolCall, isEffectivelyHiddenToolCall } from "./shouldHideToolCall";
 import { summarizeToolResult } from "./summarizeToolResult";
+import {
+  resolveToolTitle,
+  resolveToolChildTitle,
+  resolveToolSubtitle,
+} from "./toolMetadataResolve";
 import { TOOLS_WITH_BUILTIN_SUBMIT_UI } from "./toolsWithBuiltinSubmitUI";
 
 interface ToolViewProps {
@@ -231,23 +236,12 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       />
     );
   } else if (knownTool?.title) {
-    if (typeof knownTool.title === "function") {
-      toolTitle = knownTool.title({ tool, metadata: props.metadata });
-    } else {
-      toolTitle = knownTool.title;
-    }
+    toolTitle = resolveToolTitle(knownTool, tool, props.metadata);
   }
 
-  if (
-    knownTool &&
-    typeof knownTool.extractSubtitle === "function" &&
-    !isSessionCompact
-  ) {
-    const subtitle = knownTool.extractSubtitle({
-      tool,
-      metadata: props.metadata,
-    });
-    if (typeof subtitle === "string" && subtitle) {
+  if (!isSessionCompact) {
+    const subtitle = resolveToolSubtitle(knownTool, tool, props.metadata);
+    if (subtitle) {
       description = subtitle;
     }
   }
@@ -265,26 +259,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         const childKnown = knownTools[
           m.tool.name as keyof typeof knownTools
         ] as any;
-        let childTitle = m.tool.name;
-        if (childKnown) {
-          if (
-            "extractDescription" in childKnown &&
-            typeof childKnown.extractDescription === "function"
-          ) {
-            childTitle = childKnown.extractDescription({
-              tool: m.tool,
-              metadata: props.metadata,
-            });
-          } else if (typeof childKnown.title === "function") {
-            childTitle = childKnown.title({
-              tool: m.tool,
-              metadata: props.metadata,
-            });
-          } else if (childKnown.title) {
-            childTitle = childKnown.title;
-          }
-        }
-        description = childTitle;
+        description = resolveToolChildTitle(childKnown, m.tool, props.metadata);
         break;
       }
     }

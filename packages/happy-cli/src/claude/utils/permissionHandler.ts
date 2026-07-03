@@ -5,9 +5,8 @@
  * Handles tool permission requests, responses, and state management.
  */
 
-import { isDeepStrictEqual } from "node:util";
 import { logger } from "@/lib";
-import { ClaudeJsonlAssistantMessage, ClaudeJsonlMessage, ClaudeJsonlUserMessage } from "../jsonl";
+import { ClaudeJsonlMessage } from "../jsonl";
 import type { PermissionResult, PermissionDecisionClassification } from "../jsonl/types";
 import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "../jsonl/prompts";
 import { Session } from "../session";
@@ -15,6 +14,8 @@ import { getToolName } from "./getToolName";
 import { EnhancedMode, PermissionMode } from "../loop";
 import { getToolDescriptor } from "./getToolDescriptor";
 import { delay } from "@/utils/time";
+import { createAllowedToolMatcher } from "./allowedToolMatcher";
+import { createToolCallTracker } from "./toolCallTracker";
 
 interface PermissionResponse {
   id: string;
@@ -38,14 +39,13 @@ interface PendingRequest {
 const BYPASS_MODES: ReadonlySet<string> = new Set(["bypassPermissions", "yolo"]);
 
 export class PermissionHandler {
-  private toolCalls: { id: string; name: string; input: any; used: boolean }[] =
-    [];
+  // JSONL tool_use ↔ canCallTool matching lives behind this pure seam.
+  private tracker = createToolCallTracker();
   private responses = new Map<string, PermissionResponse>();
   private pendingRequests = new Map<string, PendingRequest>();
   private session: Session;
-  private allowedTools = new Set<string>();
-  private allowedBashLiterals = new Set<string>();
-  private allowedBashPrefixes = new Set<string>();
+  // Session-wide "already granted" grant/check invariant lives behind this pure seam.
+  private allowed = createAllowedToolMatcher();
   private permissionMode: PermissionMode = "default";
   private onPermissionRequestCallback?: (toolCallId: string) => void;
 
@@ -92,13 +92,7 @@ export class PermissionHandler {
   ): void {
     // Update allowed tools
     if (response.allowTools && response.allowTools.length > 0) {
-      response.allowTools.forEach((tool) => {
-        if (tool.startsWith("Bash(") || tool === "Bash") {
-          this.parseBashPermission(tool);
-        } else {
-          this.allowedTools.add(tool);
-        }
-      });
+      response.allowTools.forEach((tool) => this.allowed.grant(tool));
     }
 
     // Update permission mode
@@ -195,10 +189,10 @@ export class PermissionHandler {
       }
 
       // In other modes: go through the normal approval flow (shows Yes/No buttons in App)
-      let toolCallId = this.resolveToolCallId(toolName, input);
+      let toolCallId = this.tracker.resolveId(toolName, input);
       if (!toolCallId) {
         await delay(1000);
-        toolCallId = this.resolveToolCallId(toolName, input);
+        toolCallId = this.tracker.resolveId(toolName, input);
         if (!toolCallId) {
           throw new Error(`Could not resolve tool call ID for ${toolName}`);
         }
@@ -211,28 +205,8 @@ export class PermissionHandler {
       );
     }
 
-    // Check if tool is explicitly allowed
-    if (toolName === "Bash") {
-      const inputObj = input as { command?: string };
-      if (inputObj?.command) {
-        // Check literal matches
-        if (this.allowedBashLiterals.has(inputObj.command)) {
-          return {
-            behavior: "allow",
-            updatedInput: input as Record<string, unknown>,
-          };
-        }
-        // Check prefix matches
-        for (const prefix of this.allowedBashPrefixes) {
-          if (inputObj.command.startsWith(prefix)) {
-            return {
-              behavior: "allow",
-              updatedInput: input as Record<string, unknown>,
-            };
-          }
-        }
-      }
-    } else if (this.allowedTools.has(toolName)) {
+    // Check if tool is explicitly allowed (session-wide grant, incl. Bash patterns)
+    if (this.allowed.isPreAllowed(toolName, input)) {
       return {
         behavior: "allow",
         updatedInput: input as Record<string, unknown>,
@@ -274,11 +248,11 @@ export class PermissionHandler {
     // Approval flow
     //
 
-    let toolCallId = this.resolveToolCallId(toolName, input);
+    let toolCallId = this.tracker.resolveId(toolName, input);
     if (!toolCallId) {
       // What if we got permission before tool call
       await delay(1000);
-      toolCallId = this.resolveToolCallId(toolName, input);
+      toolCallId = this.tracker.resolveId(toolName, input);
       if (!toolCallId) {
         throw new Error(`Could not resolve tool call ID for ${toolName}`);
       }
@@ -367,10 +341,10 @@ export class PermissionHandler {
     toolName: string,
     input: unknown,
   ): Promise<PermissionResult> {
-    let toolCallId = this.resolveToolCallId(toolName, input);
+    let toolCallId = this.tracker.resolveId(toolName, input);
     if (!toolCallId) {
       await delay(1000);
-      toolCallId = this.resolveToolCallId(toolName, input);
+      toolCallId = this.tracker.resolveId(toolName, input);
       if (!toolCallId) {
         throw new Error(`Could not resolve tool call ID for ${toolName}`);
       }
@@ -389,10 +363,7 @@ export class PermissionHandler {
     });
 
     // Mark the tool call as used
-    const toolCall = this.toolCalls.find((tc) => tc.id === toolCallId);
-    if (toolCall) {
-      toolCall.used = true;
-    }
+    this.tracker.markUsed(toolCallId);
 
     // Queue PLAN_FAKE_RESTART to trigger session restart in the outer loop
     this.session.queue.unshift(PLAN_FAKE_RESTART, {
@@ -421,92 +392,11 @@ export class PermissionHandler {
   }
 
   /**
-   * Parses Bash permission strings into literal and prefix sets
-   */
-  private parseBashPermission(permission: string): void {
-    // Ignore plain "Bash"
-    if (permission === "Bash") {
-      return;
-    }
-
-    // Match Bash(command) or Bash(command:*)
-    const bashPattern = /^Bash\((.+?)\)$/;
-    const match = permission.match(bashPattern);
-
-    if (!match) {
-      return;
-    }
-
-    const command = match[1];
-
-    // Check if it's a prefix pattern (ends with :*)
-    if (command.endsWith(":*")) {
-      const prefix = command.slice(0, -2); // Remove :*
-      this.allowedBashPrefixes.add(prefix);
-    } else {
-      // Literal match
-      this.allowedBashLiterals.add(command);
-    }
-  }
-
-  /**
-   * Resolves tool call ID based on tool name and input
-   */
-  private resolveToolCallId(name: string, args: any): string | null {
-    // Search in reverse (most recent first)
-    for (let i = this.toolCalls.length - 1; i >= 0; i--) {
-      const call = this.toolCalls[i];
-      if (call.name === name && isDeepStrictEqual(call.input, args)) {
-        if (call.used) {
-          return null;
-        }
-        // Found unused match - mark as used and return
-        call.used = true;
-        return call.id;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Handles messages to track tool calls
+   * Handles messages to track tool calls. Delegates to the pure tool-call
+   * tracker seam (toolCallTracker.ts).
    */
   onMessage(message: ClaudeJsonlMessage): void {
-    if (message.type === "assistant") {
-      const assistantMsg = message as ClaudeJsonlAssistantMessage;
-      if (assistantMsg.message && assistantMsg.message.content) {
-        for (const block of assistantMsg.message.content) {
-          if (block.type === "tool_use") {
-            this.toolCalls.push({
-              id: block.id!,
-              name: block.name!,
-              input: block.input,
-              used: false,
-            });
-          }
-        }
-      }
-    }
-    if (message.type === "user") {
-      const userMsg = message as ClaudeJsonlUserMessage;
-      if (
-        userMsg.message &&
-        userMsg.message.content &&
-        Array.isArray(userMsg.message.content)
-      ) {
-        for (const block of userMsg.message.content) {
-          if (block.type === "tool_result" && block.tool_use_id) {
-            const toolCall = this.toolCalls.find(
-              (tc) => tc.id === block.tool_use_id,
-            );
-            if (toolCall && !toolCall.used) {
-              toolCall.used = true;
-            }
-          }
-        }
-      }
-    }
+    this.tracker.ingest(message);
   }
 
   /**
@@ -519,11 +409,7 @@ export class PermissionHandler {
     }
 
     // Always abort exit_plan_mode
-    const toolCall = this.toolCalls.find((tc) => tc.id === toolCallId);
-    if (
-      toolCall &&
-      (toolCall.name === "exit_plan_mode" || toolCall.name === "ExitPlanMode")
-    ) {
+    if (this.tracker.isExitPlanCall(toolCallId)) {
       return true;
     }
 
@@ -535,11 +421,9 @@ export class PermissionHandler {
    * Resets all state for new sessions
    */
   reset(reason: string = 'Session switched to local mode'): void {
-    this.toolCalls = [];
+    this.tracker.clear();
     this.responses.clear();
-    this.allowedTools.clear();
-    this.allowedBashLiterals.clear();
-    this.allowedBashPrefixes.clear();
+    this.allowed.clear();
 
     // Cancel all pending requests
     for (const [, pending] of this.pendingRequests.entries()) {

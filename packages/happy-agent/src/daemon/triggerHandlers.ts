@@ -4,13 +4,13 @@
  * deduplication, concurrency limits, and retry.
  */
 
-import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { logger } from "../logger";
 import { spawnSession } from "./spawnSession";
 import { bindJobToSessionExit } from "./bindJobToSessionExit";
+import { writePromptFile as writePromptFileTo } from "./promptFileWriter";
 import type { MachineClient } from "../api/machineClient";
 import type { AutomationScheduler } from "./scheduler";
 
@@ -71,11 +71,7 @@ const PROMPT_DIR = join(tmpdir(), "happy", "agent-prompts");
 // ---------------------------------------------------------------------------
 
 async function writePromptFile(prefix: string, content: string): Promise<string> {
-  await mkdir(PROMPT_DIR, { recursive: true });
-  const filename = `${prefix}-${Date.now()}.md`;
-  const filepath = join(PROMPT_DIR, filename);
-  await writeFile(filepath, content, "utf-8");
-  return filepath;
+  return writePromptFileTo(PROMPT_DIR, `${prefix}-${Date.now()}.md`, content);
 }
 
 function buildWebhookPrompt(data: WebhookTriggerData): string {
@@ -114,6 +110,42 @@ function mapTaskPriority(priority: string): "urgent" | "user" | "background" {
   if (priority === "urgent" || priority === "high") return "urgent";
   if (priority === "background" || priority === "low") return "background";
   return "user";
+}
+
+/**
+ * Build the spawn environment for a task trigger. Pure, so the two bug-prone
+ * invariants it carries are testable without spawning a session: (1) the
+ * profile-resolved env is applied FIRST so task-specific `HAPPY_TASK_*` vars win
+ * on collision, and (2) skill contents expand into indexed `HAPPY_TASK_SKILL_i_*`
+ * vars plus a `_COUNT`. The webhook/supervisor triggers keep their env inline —
+ * their maps are trivial literals in a different var namespace, with no shared
+ * invariant to concentrate (so no unified builder).
+ */
+export function buildTaskSpawnEnv(
+  data: TaskTriggerData,
+  promptFile: string,
+  serverUrl: string,
+): Record<string, string> {
+  const skillEnv: Record<string, string> = {};
+  if (data.skillContents?.length) {
+    skillEnv.HAPPY_TASK_SKILL_COUNT = String(data.skillContents.length);
+    for (let i = 0; i < data.skillContents.length; i++) {
+      skillEnv[`HAPPY_TASK_SKILL_${i}_NAME`] = data.skillContents[i].name;
+      skillEnv[`HAPPY_TASK_SKILL_${i}_CONTENT`] = data.skillContents[i].content;
+    }
+  }
+
+  return {
+    // Profile-resolved env applied first so task-specific overrides win.
+    ...(data.runtimeProfile?.environmentVariables ?? {}),
+    HAPPY_INITIAL_PROMPT_FILE: promptFile,
+    HAPPY_TASK_ID: data.taskId,
+    HAPPY_TASK_PRIORITY: data.priority,
+    HAPPY_TASK_SERVER_URL: serverUrl,
+    HAPPY_TASK_RESULT_TOKEN: data.resultToken ?? "",
+    HAPPY_TASK_REPORT_URL: `${serverUrl}/v1/tasks/${data.taskId}/result`,
+    ...skillEnv,
+  };
 }
 
 export function handleWebhookTrigger(
@@ -237,30 +269,11 @@ export function handleTaskTrigger(
     run: async (jobId) => {
       const promptFile = await writePromptFile("task", data.prompt);
 
-      const skillEnv: Record<string, string> = {};
-      if (data.skillContents?.length) {
-        skillEnv.HAPPY_TASK_SKILL_COUNT = String(data.skillContents.length);
-        for (let i = 0; i < data.skillContents.length; i++) {
-          skillEnv[`HAPPY_TASK_SKILL_${i}_NAME`] = data.skillContents[i].name;
-          skillEnv[`HAPPY_TASK_SKILL_${i}_CONTENT`] = data.skillContents[i].content;
-        }
-      }
-
       const result = await spawnSession({
         directory: data.directory,
         approvedNewDirectoryCreation: true,
         automationContext: { kind: "task", trigger: "task-dispatch", projectId: data.projectId },
-        environmentVariables: {
-          // Profile-resolved env applied first so task-specific overrides win.
-          ...(data.runtimeProfile?.environmentVariables ?? {}),
-          HAPPY_INITIAL_PROMPT_FILE: promptFile,
-          HAPPY_TASK_ID: data.taskId,
-          HAPPY_TASK_PRIORITY: data.priority,
-          HAPPY_TASK_SERVER_URL: serverUrl,
-          HAPPY_TASK_RESULT_TOKEN: data.resultToken ?? "",
-          HAPPY_TASK_REPORT_URL: `${serverUrl}/v1/tasks/${data.taskId}/result`,
-          ...skillEnv,
-        },
+        environmentVariables: buildTaskSpawnEnv(data, promptFile, serverUrl),
       });
 
       if (result.type !== "success") {

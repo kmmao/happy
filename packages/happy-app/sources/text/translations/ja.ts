@@ -4454,6 +4454,7 @@ export const ja: TranslationStructure = {
     loopStatus_failed: "ループ失敗",
     loopStatus_stopped: "ループ停止",
     loopExit_max_iterations: "最大イテレーション数に到達",
+    loopExit_daily_limit: "1日の実行上限に達しました",
     loopExit_cost_cap: "コスト上限に到達",
     loopExit_health_target: "ヘルス目標に到達",
     loopExit_no_new_actions: "修正すべき問題がありません",

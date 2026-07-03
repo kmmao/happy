@@ -209,12 +209,285 @@ export function closeClaudeTurnWithStatus(
   };
 }
 
+/**
+ * The accumulators every per-message-type handler threads through. Handlers
+ * push envelopes and drop-reasons here instead of each rebuilding the
+ * `ClaudeMapperResult` boilerplate; the dispatcher stamps the turn cursor once.
+ */
+type MapperSink = {
+  envelopes: SessionEnvelope[];
+  dropped: DroppedMessage[];
+};
+
+function makeResult(
+  state: ClaudeSessionProtocolState,
+  sink: MapperSink,
+): ClaudeMapperResult {
+  return {
+    currentTurnId: state.currentTurnId,
+    envelopes: sink.envelopes,
+    dropped: sink.dropped,
+  };
+}
+
+/**
+ * Emit one assistant `tool_use` block: allocate the call id, register a Task /
+ * Agent subagent, emit the `tool-call-start` envelope, then replay any messages
+ * that were buffered waiting for this call to appear. Isolated so the
+ * subagent-linking + buffered-replay invariants live in one testable place
+ * instead of being inlined in the assistant loop.
+ */
+function emitAssistantToolUse(
+  state: ClaudeSessionProtocolState,
+  block: { id?: unknown; name?: unknown; input?: unknown },
+  subagent: string | undefined,
+  assistantClaudeUuid: string | undefined,
+  sink: MapperSink,
+): void {
+  const call =
+    typeof block.id === "string" && block.id.length > 0
+      ? block.id
+      : createId();
+  const name =
+    typeof block.name === "string" && block.name.length > 0
+      ? block.name
+      : "unknown";
+  const args = toToolArgs(block.input);
+  const title = toolTitle(name, block.input);
+  const sessionSubagentForCall = state.subagents.ensureSessionId(call);
+  if (name === "Task" || name === "Agent") {
+    state.subagents.registerTaskCall(call, block.input);
+    // Inject subagent ID into args for App-side sidechain linking
+    if (sessionSubagentForCall) {
+      args._subagentId = sessionSubagentForCall;
+    }
+    // Fall through to emit tool-call-start envelope like regular tools
+  }
+
+  emitContent(
+    state,
+    {
+      t: "tool-call-start",
+      call,
+      name,
+      title,
+      description: title,
+      args,
+    },
+    subagent,
+    sink.envelopes,
+    assistantClaudeUuid,
+  );
+  const buffered = state.subagents.consumeBuffered(call);
+  for (const bufferedMessage of buffered) {
+    const replay = mapClaudeLogMessageToSessionEnvelopes(bufferedMessage, state);
+    sink.envelopes.push(...replay.envelopes);
+    sink.dropped.push(...replay.dropped);
+  }
+}
+
+/** Map an `assistant` record's content blocks (text / thinking / tool_use). */
+function handleAssistantMessage(
+  message: Extract<RawJSONLines, { type: "assistant" }>,
+  state: ClaudeSessionProtocolState,
+  subagent: string | undefined,
+  sink: MapperSink,
+): void {
+  const blocks = Array.isArray(message.message?.content)
+    ? message.message.content
+    : [];
+  // Same record-level UUID is threaded onto every envelope emitted from
+  // this assistant message, so a multi-block message (text + tool_use)
+  // shares a single fork anchor pointing at the source JSONL record.
+  const assistantClaudeUuid = pickUuid(message);
+
+  for (const block of blocks) {
+    if (block.type === "text" && typeof block.text === "string") {
+      emitContent(
+        state,
+        { t: "text", text: block.text },
+        subagent,
+        sink.envelopes,
+        assistantClaudeUuid,
+      );
+      continue;
+    }
+
+    if (block.type === "thinking" && typeof block.thinking === "string") {
+      // Opus 4.7+ defaults to thinking.display="omitted" — the API returns
+      // an empty `thinking` field plus a signature. Skip empty blocks so the
+      // App doesn't render an orphan "Thinking" header with no content.
+      if (block.thinking.length === 0) {
+        continue;
+      }
+      emitContent(
+        state,
+        { t: "text", text: block.thinking, thinking: true },
+        subagent,
+        sink.envelopes,
+        assistantClaudeUuid,
+      );
+      continue;
+    }
+
+    if (block.type === "tool_use") {
+      emitAssistantToolUse(state, block, subagent, assistantClaudeUuid, sink);
+    }
+  }
+}
+
+/**
+ * Emit one user `tool_result` block: auto-stop the matching subagent, build the
+ * `tool-call-end` envelope, and lift background-task metadata out of a Bash
+ * result. Isolated so the subagent-stop + background-task parsing invariants
+ * are testable independent of the surrounding user-message loop.
+ */
+function emitUserToolResult(
+  state: ClaudeSessionProtocolState,
+  message: Extract<RawJSONLines, { type: "user" }>,
+  block: { tool_use_id: string; content?: unknown },
+  subagent: string | undefined,
+  userBlocksClaudeUuid: string | undefined,
+  sink: MapperSink,
+): void {
+  const sessionSubagentForToolResult = state.subagents.sessionIdFor(
+    block.tool_use_id,
+  );
+  if (!message.isSidechain && sessionSubagentForToolResult) {
+    applyIntent(
+      state,
+      { kind: "subagentStop", subagent: sessionSubagentForToolResult },
+      sink.envelopes,
+    );
+  }
+  const toolCallEnd: Record<string, unknown> = {
+    t: "tool-call-end",
+    call: block.tool_use_id,
+  };
+
+  // Extract background task metadata from Bash tool_result
+  const resultContent =
+    typeof block.content === "string" ? block.content : "";
+  const bgMatch = resultContent.match(
+    /Command running in background with ID: (\S+)\. Output is being written to: (\S+)/,
+  );
+  if (bgMatch) {
+    toolCallEnd.backgroundTaskId = bgMatch[1];
+    toolCallEnd.outputFile = bgMatch[2];
+  }
+
+  emitContent(
+    state,
+    toolCallEnd as unknown as SessionEvent,
+    subagent,
+    sink.envelopes,
+    userBlocksClaudeUuid,
+  );
+}
+
+/**
+ * Map a `user` record. Three shapes: string content (opens a real user turn, or
+ * relays a sidechain line), or an array of tool_result / text blocks. Returns
+ * `false` for the two whole-message drop cases (meta, empty) so the dispatcher
+ * can record the reason; returns `true` once any envelope path is taken.
+ */
+function handleUserMessage(
+  message: Extract<RawJSONLines, { type: "user" }>,
+  state: ClaudeSessionProtocolState,
+  subagent: string | undefined,
+  sink: MapperSink,
+): DropReason | null {
+  // SDK-injected synthetic user messages (e.g. the Skill tool feeds
+  // the skill prompt back to Claude as a 'user' message with
+  // isMeta=true so the model sees it but the human shouldn't).
+  // Without this skip the prompt body — easily 10–20k characters —
+  // gets emitted as an agent-text envelope and lands in the chat as
+  // a wall of text.
+  if (message.isMeta) {
+    return "meta-user-message";
+  }
+
+  if (typeof message.message.content === "string") {
+    if (message.isSidechain) {
+      emitContent(
+        state,
+        { t: "text", text: message.message.content },
+        subagent,
+        sink.envelopes,
+        pickUuid(message),
+      );
+    } else {
+      closeTurn(state, "completed", sink.envelopes);
+      const userUuid = pickUuid(message);
+      sink.envelopes.push(
+        createEnvelope("user", { t: "text", text: message.message.content }, {
+          id: userUuid,
+          ...(userUuid ? { claudeUuid: userUuid } : {}),
+        }),
+      );
+    }
+    return null;
+  }
+
+  const blocks = Array.isArray(message.message.content)
+    ? message.message.content
+    : [];
+  if (blocks.length === 0) {
+    return "empty-user-content";
+  }
+  // Single anchor per source record — same idea as the assistant branch:
+  // tool_result + sidechain text blocks emitted from one user message all
+  // point at the same JSONL UUID for fork purposes.
+  const userBlocksClaudeUuid = pickUuid(message);
+
+  for (const block of blocks) {
+    if (
+      block.type === "tool_result" &&
+      typeof block.tool_use_id === "string" &&
+      block.tool_use_id.length > 0
+    ) {
+      emitUserToolResult(
+        state,
+        message,
+        block as { tool_use_id: string; content?: unknown },
+        subagent,
+        userBlocksClaudeUuid,
+        sink,
+      );
+      continue;
+    }
+
+    if (
+      block.type === "text" &&
+      typeof block.text === "string" &&
+      block.text.trim().length > 0
+    ) {
+      emitContent(
+        state,
+        { t: "text", text: block.text },
+        subagent,
+        sink.envelopes,
+        userBlocksClaudeUuid,
+      );
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Dispatch one raw Claude JSONL record to its per-type handler. This function
+ * owns only the shared preamble — Subagent identity resolution + the
+ * pending-parent buffering deferral — and the type switch; every message
+ * type's real work lives behind a named handler seam
+ * (`handleAssistantMessage` / `handleUserMessage`) so each concern is testable
+ * on its own and a reader sees the whole shape at a glance.
+ */
 export function mapClaudeLogMessageToSessionEnvelopes(
   message: RawJSONLines,
   state: ClaudeSessionProtocolState,
 ): ClaudeMapperResult {
-  const envelopes: SessionEnvelope[] = [];
-  const dropped: DroppedMessage[] = [];
+  const sink: MapperSink = { envelopes: [], dropped: [] };
   const providerSubagent = state.subagents.resolveProvider(message);
   const subagent = providerSubagent
     ? state.subagents.sessionIdFor(providerSubagent)
@@ -223,245 +496,33 @@ export function mapClaudeLogMessageToSessionEnvelopes(
 
   if (providerSubagent && !subagent) {
     state.subagents.buffer(providerSubagent, message);
-    return {
-      currentTurnId: state.currentTurnId,
-      envelopes,
-      dropped: [{ type: message.type, reason: "buffered-pending-subagent" }],
-    };
+    sink.dropped.push({ type: message.type, reason: "buffered-pending-subagent" });
+    return makeResult(state, sink);
   }
 
-  if (message.type === "summary") {
-    return {
-      currentTurnId: state.currentTurnId,
-      envelopes,
-      dropped: [{ type: message.type, reason: "summary-message" }],
-    };
+  switch (message.type) {
+    case "summary":
+      sink.dropped.push({ type: message.type, reason: "summary-message" });
+      return makeResult(state, sink);
+
+    case "system":
+      sink.dropped.push({ type: message.type, reason: "system-message" });
+      return makeResult(state, sink);
+
+    case "assistant":
+      handleAssistantMessage(message, state, subagent, sink);
+      return makeResult(state, sink);
+
+    case "user": {
+      const dropReason = handleUserMessage(message, state, subagent, sink);
+      if (dropReason) {
+        sink.dropped.push({ type: message.type, reason: dropReason });
+      }
+      return makeResult(state, sink);
+    }
+
+    default:
+      sink.dropped.push({ type: message.type, reason: "unhandled-message-type" });
+      return makeResult(state, sink);
   }
-
-  if (message.type === "system") {
-    return {
-      currentTurnId: state.currentTurnId,
-      envelopes,
-      dropped: [{ type: message.type, reason: "system-message" }],
-    };
-  }
-
-  if (message.type === "assistant") {
-    const blocks = Array.isArray(message.message?.content)
-      ? message.message.content
-      : [];
-    // Same record-level UUID is threaded onto every envelope emitted from
-    // this assistant message, so a multi-block message (text + tool_use)
-    // shares a single fork anchor pointing at the source JSONL record.
-    const assistantClaudeUuid = pickUuid(message);
-
-    for (const block of blocks) {
-      if (block.type === "text" && typeof block.text === "string") {
-        emitContent(
-          state,
-          { t: "text", text: block.text },
-          subagent,
-          envelopes,
-          assistantClaudeUuid,
-        );
-        continue;
-      }
-
-      if (block.type === "thinking" && typeof block.thinking === "string") {
-        // Opus 4.7+ defaults to thinking.display="omitted" — the API returns
-        // an empty `thinking` field plus a signature. Skip empty blocks so the
-        // App doesn't render an orphan "Thinking" header with no content.
-        if (block.thinking.length === 0) {
-          continue;
-        }
-        emitContent(
-          state,
-          { t: "text", text: block.thinking, thinking: true },
-          subagent,
-          envelopes,
-          assistantClaudeUuid,
-        );
-        continue;
-      }
-
-      if (block.type === "tool_use") {
-        const call =
-          typeof block.id === "string" && block.id.length > 0
-            ? block.id
-            : createId();
-        const name =
-          typeof block.name === "string" && block.name.length > 0
-            ? block.name
-            : "unknown";
-        const args = toToolArgs(block.input);
-        const title = toolTitle(name, block.input);
-        const sessionSubagentForCall = state.subagents.ensureSessionId(call);
-        if (name === "Task" || name === "Agent") {
-          state.subagents.registerTaskCall(call, block.input);
-          // Inject subagent ID into args for App-side sidechain linking
-          if (sessionSubagentForCall) {
-            args._subagentId = sessionSubagentForCall;
-          }
-          // Fall through to emit tool-call-start envelope like regular tools
-        }
-
-        emitContent(
-          state,
-          {
-            t: "tool-call-start",
-            call,
-            name,
-            title,
-            description: title,
-            args,
-          },
-          subagent,
-          envelopes,
-          assistantClaudeUuid,
-        );
-        const buffered = state.subagents.consumeBuffered(call);
-        for (const bufferedMessage of buffered) {
-          const replay = mapClaudeLogMessageToSessionEnvelopes(
-            bufferedMessage,
-            state,
-          );
-          envelopes.push(...replay.envelopes);
-          dropped.push(...replay.dropped);
-        }
-      }
-    }
-
-    return {
-      currentTurnId: state.currentTurnId,
-      envelopes,
-      dropped,
-    };
-  }
-
-  if (message.type === "user") {
-    // SDK-injected synthetic user messages (e.g. the Skill tool feeds
-    // the skill prompt back to Claude as a 'user' message with
-    // isMeta=true so the model sees it but the human shouldn't).
-    // Without this skip the prompt body — easily 10–20k characters —
-    // gets emitted as an agent-text envelope and lands in the chat as
-    // a wall of text.
-    if (message.isMeta) {
-      return {
-        currentTurnId: state.currentTurnId,
-        envelopes,
-        dropped: [{ type: message.type, reason: "meta-user-message" }],
-      };
-    }
-
-    if (typeof message.message.content === "string") {
-      if (message.isSidechain) {
-        emitContent(
-          state,
-          { t: "text", text: message.message.content },
-          subagent,
-          envelopes,
-          pickUuid(message),
-        );
-      } else {
-        closeTurn(state, "completed", envelopes);
-        const userUuid = pickUuid(message);
-        envelopes.push(
-          createEnvelope("user", { t: "text", text: message.message.content }, {
-            id: userUuid,
-            ...(userUuid ? { claudeUuid: userUuid } : {}),
-          }),
-        );
-      }
-
-      return {
-        currentTurnId: state.currentTurnId,
-        envelopes,
-        dropped,
-      };
-    }
-
-    const blocks = Array.isArray(message.message.content)
-      ? message.message.content
-      : [];
-    if (blocks.length === 0) {
-      return {
-        currentTurnId: state.currentTurnId,
-        envelopes,
-        dropped: [{ type: message.type, reason: "empty-user-content" }],
-      };
-    }
-    // Single anchor per source record — same idea as the assistant branch:
-    // tool_result + sidechain text blocks emitted from one user message all
-    // point at the same JSONL UUID for fork purposes.
-    const userBlocksClaudeUuid = pickUuid(message);
-
-    for (const block of blocks) {
-      if (
-        block.type === "tool_result" &&
-        typeof block.tool_use_id === "string" &&
-        block.tool_use_id.length > 0
-      ) {
-        const sessionSubagentForToolResult = state.subagents.sessionIdFor(
-          block.tool_use_id,
-        );
-        if (!message.isSidechain && sessionSubagentForToolResult) {
-          applyIntent(
-            state,
-            { kind: "subagentStop", subagent: sessionSubagentForToolResult },
-            envelopes,
-          );
-        }
-        const toolCallEnd: Record<string, unknown> = {
-          t: "tool-call-end",
-          call: block.tool_use_id,
-        };
-
-        // Extract background task metadata from Bash tool_result
-        const resultContent =
-          typeof block.content === "string" ? block.content : "";
-        const bgMatch = resultContent.match(
-          /Command running in background with ID: (\S+)\. Output is being written to: (\S+)/,
-        );
-        if (bgMatch) {
-          toolCallEnd.backgroundTaskId = bgMatch[1];
-          toolCallEnd.outputFile = bgMatch[2];
-        }
-
-        emitContent(
-          state,
-          toolCallEnd as unknown as SessionEvent,
-          subagent,
-          envelopes,
-          userBlocksClaudeUuid,
-        );
-        continue;
-      }
-
-      if (
-        block.type === "text" &&
-        typeof block.text === "string" &&
-        block.text.trim().length > 0
-      ) {
-        emitContent(
-          state,
-          { t: "text", text: block.text },
-          subagent,
-          envelopes,
-          userBlocksClaudeUuid,
-        );
-      }
-    }
-
-    return {
-      currentTurnId: state.currentTurnId,
-      envelopes,
-      dropped,
-    };
-  }
-
-  return {
-    currentTurnId: state.currentTurnId,
-    envelopes,
-    dropped: [{ type: message.type, reason: "unhandled-message-type" }],
-  };
 }

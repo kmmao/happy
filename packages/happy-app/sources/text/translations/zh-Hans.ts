@@ -4376,6 +4376,7 @@ export const zhHans: TranslationStructure = {
     loopStatus_failed: "循环失败",
     loopStatus_stopped: "循环已停止",
     loopExit_max_iterations: "已达最大迭代次数",
+    loopExit_daily_limit: "已达到每日运行上限",
     loopExit_cost_cap: "已达费用上限",
     loopExit_health_target: "已达健康度目标",
     loopExit_no_new_actions: "没有更多问题需要修复",

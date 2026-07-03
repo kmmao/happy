@@ -5,6 +5,7 @@ import { log } from "@/utils/log";
 import { Socket } from "socket.io";
 import * as privacyKit from "privacy-kit";
 import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
+import { artifactCreate } from "@/app/api/artifact/artifactCreate";
 
 export function artifactUpdateHandler(userId: string, socket: Socket) {
     // Read artifact with full body
@@ -198,55 +199,24 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            // Check if artifact already exists
-            const existingArtifact = await db.artifact.findUnique({
-                where: { id }
+            // Intake (existence check, conflict rule, idempotency, initial row
+            // shape, new-artifact broadcast) lives in the artifactCreate seam.
+            const result = await artifactCreate({
+                accountId: userId,
+                id,
+                header,
+                body,
+                dataEncryptionKey,
             });
 
-            if (existingArtifact) {
-                // If exists for another account, return error
-                if (existingArtifact.accountId !== userId) {
-                    if (callback) {
-                        callback({ result: 'error', message: 'Artifact with this ID already exists for another account' });
-                    }
-                    return;
+            if (result.status === 'conflict') {
+                if (callback) {
+                    callback({ result: 'error', message: 'Artifact with this ID already exists for another account' });
                 }
-
-                // If exists for same account, return existing (idempotent)
-                callback({
-                    result: 'success',
-                    artifact: {
-                        id: existingArtifact.id,
-                        header: privacyKit.encodeBase64(existingArtifact.header),
-                        headerVersion: existingArtifact.headerVersion,
-                        body: privacyKit.encodeBase64(existingArtifact.body),
-                        bodyVersion: existingArtifact.bodyVersion,
-                        seq: existingArtifact.seq,
-                        createdAt: existingArtifact.createdAt.getTime(),
-                        updatedAt: existingArtifact.updatedAt.getTime()
-                    }
-                });
                 return;
             }
 
-            // Create new artifact
-            const artifact = await db.artifact.create({
-                data: {
-                    id,
-                    accountId: userId,
-                    header: privacyKit.decodeBase64(header),
-                    headerVersion: 1,
-                    body: privacyKit.decodeBase64(body),
-                    bodyVersion: 1,
-                    dataEncryptionKey: privacyKit.decodeBase64(dataEncryptionKey),
-                    seq: 0
-                }
-            });
-
-            // Broadcast new-artifact. Seam owns seq + id + recipient (ADR-0023).
-            await emitSyncUpdate(userId, { t: "new-artifact", artifact });
-
-            // Return created artifact
+            const artifact = result.artifact;
             callback({
                 result: 'success',
                 artifact: {

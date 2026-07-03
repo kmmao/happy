@@ -6,9 +6,10 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import { openBrowser } from '@/utils/browser';
-import { ClaudeAuthTokens, PKCECodes } from './types';
+import { ClaudeAuthTokens } from './types';
+import { generatePKCE, findAvailablePort, isPortAvailable } from './oauthUtils';
 import { logger } from '@/ui/logger';
 
 // Anthropic OAuth Configuration for Claude.ai
@@ -19,59 +20,10 @@ const DEFAULT_PORT = 54545;
 const SCOPE = 'user:inference';
 
 /**
- * Generate PKCE codes for OAuth flow
- */
-function generatePKCE(): PKCECodes {
-    // Generate code verifier (43-128 characters, base64url)
-    const verifier = randomBytes(32)
-        .toString('base64url')
-        .replace(/[^a-zA-Z0-9\-._~]/g, '');
-
-    // Generate code challenge (SHA256 of verifier, base64url encoded)
-    const challenge = createHash('sha256')
-        .update(verifier)
-        .digest('base64url')
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-
-    return { verifier, challenge };
-}
-
-/**
  * Generate random state for OAuth security
  */
 function generateState(): string {
     return randomBytes(32).toString('base64url');
-}
-
-/**
- * Find an available port for the callback server
- */
-async function findAvailablePort(): Promise<number> {
-    return new Promise((resolve) => {
-        const server = createServer();
-        server.listen(0, '127.0.0.1', () => {
-            const port = (server.address() as any).port;
-            server.close(() => resolve(port));
-        });
-    });
-}
-
-/**
- * Check if a port is available
- */
-async function isPortAvailable(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const testServer = createServer();
-        testServer.once('error', () => {
-            testServer.close();
-            resolve(false);
-        });
-        testServer.listen(port, '127.0.0.1', () => {
-            testServer.close(() => resolve(true));
-        });
-    });
 }
 
 /**

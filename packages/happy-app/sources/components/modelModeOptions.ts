@@ -304,6 +304,39 @@ export function getGeminiModelModes(): ModelMode[] {
   return GEMINI_MODEL_FALLBACKS;
 }
 
+/**
+ * Single source for permission-mode → i18n label-key, spanning Claude and Codex
+ * mode keys (plus the `yolo` alias that renders as bypassPermissions). Badge
+ * rendering (MessageView) reads it through `getPermissionModeLabel` instead of
+ * re-declaring the map, so a new mode is labelled everywhere by editing one
+ * place. `default` is intentionally absent — callers omit it from badges.
+ */
+const PERMISSION_MODE_LABEL_KEYS: Record<string, string> = {
+  acceptEdits: "agentInput.permissionMode.acceptEdits",
+  plan: "agentInput.permissionMode.plan",
+  dontAsk: "agentInput.permissionMode.dontAsk",
+  auto: "agentInput.permissionMode.auto",
+  bypassPermissions: "agentInput.permissionMode.bypassPermissions",
+  yolo: "agentInput.permissionMode.bypassPermissions",
+  readOnly: "agentInput.codexPermissionMode.readOnly",
+  safeYolo: "agentInput.codexPermissionMode.safeYolo",
+};
+
+/**
+ * Resolve a permission-mode key to its translated label, or null for the
+ * `default` mode / an unknown key (both of which should render no badge).
+ */
+export function getPermissionModeLabel(
+  modeKey: string | null | undefined,
+  translate: Translate,
+): string | null {
+  if (!modeKey || modeKey === "default") {
+    return null;
+  }
+  const transKey = PERMISSION_MODE_LABEL_KEYS[modeKey];
+  return transKey ? translate(transKey) : null;
+}
+
 export function getHardcodedPermissionModes(
   flavor: AgentFlavor,
   translate: Translate,

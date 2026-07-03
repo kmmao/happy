@@ -4486,6 +4486,7 @@ export const ca: TranslationStructure = {
     loopStatus_failed: "Bucle fallat",
     loopStatus_stopped: "Bucle aturat",
     loopExit_max_iterations: "S'ha assolit el màxim d'iteracions",
+    loopExit_daily_limit: "S'ha assolit el límit diari d'execucions",
     loopExit_cost_cap: "S'ha assolit el límit de cost",
     loopExit_health_target: "S'ha assolit l'objectiu de salut",
     loopExit_no_new_actions: "No hi ha més problemes per corregir",

@@ -6,8 +6,9 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { randomBytes, createHash } from 'crypto';
-import { CodexAuthTokens, PKCECodes } from './types';
+import { randomBytes } from 'crypto';
+import { CodexAuthTokens } from './types';
+import { generatePKCE, findAvailablePort, isPortAvailable } from './oauthUtils';
 import { openBrowser } from '@/utils/browser';
 import { logger } from '@/ui/logger';
 
@@ -15,26 +16,6 @@ import { logger } from '@/ui/logger';
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const AUTH_BASE_URL = 'https://auth.openai.com';
 const DEFAULT_PORT = 1455;
-
-/**
- * Generate PKCE codes for OAuth flow
- */
-function generatePKCE(): PKCECodes {
-    // Generate code verifier (43-128 characters, base64url)
-    const verifier = randomBytes(32)
-        .toString('base64url')
-        .replace(/[^a-zA-Z0-9\-._~]/g, '');
-
-    // Generate code challenge (SHA256 of verifier, base64url encoded)
-    const challenge = createHash('sha256')
-        .update(verifier)
-        .digest('base64url')
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-
-    return { verifier, challenge };
-}
 
 /**
  * Generate random state for OAuth security
@@ -54,35 +35,6 @@ function parseJWT(token: string): any {
 
     const payload = Buffer.from(parts[1], 'base64url').toString();
     return JSON.parse(payload);
-}
-
-/**
- * Find an available port for the callback server
- */
-async function findAvailablePort(): Promise<number> {
-    return new Promise((resolve) => {
-        const server = createServer();
-        server.listen(0, '127.0.0.1', () => {
-            const port = (server.address() as any).port;
-            server.close(() => resolve(port));
-        });
-    });
-}
-
-/**
- * Check if a port is available
- */
-async function isPortAvailable(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const testServer = createServer();
-        testServer.once('error', () => {
-            testServer.close();
-            resolve(false);
-        });
-        testServer.listen(port, '127.0.0.1', () => {
-            testServer.close(() => resolve(true));
-        });
-    });
 }
 
 /**

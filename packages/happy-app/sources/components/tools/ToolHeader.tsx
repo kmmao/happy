@@ -10,6 +10,10 @@ import {
     getToolProvider,
     type ToolProvider,
 } from '@/components/tools/toolProvider';
+import {
+    resolveToolTitle,
+    resolveToolSubtitle,
+} from '@/components/tools/toolMetadataResolve';
 
 interface ToolHeaderProps {
     tool: ToolCall;
@@ -26,28 +30,14 @@ export function ToolHeader({ tool, metadata = null, provider }: ToolHeaderProps)
         ? knownTools[tool.name as keyof typeof knownTools]
         : undefined;
 
-    // Handle optional title and function type
-    let toolTitle = tool.name;
-    if (knownTool?.title) {
-        if (typeof knownTool.title === 'function') {
-            toolTitle = knownTool.title({ tool, metadata });
-        } else {
-            toolTitle = knownTool.title;
-        }
-    }
+    // Title + subtitle resolution shared with ToolView via toolMetadataResolve.
+    const toolTitle = resolveToolTitle(knownTool, tool, metadata);
 
     const icon = knownTool?.icon
         ? knownTool.icon(18, headerTheme.iconColor)
         : <Ionicons name="construct-outline" size={18} color={headerTheme.iconColor} />;
 
-    // Extract subtitle using the same logic as ToolView
-    let subtitle = null;
-    if (knownTool && 'extractSubtitle' in knownTool && typeof knownTool.extractSubtitle === 'function') {
-        const extractedSubtitle = knownTool.extractSubtitle({ tool, metadata });
-        if (typeof extractedSubtitle === 'string' && extractedSubtitle) {
-            subtitle = extractedSubtitle;
-        }
-    }
+    const subtitle = resolveToolSubtitle(knownTool, tool, metadata);
 
     return (
         <View style={styles.container}>

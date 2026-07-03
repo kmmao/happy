@@ -5,6 +5,7 @@ import { z } from "zod";
 import { log } from "@/utils/log";
 import * as privacyKit from "privacy-kit";
 import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
+import { artifactCreate } from "@/app/api/artifact/artifactCreate";
 import { assertOwnedArtifact, ownedArtifact } from "../ownership";
 
 export function artifactsRoutes(app: Fastify) {
@@ -164,52 +165,23 @@ export function artifactsRoutes(app: Fastify) {
         const { id, header, body, dataEncryptionKey } = request.body;
 
         try {
-            // Check if artifact exists
-            const existingArtifact = await db.artifact.findUnique({
-                where: { id }
+            // Intake (existence check, conflict rule, idempotency, initial row
+            // shape, new-artifact broadcast) lives in the artifactCreate seam.
+            const result = await artifactCreate({
+                accountId: userId,
+                id,
+                header,
+                body,
+                dataEncryptionKey,
             });
 
-            if (existingArtifact) {
-                // If exists for another account, return conflict
-                if (existingArtifact.accountId !== userId) {
-                    return reply.code(409).send({ 
-                        error: 'Artifact with this ID already exists for another account' 
-                    });
-                }
-                
-                // If exists for same account, return existing (idempotent)
-                log({ module: 'api', artifactId: id, userId }, 'Found existing artifact');
-                return reply.send({
-                    id: existingArtifact.id,
-                    header: privacyKit.encodeBase64(existingArtifact.header),
-                    headerVersion: existingArtifact.headerVersion,
-                    body: privacyKit.encodeBase64(existingArtifact.body),
-                    bodyVersion: existingArtifact.bodyVersion,
-                    dataEncryptionKey: privacyKit.encodeBase64(existingArtifact.dataEncryptionKey),
-                    seq: existingArtifact.seq,
-                    createdAt: existingArtifact.createdAt.getTime(),
-                    updatedAt: existingArtifact.updatedAt.getTime()
+            if (result.status === 'conflict') {
+                return reply.code(409).send({
+                    error: 'Artifact with this ID already exists for another account'
                 });
             }
 
-            // Create new artifact
-            log({ module: 'api', artifactId: id, userId }, 'Creating new artifact');
-            const artifact = await db.artifact.create({
-                data: {
-                    id,
-                    accountId: userId,
-                    header: privacyKit.decodeBase64(header),
-                    headerVersion: 1,
-                    body: privacyKit.decodeBase64(body),
-                    bodyVersion: 1,
-                    dataEncryptionKey: privacyKit.decodeBase64(dataEncryptionKey),
-                    seq: 0
-                }
-            });
-
-            // Broadcast new-artifact. Seam owns seq + id + recipient (ADR-0023).
-            await emitSyncUpdate(userId, { t: "new-artifact", artifact });
-
+            const artifact = result.artifact;
             return reply.send({
                 id: artifact.id,
                 header: privacyKit.encodeBase64(artifact.header),

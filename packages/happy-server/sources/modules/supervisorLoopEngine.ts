@@ -80,6 +80,7 @@ export interface LoopConfig {
 
 export type LoopExitReason =
     | "max_iterations"
+    | "daily_limit"
     | "cost_cap"
     | "health_target"
     | "no_new_actions"
@@ -761,10 +762,12 @@ async function triggerNextAnalysis(
 ): Promise<void> {
     const nextIteration = loop.currentIteration + 1;
 
-    // Daily limit check
+    // Daily limit check. This is a distinct cap from the loop's own
+    // maxIterations — surfacing it as "daily_limit" (not "max_iterations") tells
+    // the user to wait for the daily reset rather than raise maxIterations.
     const limitCheck = await checkDailyRunLimit(projectId);
     if (!limitCheck.allowed) {
-        await completeLoop(userId, loop, "max_iterations");
+        await completeLoop(userId, loop, "daily_limit");
         return;
     }
 

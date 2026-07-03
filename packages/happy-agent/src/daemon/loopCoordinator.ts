@@ -15,9 +15,9 @@ import type { AutomationScheduler } from "./scheduler";
 import type { GuardianSessionRegistry } from "./guardianRegistry";
 import { spawnSession } from "./spawnSession";
 import { bindJobToSessionExit } from "./bindJobToSessionExit";
-import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { writePromptFile } from "./promptFileWriter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -303,15 +303,12 @@ export class AgentLoopCoordinator {
 // ---------------------------------------------------------------------------
 
 async function writeLoopPromptFile(name: string, prompt: string, iteration: number): Promise<string> {
-  await mkdir(PROMPT_DIR, { recursive: true });
   const filename = `loop-${name.replace(/[^a-zA-Z0-9-]/g, "_")}-${iteration}-${Date.now()}.md`;
-  const filepath = join(PROMPT_DIR, filename);
   const content = [
     `# Agent Loop: ${name}`,
     `Iteration: ${iteration}`,
     "",
     prompt,
   ].join("\n");
-  await writeFile(filepath, content, "utf-8");
-  return filepath;
+  return writePromptFile(PROMPT_DIR, filename, content);
 }

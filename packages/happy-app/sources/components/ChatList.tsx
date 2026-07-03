@@ -32,8 +32,8 @@ import {
   isTurnStartSeparator,
   type ChatDisplayItem,
   type FinalChatDisplayItem,
+  type ToolGroupItem,
 } from "./chatTimelineDisplay";
-import { type ToolGroupItem } from "@/hooks/useGroupedMessages";
 import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
 import { shouldLogChatListTiming } from "./chatListPerformanceTiming";
 import { log } from "@/log";

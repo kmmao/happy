@@ -3,6 +3,7 @@ import { inTx, afterTx } from "@/storage/inTx";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
+import { getSessionMachineIds } from "@/app/session/getSessionMachineIds";
 
 /**
  * Delete a session and all its related data.
@@ -65,11 +66,7 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
         }, `Detached ${detachedReports.count} usage reports (sessionId set to null)`);
 
         // 3. Query machine IDs before deleting access keys (used to notify CLI daemons)
-        const accessKeys = await tx.accessKey.findMany({
-            where: { sessionId },
-            select: { machineId: true }
-        });
-        const machineIds = [...new Set(accessKeys.map(ak => ak.machineId))];
+        const machineIds = await getSessionMachineIds(tx, sessionId);
 
         // 4. Delete access keys
         const deletedAccessKeys = await tx.accessKey.deleteMany({

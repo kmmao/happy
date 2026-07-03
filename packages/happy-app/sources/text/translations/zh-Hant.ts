@@ -4380,6 +4380,7 @@ export const zhHant: TranslationStructure = {
     loopStatus_failed: "循環失敗",
     loopStatus_stopped: "循環已停止",
     loopExit_max_iterations: "已達最大迭代次數",
+    loopExit_daily_limit: "已達到每日執行上限",
     loopExit_cost_cap: "已達費用上限",
     loopExit_health_target: "已達健康度目標",
     loopExit_no_new_actions: "沒有更多問題需要修復",

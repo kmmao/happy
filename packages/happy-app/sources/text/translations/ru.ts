@@ -4500,6 +4500,7 @@ export const ru: TranslationStructure = {
     loopStatus_failed: "Цикл не удался",
     loopStatus_stopped: "Цикл остановлен",
     loopExit_max_iterations: "Достигнуто максимальное число итераций",
+    loopExit_daily_limit: "Достигнут дневной лимит запусков",
     loopExit_cost_cap: "Достигнут лимит стоимости",
     loopExit_health_target: "Достигнута цель здоровья",
     loopExit_no_new_actions: "Больше нет проблем для исправления",

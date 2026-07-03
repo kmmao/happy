@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
     applyRunningWorkflowStatus,
+    buildSessionStatusDisplay,
     formatApiRetryStatus,
     getLatestUserRequestPreview,
     getSessionProviderDisplayLabel,
@@ -73,6 +74,63 @@ function createUserTextMessage(overrides: Partial<Message> & { text: string }): 
 }
 
 describe('sessionUtils', () => {
+    describe('buildSessionStatusDisplay', () => {
+        const vibing = 'vibing…';
+
+        it('renders disconnected in grey, not connected, no pulse', () => {
+            const r = buildSessionStatusDisplay('disconnected', createSession(), vibing);
+            expect(r.state).toBe('disconnected');
+            expect(r.isConnected).toBe(false);
+            expect(r.statusColor).toBe('#999');
+            expect(r.statusDotColor).toBe('#999');
+            expect(r.shouldShowStatus).toBe(true);
+            expect(r.isPulsing).toBeUndefined();
+        });
+
+        it('renders permission_required in amber and pulsing', () => {
+            const r = buildSessionStatusDisplay('permission_required', createSession(), vibing);
+            expect(r.state).toBe('permission_required');
+            expect(r.statusColor).toBe('#FF9500');
+            expect(r.isPulsing).toBe(true);
+        });
+
+        it('renders needs_attention in amber and pulsing', () => {
+            const r = buildSessionStatusDisplay('needs_attention', createSession(), vibing);
+            expect(r.statusColor).toBe('#FF9500');
+            expect(r.isPulsing).toBe(true);
+        });
+
+        it('renders thinking in blue with the vibing word', () => {
+            const r = buildSessionStatusDisplay('thinking', createSession(), vibing);
+            expect(r.state).toBe('thinking');
+            expect(r.statusColor).toBe('#007AFF');
+            expect(r.statusText).toBe(vibing);
+            expect(r.isPulsing).toBe(true);
+        });
+
+        it('renders thinking in amber with the api-retry status when retrying', () => {
+            const r = buildSessionStatusDisplay(
+                'thinking',
+                createSession({
+                    apiRetry: { attempt: 1, maxRetries: 3, retryDelayMs: 2000, errorStatus: 429 },
+                } as Partial<Session>),
+                vibing,
+            );
+            expect(r.state).toBe('thinking');
+            expect(r.statusColor).toBe('#FF9500');
+            expect(r.statusText).not.toBe(vibing);
+            expect(r.isPulsing).toBe(true);
+        });
+
+        it('renders waiting in green and hides the status', () => {
+            const r = buildSessionStatusDisplay('waiting', createSession(), vibing);
+            expect(r.state).toBe('waiting');
+            expect(r.statusColor).toBe('#34C759');
+            expect(r.shouldShowStatus).toBe(false);
+            expect(r.isPulsing).toBeUndefined();
+        });
+    });
+
     describe('formatApiRetryStatus', () => {
         it('shows a friendly retry message with remaining seconds for rate limits', () => {
             const statusText = formatApiRetryStatus({

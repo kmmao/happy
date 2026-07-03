@@ -10,6 +10,7 @@ import { AddressInfo } from "node:net";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
+import { createAskUserRegistry } from "@/claude/utils/askUserRegistry";
 import {
   buildAutoSummarySyntheticPrompt,
   HAPPY_AUTO_SUMMARY_SOURCE,
@@ -67,12 +68,6 @@ export async function queryProjectKnowledge(
  */
 const ASK_USER_TIMEOUT_MS = 30 * 60 * 1000;
 
-type PendingAskUser = {
-  resolve: (answers: Record<string, string>) => void;
-  reject: (err: Error) => void;
-  timer: NodeJS.Timeout;
-};
-
 export async function startHappyServer(client: ApiSessionClient) {
   logger.debug(`[happyMCP] server:start sessionId=${client.sessionId}`);
 
@@ -81,18 +76,14 @@ export async function startHappyServer(client: ApiSessionClient) {
   // answers via the `ask_user_response` RPC which looks the entry up and
   // resolves it. On session teardown all surviving entries are rejected so the
   // MCP handler returns isError instead of hanging the next turn.
-  const pendingAskUser = new Map<string, PendingAskUser>();
+  const askUserRegistry = createAskUserRegistry();
 
   const rejectAllPendingAskUser = (reason: string) => {
-    if (pendingAskUser.size === 0) return;
+    if (askUserRegistry.size === 0) return;
     logger.debug(
-      `[happyMCP] ask_user: rejecting ${pendingAskUser.size} pending entries (${reason})`,
+      `[happyMCP] ask_user: rejecting ${askUserRegistry.size} pending entries (${reason})`,
     );
-    for (const [, pending] of pendingAskUser) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(reason));
-    }
-    pendingAskUser.clear();
+    askUserRegistry.rejectAll(reason);
   };
 
   // Handler that sends title updates via the client
@@ -206,29 +197,25 @@ export async function startHappyServer(client: ApiSessionClient) {
   client.rpcHandlerManager.registerHandler<AskUserResponseRequest, { ok: true }>(
     "ask_user_response",
     async (req) => {
-      const pending = pendingAskUser.get(req.askId);
-      if (!pending) {
+      // Settle the pending ask via the registry. `canceled` (the picker's
+      // "取消选择" button) rejects so the tool handler's catch path records a
+      // canceled completedRequest and returns isError to Claude TUI; otherwise
+      // resolve with the answers. A false return means no live entry (already
+      // resolved or expired) — a no-op, matching the prior guard.
+      const settled = req.canceled
+        ? askUserRegistry.reject(
+            req.askId,
+            "User declined to answer this question",
+          )
+        : askUserRegistry.resolve(req.askId, req.answers ?? {});
+      if (!settled) {
         logger.debug(
           `[happyMCP] ask_user_response: no pending entry for askId=${req.askId} (likely already resolved or expired)`,
         );
-        return { ok: true };
-      }
-      pendingAskUser.delete(req.askId);
-      clearTimeout(pending.timer);
-      if (req.canceled) {
-        // User tapped the picker's "取消选择" button. Reject the pending MCP
-        // promise so the tool handler's catch path runs — that records a
-        // canceled entry in completedRequests and returns isError to Claude
-        // TUI, letting the model know it did not get an answer and should
-        // proceed differently (e.g. ask in plain text or pick defaults).
+      } else if (req.canceled) {
         logger.debug(
           `[happyMCP] ask_user_response: user declined askId=${req.askId}`,
         );
-        pending.reject(
-          new Error("User declined to answer this question"),
-        );
-      } else {
-        pending.resolve(req.answers ?? {});
       }
       return { ok: true };
     },
@@ -437,32 +424,15 @@ export async function startHappyServer(client: ApiSessionClient) {
       }
 
       const onAbort = () => {
-        const pending = pendingAskUser.get(askId);
-        if (!pending) return;
-        pendingAskUser.delete(askId);
-        clearTimeout(pending.timer);
-        pending.reject(
-          new Error(
-            "MCP client aborted the request (likely TUI-side timeout or cancel)",
-          ),
+        askUserRegistry.reject(
+          askId,
+          "MCP client aborted the request (likely TUI-side timeout or cancel)",
         );
       };
       extra.signal.addEventListener("abort", onAbort);
 
       try {
-        const answers = await new Promise<Record<string, string>>(
-          (resolve, reject) => {
-            const timer = setTimeout(() => {
-              if (!pendingAskUser.delete(askId)) return;
-              reject(
-                new Error(
-                  `ask_user timed out after ${Math.round(ASK_USER_TIMEOUT_MS / 60000)} minutes with no response from user`,
-                ),
-              );
-            }, ASK_USER_TIMEOUT_MS);
-            pendingAskUser.set(askId, { resolve, reject, timer });
-          },
-        );
+        const answers = await askUserRegistry.register(askId, ASK_USER_TIMEOUT_MS);
 
         cleanupRequestEntry({ status: "approved", answers });
         logger.debug(

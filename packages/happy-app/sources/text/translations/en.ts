@@ -4479,6 +4479,7 @@ export const en: TranslationStructure = {
     loopStatus_failed: "Loop Failed",
     loopStatus_stopped: "Loop Stopped",
     loopExit_max_iterations: "Reached max iterations",
+    loopExit_daily_limit: "Reached daily run limit",
     loopExit_cost_cap: "Cost cap reached",
     loopExit_health_target: "Health target reached",
     loopExit_no_new_actions: "No more issues to fix",

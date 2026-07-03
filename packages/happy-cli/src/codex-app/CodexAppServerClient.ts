@@ -8,6 +8,13 @@ import {
 } from "./CodexTransport";
 import type { CodexSessionConfig, CodexToolResponse } from "@/codex/types";
 import type { CodexPermissionHandler } from "@/codex/utils/permissionHandler";
+import {
+  buildConfigWarningMessage,
+  buildModelReroutedMessage,
+  buildPlanUpdateMessage,
+  classifyTurnCompletedOutcome,
+} from "./codexNotificationEvents";
+import { pickPermissionId } from "./codexApprovalHelpers";
 import type { SandboxConfig } from "@/persistence";
 import { initializeSandbox, wrapForMcpTransport } from "@/sandbox/manager";
 import type {
@@ -155,28 +162,6 @@ function parseError(payload: unknown, fallbackMessage: string): Error {
     return new Error((payload as { message: string }).message);
   }
   return new Error(fallbackMessage);
-}
-
-function formatPlanLine(step: {
-  title?: string | null;
-  step?: string | null;
-  status?: string | null;
-}): string {
-  const text =
-    (typeof step.title === "string" && step.title.trim().length > 0
-      ? step.title.trim()
-      : null) ??
-    (typeof step.step === "string" && step.step.trim().length > 0
-      ? step.step.trim()
-      : null) ??
-    "Untitled step";
-
-  const status =
-    typeof step.status === "string" && step.status.length > 0
-      ? `[${step.status}] `
-      : "";
-
-  return `${status}${text}`;
 }
 
 function stringifyUnknownValue(value: unknown): string | null {
@@ -467,6 +452,9 @@ function buildGrantedPermissions(
 type ServerRequestOutcome =
   | { kind: "respond"; result: unknown }
   | { kind: "error"; message: string };
+
+/** Raw decision vocabulary the permission handler returns, before mapping. */
+type CodexRawDecision = "approved" | "approved_for_session" | "denied" | "abort";
 
 export class CodexAppServerClient {
   private transport: CodexTransport | null = null;
@@ -1295,22 +1283,45 @@ export class CodexAppServerClient {
     }
   }
 
+  /**
+   * Shared approval spine for the four `{decision}`-shaped approval requests:
+   * ask the permission handler for a raw decision on `(permissionId, toolName,
+   * toolArgs)`, map it to the wire vocabulary, or return `fallback` when no
+   * permission handler is wired. Each handler supplies its own id, tool, args,
+   * mapper, and fallback; the handler-call + map + no-handler branch live once.
+   */
+  private async resolveToolDecision<D>(
+    permissionId: string,
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    mapDecision: (raw: CodexRawDecision) => D,
+    fallback: D,
+  ): Promise<D> {
+    if (!this.permissionHandler) {
+      return fallback;
+    }
+    const raw = (
+      await this.permissionHandler.handleToolCall(permissionId, toolName, toolArgs)
+    ).decision;
+    return mapDecision(raw);
+  }
+
   private async handleCommandExecutionApproval(
     params: Record<string, unknown>,
     requestKey: string,
   ): Promise<ServerRequestOutcome> {
-    const decision = this.permissionHandler
-      ? mapPermissionDecision(
-          (
-            await this.permissionHandler.handleToolCall(requestKey, "CodexBash", {
-              command: params.command,
-              cwd: params.cwd,
-              reason: params.reason,
-              availableDecisions: params.availableDecisions,
-            })
-          ).decision,
-        )
-      : "cancel";
+    const decision = await this.resolveToolDecision(
+      requestKey,
+      "CodexBash",
+      {
+        command: params.command,
+        cwd: params.cwd,
+        reason: params.reason,
+        availableDecisions: params.availableDecisions,
+      },
+      mapPermissionDecision,
+      "cancel",
+    );
     return { kind: "respond", result: { decision } };
   }
 
@@ -1318,23 +1329,19 @@ export class CodexAppServerClient {
     params: Record<string, unknown>,
     requestKey: string,
   ): Promise<ServerRequestOutcome> {
-    const permissionId =
-      typeof params.callId === "string" && params.callId.length > 0
-        ? params.callId
-        : requestKey;
-    const decision = this.permissionHandler
-      ? mapLegacyReviewDecision(
-          (
-            await this.permissionHandler.handleToolCall(permissionId, "CodexBash", {
-              command: params.command,
-              cwd: params.cwd,
-              reason: params.reason,
-              parsedCmd: params.parsedCmd,
-              approvalId: params.approvalId,
-            })
-          ).decision,
-        )
-      : "abort";
+    const decision = await this.resolveToolDecision(
+      pickPermissionId(params, "callId", requestKey),
+      "CodexBash",
+      {
+        command: params.command,
+        cwd: params.cwd,
+        reason: params.reason,
+        parsedCmd: params.parsedCmd,
+        approvalId: params.approvalId,
+      },
+      mapLegacyReviewDecision,
+      "abort",
+    );
     return { kind: "respond", result: { decision } };
   }
 
@@ -1342,16 +1349,16 @@ export class CodexAppServerClient {
     params: Record<string, unknown>,
     requestKey: string,
   ): Promise<ServerRequestOutcome> {
-    const decision = this.permissionHandler
-      ? mapPermissionDecision(
-          (
-            await this.permissionHandler.handleToolCall(requestKey, "CodexPatch", {
-              reason: params.reason,
-              grantRoot: params.grantRoot,
-            })
-          ).decision,
-        )
-      : "cancel";
+    const decision = await this.resolveToolDecision(
+      requestKey,
+      "CodexPatch",
+      {
+        reason: params.reason,
+        grantRoot: params.grantRoot,
+      },
+      mapPermissionDecision,
+      "cancel",
+    );
     return { kind: "respond", result: { decision } };
   }
 
@@ -1359,21 +1366,17 @@ export class CodexAppServerClient {
     params: Record<string, unknown>,
     requestKey: string,
   ): Promise<ServerRequestOutcome> {
-    const permissionId =
-      typeof params.callId === "string" && params.callId.length > 0
-        ? params.callId
-        : requestKey;
-    const decision = this.permissionHandler
-      ? mapLegacyReviewDecision(
-          (
-            await this.permissionHandler.handleToolCall(permissionId, "CodexPatch", {
-              reason: params.reason,
-              grantRoot: params.grantRoot,
-              fileChanges: params.fileChanges,
-            })
-          ).decision,
-        )
-      : "abort";
+    const decision = await this.resolveToolDecision(
+      pickPermissionId(params, "callId", requestKey),
+      "CodexPatch",
+      {
+        reason: params.reason,
+        grantRoot: params.grantRoot,
+        fileChanges: params.fileChanges,
+      },
+      mapLegacyReviewDecision,
+      "abort",
+    );
     return { kind: "respond", result: { decision } };
   }
 
@@ -1381,10 +1384,7 @@ export class CodexAppServerClient {
     params: Record<string, unknown>,
     requestKey: string,
   ): Promise<ServerRequestOutcome> {
-    const permissionId =
-      typeof params.itemId === "string" && params.itemId.length > 0
-        ? params.itemId
-        : requestKey;
+    const permissionId = pickPermissionId(params, "itemId", requestKey);
     const requestedToolName =
       typeof params.itemId === "string" && params.itemId.length > 0
         ? this.mcpToolNames.get(params.itemId) ?? null
@@ -1612,16 +1612,14 @@ export class CodexAppServerClient {
         }
         this.activeTurnId = null;
         this.lastDiffPreview = null;
-        if (status === "completed") {
-          this.handler?.({ type: "task_complete", status });
+        const outcome = classifyTurnCompletedOutcome(status, turn);
+        if (outcome.kind === "complete") {
+          this.handler?.({ type: "task_complete", status: outcome.status });
         } else {
           this.handler?.({
             type: "turn_aborted",
-            status,
-            reason:
-              typeof turn?.error?.message === "string"
-                ? turn.error.message
-                : status,
+            status: outcome.status,
+            reason: outcome.reason,
           });
         }
         return;
@@ -1719,10 +1717,10 @@ export class CodexAppServerClient {
         }
         this.handler?.({
           type: "service_message",
-          text:
-            notification.toModel && notification.fromModel
-              ? `Codex rerouted model from ${notification.fromModel} to ${notification.toModel}`
-              : "Codex rerouted the active model",
+          text: buildModelReroutedMessage(
+            notification.fromModel,
+            notification.toModel,
+          ),
         });
         return;
       }
@@ -1730,10 +1728,7 @@ export class CodexAppServerClient {
         const warning = params as { summary?: string; details?: string | null };
         this.handler?.({
           type: "service_message",
-          text:
-            warning.details && warning.summary
-              ? `${warning.summary}\n${warning.details}`
-              : warning.summary || "Codex reported a configuration warning",
+          text: buildConfigWarningMessage(warning.summary, warning.details),
         });
         return;
       }
@@ -1763,13 +1758,9 @@ export class CodexAppServerClient {
           explanation: notification.explanation ?? null,
           plan: notification.plan ?? [],
         });
-        const lines = [
-          notification.explanation || "Plan updated",
-          ...(notification.plan || []).map((step) => formatPlanLine(step)),
-        ].filter(Boolean);
         this.handler?.({
           type: "service_message",
-          text: lines.join("\n"),
+          text: buildPlanUpdateMessage(notification.explanation, notification.plan),
         });
         return;
       }

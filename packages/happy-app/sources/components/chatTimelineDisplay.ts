@@ -8,7 +8,21 @@ import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { isToolVisibleWithoutInline } from "./tools/toolVisibility";
 import { summarizeHappyProgressInput } from "./tools/views/happyProgressViewData";
-import type { ToolGroupItem } from "@/hooks/useGroupedMessages";
+
+/**
+ * A run of consecutive tool-call messages collapsed into one expandable row,
+ * produced by the timeline grouping stage and rendered by ToolGroupView.
+ * Moved here from the retired `hooks/useGroupedMessages` module. Only the TYPE
+ * lives here so this module stays RN-free (react-native-free) and unit-testable;
+ * `generateGroupSummary` (which needs i18n) lives with its sole renderer,
+ * ToolGroupView.
+ */
+export type ToolGroupItem = {
+  type: "tool-group";
+  id: string;
+  messages: Message[];
+  hasRunning: boolean;
+};
 
 export interface TurnTimelineThinkingStep {
   readonly kind: "thinking";

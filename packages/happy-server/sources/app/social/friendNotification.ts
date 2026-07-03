@@ -29,6 +29,63 @@ export function shouldSendNotification(
 }
 
 /**
+ * Send ONE directional friend-feed notification: from `ownerUserId`'s point of
+ * view about `otherUserId`, gated by that direction's own relationship record.
+ *
+ * The four-step dance — read the owner→other relationship, apply the 24h /
+ * not-rejected `shouldSendNotification` gate, post the feed item (repeat-keyed
+ * `${kind}_${otherUserId}` so re-runs dedupe), and stamp `lastNotifiedAt` — was
+ * written out three times (once for a friend request, twice for the two sides
+ * of an established friendship). Concentrating it here means the gate + feed +
+ * timestamp invariant lives in one place; the two entry points below just name
+ * the direction(s) and the notification kind.
+ */
+async function sendOneWayFriendNotification(
+    tx: Prisma.TransactionClient,
+    ownerUserId: string,
+    otherUserId: string,
+    kind: "friend_request" | "friend_accepted"
+): Promise<void> {
+    const relationship = await tx.userRelationship.findUnique({
+        where: {
+            fromUserId_toUserId: {
+                fromUserId: ownerUserId,
+                toUserId: otherUserId
+            }
+        }
+    });
+
+    if (!relationship || !shouldSendNotification(
+        relationship.lastNotifiedAt,
+        relationship.status
+    )) {
+        return;
+    }
+
+    await feedPost(
+        tx,
+        Context.create(ownerUserId),
+        {
+            kind,
+            uid: otherUserId
+        },
+        `${kind}_${otherUserId}` // repeatKey to avoid duplicates
+    );
+
+    await tx.userRelationship.update({
+        where: {
+            fromUserId_toUserId: {
+                fromUserId: ownerUserId,
+                toUserId: otherUserId
+            }
+        },
+        data: {
+            lastNotifiedAt: new Date()
+        }
+    });
+}
+
+/**
  * Send a friend request notification to the receiver and update lastNotifiedAt.
  * This creates a feed item for the receiver about the incoming friend request.
  */
@@ -37,47 +94,12 @@ export async function sendFriendRequestNotification(
     receiverUserId: string,
     senderUserId: string
 ): Promise<void> {
-    // Check if we should send notification to receiver
-    const receiverRelationship = await tx.userRelationship.findUnique({
-        where: {
-            fromUserId_toUserId: {
-                fromUserId: receiverUserId,
-                toUserId: senderUserId
-            }
-        }
-    });
-
-    if (!receiverRelationship || !shouldSendNotification(
-        receiverRelationship.lastNotifiedAt,
-        receiverRelationship.status
-    )) {
-        return;
-    }
-
-    // Create feed notification for receiver
-    const receiverCtx = Context.create(receiverUserId);
-    await feedPost(
+    await sendOneWayFriendNotification(
         tx,
-        receiverCtx,
-        {
-            kind: 'friend_request',
-            uid: senderUserId
-        },
-        `friend_request_${senderUserId}` // repeatKey to avoid duplicates
+        receiverUserId,
+        senderUserId,
+        "friend_request"
     );
-
-    // Update lastNotifiedAt for the receiver's relationship record
-    await tx.userRelationship.update({
-        where: {
-            fromUserId_toUserId: {
-                fromUserId: receiverUserId,
-                toUserId: senderUserId
-            }
-        },
-        data: {
-            lastNotifiedAt: new Date()
-        }
-    });
 }
 
 /**
@@ -89,81 +111,6 @@ export async function sendFriendshipEstablishedNotification(
     user1Id: string,
     user2Id: string
 ): Promise<void> {
-    // Check and send notification to user1
-    const user1Relationship = await tx.userRelationship.findUnique({
-        where: {
-            fromUserId_toUserId: {
-                fromUserId: user1Id,
-                toUserId: user2Id
-            }
-        }
-    });
-
-    if (user1Relationship && shouldSendNotification(
-        user1Relationship.lastNotifiedAt,
-        user1Relationship.status
-    )) {
-        const user1Ctx = Context.create(user1Id);
-        await feedPost(
-            tx,
-            user1Ctx,
-            {
-                kind: 'friend_accepted',
-                uid: user2Id
-            },
-            `friend_accepted_${user2Id}` // repeatKey to avoid duplicates
-        );
-
-        // Update lastNotifiedAt for user1
-        await tx.userRelationship.update({
-            where: {
-                fromUserId_toUserId: {
-                    fromUserId: user1Id,
-                    toUserId: user2Id
-                }
-            },
-            data: {
-                lastNotifiedAt: new Date()
-            }
-        });
-    }
-
-    // Check and send notification to user2
-    const user2Relationship = await tx.userRelationship.findUnique({
-        where: {
-            fromUserId_toUserId: {
-                fromUserId: user2Id,
-                toUserId: user1Id
-            }
-        }
-    });
-
-    if (user2Relationship && shouldSendNotification(
-        user2Relationship.lastNotifiedAt,
-        user2Relationship.status
-    )) {
-        const user2Ctx = Context.create(user2Id);
-        await feedPost(
-            tx,
-            user2Ctx,
-            {
-                kind: 'friend_accepted',
-                uid: user1Id
-            },
-            `friend_accepted_${user1Id}` // repeatKey to avoid duplicates
-        );
-
-        // Update lastNotifiedAt for user2
-        await tx.userRelationship.update({
-            where: {
-                fromUserId_toUserId: {
-                    fromUserId: user2Id,
-                    toUserId: user1Id
-                }
-            },
-            data: {
-                lastNotifiedAt: new Date()
-            }
-        });
-    }
+    await sendOneWayFriendNotification(tx, user1Id, user2Id, "friend_accepted");
+    await sendOneWayFriendNotification(tx, user2Id, user1Id, "friend_accepted");
 }

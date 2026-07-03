@@ -3,6 +3,7 @@ import { inTx, afterTx } from "@/storage/inTx";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { log } from "@/utils/log";
+import { getSessionMachineIds } from "@/app/session/getSessionMachineIds";
 
 /**
  * Archive a session (set active=false) and signal the CLI daemon to terminate
@@ -48,11 +49,7 @@ export async function sessionArchive(ctx: Context, sessionId: string): Promise<b
         // Query machine IDs regardless of active state — the process may still be
         // running even if the session was already marked inactive (e.g. Supervisor
         // auto-archived the session but the daemon process never received a kill signal)
-        const accessKeys = await tx.accessKey.findMany({
-            where: { sessionId },
-            select: { machineId: true },
-        });
-        const machineIds = [...new Set(accessKeys.map((ak) => ak.machineId))];
+        const machineIds = await getSessionMachineIds(tx, sessionId);
 
         afterTx(tx, async () => {
             if (wasActive) {

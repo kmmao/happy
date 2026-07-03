@@ -89,6 +89,7 @@ export const SupervisorLoopStatusCard = React.memo(
         };
         const exitReasonLabels: Record<string, string> = {
             max_iterations: t("supervisor.loopExit_max_iterations"),
+            daily_limit: t("supervisor.loopExit_daily_limit"),
             cost_cap: t("supervisor.loopExit_cost_cap"),
             health_target: t("supervisor.loopExit_health_target"),
             no_new_actions: t("supervisor.loopExit_no_new_actions"),

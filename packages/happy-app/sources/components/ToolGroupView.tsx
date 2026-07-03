@@ -2,10 +2,11 @@ import * as React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Ionicons } from '@expo/vector-icons';
-import { ToolGroupItem, generateGroupSummary } from '@/hooks/useGroupedMessages';
+import { type ToolGroupItem } from '@/components/chatTimelineDisplay';
 import { MessageView } from './MessageView';
 import { Metadata } from '@/sync/storageTypes';
 import { layout } from './layout';
+import { generateGroupSummary } from './toolGroupSummary';
 
 interface ToolGroupViewProps {
     group: ToolGroupItem;

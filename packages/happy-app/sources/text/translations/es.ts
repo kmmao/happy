@@ -4481,6 +4481,7 @@ export const es: TranslationStructure = {
     loopStatus_failed: "Bucle fallido",
     loopStatus_stopped: "Bucle detenido",
     loopExit_max_iterations: "Máximo de iteraciones alcanzado",
+    loopExit_daily_limit: "Se alcanzó el límite diario de ejecuciones",
     loopExit_cost_cap: "Límite de coste alcanzado",
     loopExit_health_target: "Objetivo de salud alcanzado",
     loopExit_no_new_actions: "No hay más problemas que corregir",
