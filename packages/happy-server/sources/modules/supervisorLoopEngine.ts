@@ -38,6 +38,20 @@ import {
     selectTrulyStaleFixActions,
     STALE_FIX_RESOLUTION,
 } from "@/modules/supervisorFixStatusLogic";
+import {
+    ACTIVE_LOOP_STATUSES,
+    ACTIVE_RUN_STATUSES,
+    INITIAL_LOOP_STATE,
+    canProgressAfterRun,
+    canProgressAfterFix,
+    shouldDecideOnResume,
+    decidePauseTransition,
+    decideResumeTransition,
+    decideStopTransition,
+    decideEnterFixingTransition,
+    decideEnterAnalyzingTransition,
+    decideCompleteTransition,
+} from "@/modules/supervisorLoopPhaseLogic";
 import { auth } from "@/app/auth/auth";
 import {
     BUILT_IN_AI_BACKEND_PROFILE_IDS,
@@ -173,7 +187,7 @@ export async function startLoop(
                 projectId,
                 accountId,
                 role: "supervisor",
-                status: { in: ["running", "paused"] },
+                status: { in: [...ACTIVE_LOOP_STATUSES] },
             },
             select: { id: true },
         }),
@@ -181,7 +195,7 @@ export async function startLoop(
             where: {
                 projectId,
                 accountId,
-                status: { in: ["pending", "running"] },
+                status: { in: [...ACTIVE_RUN_STATUSES] },
             },
             select: { id: true },
         }),
@@ -210,9 +224,7 @@ export async function startLoop(
                 projectId,
                 accountId,
                 role: "supervisor",
-                status: "running",
-                currentPhase: "analyzing",
-                currentIteration: 1,
+                ...INITIAL_LOOP_STATE,
                 maxIterations: config.maxIterations,
                 costCapUsd: config.costCapUsd ?? null,
                 healthScoreTarget: config.healthScoreTarget ?? null,
@@ -342,7 +354,7 @@ async function progressLoopAfterRun(
         where: { id: run.loopId },
     });
 
-    if (!loop || loop.status !== "running") return;
+    if (!loop || !canProgressAfterRun(loop)) return;
 
     // Accumulate cost/tokens
     const costDelta = run.costUsd ?? 0;
@@ -422,7 +434,7 @@ async function progressLoopAfterFix(
     const loop = await db.agentLoop.findUnique({
         where: { id: run.loopId },
     });
-    if (!loop || loop.status !== "running" || loop.currentPhase !== "fixing") return;
+    if (!loop || !canProgressAfterFix(loop)) return;
 
     // Track fix result
     if (fixStatus === "completed") {
@@ -459,7 +471,7 @@ async function progressLoopAfterFix(
     const updatedLoop = await db.agentLoop.findUnique({
         where: { id: loop.id },
     });
-    if (!updatedLoop || updatedLoop.status !== "running") return;
+    if (!updatedLoop || !canProgressAfterRun(updatedLoop)) return;
 
     const exitCheck = checkExitConditions(updatedLoop);
     if (exitCheck.shouldExit) {
@@ -477,16 +489,15 @@ export async function pauseLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
+    const pause = decidePauseTransition();
     const result = await db.agentLoop.updateMany({
         where: {
             id: loopId,
             accountId: userId,
             role: "supervisor",
-            status: "running",
+            status: pause.allowedFrom,
         },
-        data: {
-            status: "paused",
-        },
+        data: pause.data,
     });
 
     if (result.count === 0) return { success: false };
@@ -502,12 +513,13 @@ export async function resumeLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
+    const resume = decideResumeTransition();
     const loop = await db.agentLoop.findFirst({
         where: {
             id: loopId,
             accountId: userId,
             role: "supervisor",
-            status: "paused",
+            status: resume.allowedFrom,
         },
     });
 
@@ -515,8 +527,8 @@ export async function resumeLoop(
 
     // Optimistic lock: only resume if still paused
     const result = await db.agentLoop.updateMany({
-        where: { id: loopId, role: "supervisor", status: "paused" },
-        data: { status: "running" },
+        where: { id: loopId, role: "supervisor", status: resume.allowedFrom },
+        data: resume.data,
     });
 
     if (result.count === 0) return { success: false };
@@ -530,7 +542,7 @@ export async function resumeLoop(
     // If the loop was paused while a run/fix was in progress, it will
     // naturally resume when that run/fix completes (the handler checks for "running" status).
     // If the loop was paused in "deciding" phase (between steps), trigger next step now.
-    if (updated.currentPhase === "deciding" || updated.currentPhase === "idle") {
+    if (shouldDecideOnResume(updated.currentPhase)) {
         await decideNextStep(userId, updated.projectId, updated);
     }
 
@@ -542,16 +554,16 @@ export async function stopLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
+    const stop = decideStopTransition();
     const result = await db.agentLoop.updateMany({
         where: {
             id: loopId,
             accountId: userId,
             role: "supervisor",
-            status: { in: ["running", "paused"] },
+            status: { in: [...stop.allowedFrom] },
         },
         data: {
-            status: "stopped",
-            exitReason: "user_stopped",
+            ...stop.data,
             completedAt: new Date(),
         },
     });
@@ -651,10 +663,11 @@ async function decideNextStep(
     }
 
     // Update loop metrics
+    const enterFixing = decideEnterFixingTransition();
     await db.agentLoop.updateMany({
-        where: { id: loop.id, role: "supervisor", status: "running" },
+        where: { id: loop.id, role: "supervisor", status: enterFixing.allowedFrom },
         data: {
-            currentPhase: "fixing",
+            ...enterFixing.data,
             // Productive iteration → reset the C-1 empty-streak counter so a
             // run that only had stale findings doesn't "carry over" toward the
             // goal_achieved threshold.
@@ -768,11 +781,11 @@ async function triggerNextAnalysis(
         },
     });
 
+    const enterAnalyzing = decideEnterAnalyzingTransition(nextIteration);
     await db.agentLoop.updateMany({
-        where: { id: loop.id, role: "supervisor", status: "running" },
+        where: { id: loop.id, role: "supervisor", status: enterAnalyzing.allowedFrom },
         data: {
-            currentPhase: "analyzing",
-            currentIteration: nextIteration,
+            ...enterAnalyzing.data,
             activeRunId: run.id,
         },
     });
@@ -875,16 +888,15 @@ async function completeLoop(
     loop: { id: string; projectId: string },
     reason: LoopExitReason,
 ): Promise<void> {
+    const complete = decideCompleteTransition(reason);
     await db.agentLoop.updateMany({
         where: {
             id: loop.id,
             role: "supervisor",
-            status: { in: ["running", "paused"] },
+            status: { in: [...complete.allowedFrom] },
         },
         data: {
-            status: "completed",
-            currentPhase: "idle",
-            exitReason: reason,
+            ...complete.data,
             completedAt: new Date(),
             activeRunId: null,
         },
@@ -1027,7 +1039,7 @@ function scheduleFixWatchdog(
                 where: { id: loopId },
                 select: { status: true, currentPhase: true },
             });
-            if (!loop || loop.status !== "running" || loop.currentPhase !== "fixing") return;
+            if (!loop || !canProgressAfterFix(loop)) return;
 
             // Find actions that are still "running" but whose session is inactive
             const staleActions = await db.supervisorAction.findMany({
