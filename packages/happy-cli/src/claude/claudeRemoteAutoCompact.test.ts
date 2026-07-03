@@ -27,6 +27,9 @@ describe("resolveCliModelForMode", () => {
     expect(resolveCliModelForMode({ model: "fable-5-1m" })).toBe(
       "claude-fable-5[1m]",
     );
+    expect(resolveCliModelForMode({ model: "sonnet-5-1m" })).toBe(
+      "claude-sonnet-5[1m]",
+    );
   });
 
   it("strips the [1m] suffix when the user picked a default (non-1m) modelMode", () => {
@@ -38,6 +41,9 @@ describe("resolveCliModelForMode", () => {
     );
     expect(resolveCliModelForMode({ model: "sonnet" })).toBe(
       "claude-sonnet-4-6",
+    );
+    expect(resolveCliModelForMode({ model: "sonnet-5" })).toBe(
+      "claude-sonnet-5",
     );
   });
 
@@ -59,6 +65,8 @@ describe("is1MModelKey", () => {
     expect(is1MModelKey("opus-4-7")).toBe(true);
     expect(is1MModelKey("opus-4-7-1m")).toBe(true);
     expect(is1MModelKey("sonnet")).toBe(true);
+    expect(is1MModelKey("sonnet-5")).toBe(true);
+    expect(is1MModelKey("sonnet-5-1m")).toBe(true);
     expect(is1MModelKey("fable-5-1m")).toBe(true);
   });
 

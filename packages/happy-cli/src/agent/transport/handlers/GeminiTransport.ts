@@ -21,6 +21,7 @@ import type {
 } from "../TransportHandler";
 import type { AgentMessage } from "../../core";
 import { logger } from "@/ui/logger";
+import { validateJsonLine } from "../jsonLineFilter";
 
 /**
  * Gemini-specific timeout values (in milliseconds)
@@ -115,30 +116,7 @@ export class GeminiTransport implements TransportHandler {
    * that breaks ACP JSON-RPC parsing. We only keep valid JSON lines.
    */
   filterStdoutLine(line: string): string | null {
-    const trimmed = line.trim();
-
-    // Empty lines - skip
-    if (!trimmed) {
-      return null;
-    }
-
-    // Must start with { or [ to be valid JSON-RPC
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-      return null;
-    }
-
-    // Validate it's actually parseable JSON and is an object (not a primitive)
-    // JSON-RPC messages are always objects, but numbers like "105887304" parse as valid JSON
-    try {
-      const parsed = JSON.parse(trimmed);
-      // Must be an object or array (for batched requests), not a primitive
-      if (typeof parsed !== "object" || parsed === null) {
-        return null;
-      }
-      return line;
-    } catch {
-      return null;
-    }
+    return validateJsonLine(line);
   }
 
   /**

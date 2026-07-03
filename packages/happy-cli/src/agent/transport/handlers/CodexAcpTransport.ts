@@ -21,6 +21,7 @@ import type {
 } from "../TransportHandler";
 import type { AgentMessage } from "../../core";
 import { logger } from "@/ui/logger";
+import { validateJsonLine } from "../jsonLineFilter";
 
 /**
  * Codex ACP timeout values (in milliseconds)
@@ -88,25 +89,7 @@ export class CodexAcpTransport implements TransportHandler {
    * when RUST_LOG is set. Only keep valid JSON lines.
    */
   filterStdoutLine(line: string): string | null {
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      return null;
-    }
-
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (typeof parsed !== "object" || parsed === null) {
-        return null;
-      }
-      return line;
-    } catch {
-      return null;
-    }
+    return validateJsonLine(line);
   }
 
   /**

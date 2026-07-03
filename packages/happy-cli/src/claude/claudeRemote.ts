@@ -138,6 +138,9 @@ export function resolveModelKey(
     // Sonnet/Opus default to 1M context — map short keys to explicit model IDs.
     // The [1m] suffix is a Happy-internal tracking convention; actual 1M context
     // is enabled via the `context-1m-2025-08-07` SDK beta (see buildBetasForModel).
+    case "sonnet-5":
+    case "sonnet-5-1m":
+      return "claude-sonnet-5[1m]";
     case "sonnet":
     case "sonnet-1m":
       return "claude-sonnet-4-6[1m]";
@@ -168,6 +171,8 @@ const BETA_1M: ClaudeJsonlBeta = "context-1m-2025-08-07";
 export function is1MModelKey(modelKey: string | undefined): boolean {
   if (!modelKey) return false;
   switch (modelKey) {
+    case "sonnet-5":
+    case "sonnet-5-1m":
     case "sonnet":
     case "sonnet-1m":
     case "opus":
