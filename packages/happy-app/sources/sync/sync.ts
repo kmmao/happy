@@ -2436,6 +2436,37 @@ class Sync {
         case "bell":
           log.log(`[terminal-signal] bell from session ${sid}`);
           return;
+        case "activity": {
+          // Live TUI status line (spinner verb + token/second counters).
+          // Merge into the ephemeral per-session status so the header
+          // subtitle and the chat "thinking" bubble reflect it. A fresh
+          // activity update clears any pending picker (the picker cleared
+          // once the TUI resumed working).
+          storage.getState().mergeTerminalStatus(sid, {
+            verb: signal.text ?? null,
+            tokens: signal.tokens,
+            seconds: signal.seconds,
+            pickerPending: false,
+          });
+          return;
+        }
+        case "picker": {
+          // A numbered selection dialog is on screen and the TUI is blocked
+          // on keyboard input — surface it as a picker-pending badge.
+          storage.getState().mergeTerminalStatus(sid, {
+            pickerPending: true,
+            pickerSnippet: signal.text,
+          });
+          return;
+        }
+        case "progress": {
+          // ConEmu-style OSC 9;4 progress report.
+          storage.getState().mergeTerminalStatus(sid, {
+            progressState: signal.progressState,
+            progressValue: signal.progressValue,
+          });
+          return;
+        }
         case "other":
           log.log(
             `[terminal-signal] OSC ${signal.oscCode ?? "?"} from session ${sid}: ${signal.text ?? ""}`,

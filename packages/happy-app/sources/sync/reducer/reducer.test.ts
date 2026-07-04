@@ -3058,7 +3058,7 @@ describe('reducer', () => {
                 role: 'agent',
                 isSidechain: false,
                 content: [{ type: 'text', text: `Task ${status}`, uuid: `u-te-${taskId}`, parentUUID: null }],
-                taskEndInfo: { taskId, status },
+                taskEndInfo: { taskId, status, toolUseId: null, summary: null },
             };
         }
 
@@ -3347,6 +3347,188 @@ describe('reducer', () => {
                 // No tool-call messages affected (already completed)
                 expect(affected).toHaveLength(0);
                 expect(state.backgroundTasks.get('bg-1')!.status).toBe('stopped');
+            });
+        });
+
+        // -------------------------------------------------------------------
+        // Background sub-agents (Agent/Task run_in_background)
+        // -------------------------------------------------------------------
+
+        describe('background sub-agents', () => {
+            // The Agent tool-call plus its launch-ack tool-result. `ackContent`
+            // mirrors what the two delivery paths produce: the structured
+            // toolUseResult object (legacy stream) or null content tagged with
+            // backgroundTaskId (protocol tool-call-end from a new CLI).
+            function agentLaunchMessages(toolId: string, agentId: string, opts?: {
+                ackContent?: unknown; backgroundTaskId?: string; createdAt?: number;
+            }): NormalizedMessage[] {
+                const t = opts?.createdAt ?? 500;
+                return [
+                    {
+                        id: `tc-${toolId}`,
+                        localId: null,
+                        createdAt: t,
+                        role: 'agent',
+                        isSidechain: false,
+                        content: [{
+                            type: 'tool-call',
+                            id: toolId,
+                            name: 'Agent',
+                            input: { subagent_type: 'Explore', description: 'scan the repo', prompt: 'scan' },
+                            description: 'scan the repo',
+                            uuid: `u-tc-${toolId}`,
+                            parentUUID: null,
+                        }],
+                    },
+                    {
+                        id: `tr-${toolId}`,
+                        localId: null,
+                        createdAt: t + 100,
+                        role: 'agent',
+                        isSidechain: false,
+                        content: [{
+                            type: 'tool-result',
+                            tool_use_id: toolId,
+                            content: opts?.ackContent !== undefined ? opts.ackContent : {
+                                isAsync: true,
+                                status: 'async_launched',
+                                agentId,
+                                description: 'scan the repo',
+                            },
+                            is_error: false,
+                            uuid: `u-tr-${toolId}`,
+                            parentUUID: null,
+                            ...(opts?.backgroundTaskId ? { backgroundTaskId: opts.backgroundTaskId } : {}),
+                        }],
+                    },
+                ];
+            }
+
+            it('keeps the Agent card running on a structured launch ack and registers the task', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a1', 'agent-abc'));
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a1')!;
+                const tool = state.messages.get(toolMsgId)!.tool!;
+                expect(tool.state).toBe('running');
+                expect(tool.backgroundTaskId).toBe('agent-abc');
+
+                const entry = state.backgroundTasks.get('agent-abc');
+                expect(entry).toBeDefined();
+                expect(entry!.status).toBe('running');
+                expect(entry!.taskType).toBe('subagent');
+                expect(entry!.toolUseId).toBe('tool-a1');
+                expect(entry!.description).toBe('scan the repo');
+            });
+
+            it('keeps the Agent card running on a text launch ack (older CLI shape)', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a2', 'agent-def', {
+                    ackContent:
+                        'Async agent launched successfully.\nagentId: agent-def (internal)\n' +
+                        'output_file: /tmp/tasks/agent-def.output\n',
+                }));
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a2')!;
+                const tool = state.messages.get(toolMsgId)!.tool!;
+                expect(tool.state).toBe('running');
+                expect(tool.backgroundTaskId).toBe('agent-def');
+                expect(tool.outputFile).toBe('/tmp/tasks/agent-def.output');
+            });
+
+            it('does not complete the card when an untagged protocol tool-call-end (null content) follows the ack', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a3', 'agent-ghi'));
+                // Old-CLI protocol tool-call-end: null content, no backgroundTaskId
+                reducer(state, [{
+                    id: 'tr-proto-a3',
+                    localId: null,
+                    createdAt: 700,
+                    role: 'agent',
+                    isSidechain: false,
+                    content: [{
+                        type: 'tool-result',
+                        tool_use_id: 'tool-a3',
+                        content: null,
+                        is_error: false,
+                        uuid: 'u-tr-proto-a3',
+                        parentUUID: null,
+                    }],
+                }]);
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a3')!;
+                expect(state.messages.get(toolMsgId)!.tool!.state).toBe('running');
+            });
+
+            it('completes the card with the summary as result on task-end (no zombie)', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a4', 'agent-jkl'));
+                reducer(state, [{
+                    ...taskEnd('agent-jkl', 'completed', { createdAt: 9000 }),
+                    taskEndInfo: {
+                        taskId: 'agent-jkl',
+                        status: 'completed',
+                        toolUseId: 'tool-a4',
+                        summary: 'Agent "scan the repo" finished',
+                    },
+                }]);
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a4')!;
+                const tool = state.messages.get(toolMsgId)!.tool!;
+                expect(tool.state).toBe('completed');
+                expect(tool.result).toBe('Agent "scan the repo" finished');
+                expect(state.backgroundTasks.get('agent-jkl')!.status).toBe('completed');
+            });
+
+            it('flips the card via taskEndInfo.toolUseId when no launch ack registered the task', () => {
+                const state = createReducer();
+                // Foreground-looking Agent card (no ack seen — e.g. history gap)
+                reducer(state, [agentLaunchMessages('tool-a5', 'agent-mno')[0]]);
+                reducer(state, [{
+                    ...taskEnd('agent-mno', 'completed', { createdAt: 9000 }),
+                    taskEndInfo: {
+                        taskId: 'agent-mno',
+                        status: 'completed',
+                        toolUseId: 'tool-a5',
+                        summary: 'done',
+                    },
+                }]);
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a5')!;
+                const tool = state.messages.get(toolMsgId)!.tool!;
+                expect(tool.state).toBe('completed');
+                expect(tool.result).toBe('done');
+            });
+
+            it('tolerates a duplicate task-end (legacy relay + protocol event)', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a6', 'agent-pqr'));
+                const end = {
+                    ...taskEnd('agent-pqr', 'completed', { createdAt: 9000 }),
+                    taskEndInfo: {
+                        taskId: 'agent-pqr',
+                        status: 'completed' as const,
+                        toolUseId: 'tool-a6',
+                        summary: 'done',
+                    },
+                };
+                reducer(state, [end]);
+                // Same completion delivered again under a different message id
+                expect(() => reducer(state, [{ ...end, id: 'te-agent-pqr-dup' }])).not.toThrow();
+                expect(state.backgroundTasks.get('agent-pqr')!.status).toBe('completed');
+            });
+
+            it('completes a foreground Agent tool-result normally (no ack involved)', () => {
+                const state = createReducer();
+                reducer(state, agentLaunchMessages('tool-a7', 'unused', {
+                    ackContent: 'Regular final agent answer',
+                }));
+
+                const toolMsgId = state.toolIdToMessageId.get('tool-a7')!;
+                const tool = state.messages.get(toolMsgId)!.tool!;
+                expect(tool.state).toBe('completed');
+                expect(tool.result).toBe('Regular final agent answer');
+                expect(state.backgroundTasks.size).toBe(0);
             });
         });
     });

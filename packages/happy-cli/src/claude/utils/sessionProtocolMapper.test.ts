@@ -513,6 +513,93 @@ describe("background task metadata in tool-call-end", () => {
     expect((toolCallEnd!.ev as any).backgroundTaskId).toBeUndefined();
     expect((toolCallEnd!.ev as any).outputFile).toBeUndefined();
   });
+
+  it("extracts agentId/outputFile from a background Agent launch ack (array content)", () => {
+    const started = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-agent-bg-1",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "tool-agent-bg-1",
+              name: "Agent",
+              input: {
+                subagent_type: "Explore",
+                description: "scan things",
+                prompt: "scan the repo",
+              },
+            },
+          ],
+        },
+      } as any,
+      { ...createClaudeProtocolState(), currentTurnId: null },
+    );
+
+    const ackText =
+      "Async agent launched successfully. (This tool result is internal metadata)\n" +
+      "agentId: a73231cd515b1dc7c (internal ID - do not mention to user.)\n" +
+      "The agent is working in the background.\n" +
+      "output_file: /private/tmp/claude-501/project/sess/tasks/a73231cd515b1dc7c.output\n" +
+      "Do NOT Read or tail this file.";
+    const ended = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-agent-bg-1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-agent-bg-1",
+              content: [{ type: "text", text: ackText }],
+            },
+          ],
+        },
+      } as any,
+      { ...createClaudeProtocolState(), currentTurnId: started.currentTurnId },
+    );
+
+    const toolCallEnd = ended.envelopes.find((e) => e.ev.t === "tool-call-end");
+    expect(toolCallEnd).toBeDefined();
+    expect((toolCallEnd!.ev as any).backgroundTaskId).toBe("a73231cd515b1dc7c");
+    expect((toolCallEnd!.ev as any).outputFile).toBe(
+      "/private/tmp/claude-501/project/sess/tasks/a73231cd515b1dc7c.output",
+    );
+  });
+});
+
+describe("task-notification relay", () => {
+  it("drops the <task-notification> user message instead of emitting user text", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-notif-1",
+        message: {
+          role: "user",
+          content:
+            "<task-notification>\n<task-id>a73231cd515b1dc7c</task-id>\n" +
+            "<tool-use-id>tool-agent-bg-1</tool-use-id>\n" +
+            "<status>completed</status>\n<summary>Agent finished</summary>\n" +
+            "</task-notification>",
+        },
+      } as any,
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
+    );
+
+    expect(
+      result.envelopes.some((e) => e.role === "user"),
+    ).toBe(false);
+    expect(result.dropped).toContainEqual({
+      type: "user",
+      reason: "task-notification-relay",
+    });
+    // The notification still closes the open turn — it starts a new prompt.
+    expect(result.envelopes.some((e) => e.ev.t === "turn-end")).toBe(true);
+    expect(result.currentTurnId).toBeNull();
+  });
 });
 
 describe("closeClaudeTurnWithStatus", () => {

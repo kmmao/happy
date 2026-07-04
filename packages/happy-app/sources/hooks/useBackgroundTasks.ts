@@ -57,6 +57,11 @@ export function useBackgroundTasks(
         for (const entry of entries.values()) {
             if (entry.status !== "running") continue;
             if (dismissed.has(entry.taskId)) continue;
+            // Background sub-agents surface through useRunningSubagents (the
+            // Agent/Task tool card stays "running" until task-end), which
+            // yields a richer chip that scrolls to the card. Skip the registry
+            // entry here so the same agent doesn't render two chips.
+            if (entry.taskType === "subagent") continue;
             result.push({
                 taskId: entry.taskId,
                 command: entry.command,

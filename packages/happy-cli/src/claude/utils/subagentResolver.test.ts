@@ -103,22 +103,45 @@ describe("SubagentResolver", () => {
     expect(resolver.consumeBuffered("task-1")).toEqual([]);
   });
 
-  it("clear() drops identity, registrations, titles, and buffers", () => {
+  it("clear() drops turn-scoped state but keeps identity and titles", () => {
     const resolver = createSubagentResolver();
-    resolver.registerTaskCall("task-1", { prompt: "alpha" });
+    resolver.registerTaskCall("task-1", { prompt: "alpha", description: "Alpha" });
     const id = resolver.ensureSessionId("task-1");
     resolver.buffer("task-1", raw({ type: "assistant" }));
     resolver.rememberMessage(raw({ type: "assistant", uuid: "u1" }), "task-1");
 
     resolver.clear();
 
-    expect(resolver.sessionIdFor("task-1")).toBeUndefined();
-    expect(resolver.titleFor(id)).toBeUndefined();
+    // Identity + titles survive: background agents keep streaming sidechain
+    // messages (explicit parent_tool_use_id) after the spawning turn closed,
+    // and those must resolve to the SAME session Subagent id the App linked
+    // to the Task card.
+    expect(resolver.sessionIdFor("task-1")).toBe(id);
+    expect(resolver.titleFor(id)).toBe("Alpha");
+    // Turn-scoped state is dropped: buffers, uuid inheritance index, and
+    // pending prompt registrations.
     expect(resolver.consumeBuffered("task-1")).toEqual([]);
     expect(
       resolver.resolveProvider(
         raw({ type: "assistant", isSidechain: true, parentUuid: "u1" }),
       ),
     ).toBeUndefined();
+  });
+
+  it("resolves explicit parent_tool_use_id to the same session id after clear()", () => {
+    const resolver = createSubagentResolver();
+    resolver.registerTaskCall("task-1", { prompt: "alpha" });
+    const id = resolver.ensureSessionId("task-1");
+
+    resolver.clear();
+
+    const post = raw({
+      type: "assistant",
+      isSidechain: true,
+      parent_tool_use_id: "task-1",
+    });
+    const provider = resolver.resolveProvider(post);
+    expect(provider).toBe("task-1");
+    expect(resolver.sessionIdFor(provider!)).toBe(id);
   });
 });

@@ -40,7 +40,16 @@ export type SubagentResolver = {
   buffer(providerSubagent: string, message: RawJSONLines): void;
   /** Drain records buffered for a provider subagent ([] when none). */
   consumeBuffered(providerSubagent: string): RawJSONLines[];
-  /** Drop all resolution state (Turn end). */
+  /**
+   * Drop the turn-scoped resolution state (Turn end). Provider→session id
+   * assignments and titles are KEPT: background agents (Task/Agent with
+   * run_in_background) outlive the turn that spawned them, and their
+   * interleaved sidechain messages keep arriving with an explicit
+   * parent_tool_use_id after the turn closes. Dropping the id map made
+   * every one of those messages buffer forever ("buffered-pending-subagent"
+   * with a parent tool call that will never re-appear) — the App stopped
+   * receiving background-agent progress the moment the main turn ended.
+   */
   clear(): void;
 };
 
@@ -296,9 +305,12 @@ export function createSubagentResolver(): SubagentResolver {
     clear() {
       uuidToProviderSubagent.clear();
       taskPromptToSubagents.clear();
-      providerToSessionId.clear();
-      titles.clear();
       bufferedMessages.clear();
+      // providerToSessionId + titles survive turn boundaries — see the
+      // interface doc: background agents keep streaming sidechain messages
+      // (explicit parent_tool_use_id) after the spawning turn has closed,
+      // and those must keep resolving to the SAME session Subagent id the
+      // App linked to the Task card via args._subagentId.
     },
   };
 

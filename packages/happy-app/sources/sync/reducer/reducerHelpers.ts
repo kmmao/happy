@@ -211,6 +211,40 @@ export function createStoredPermission(
 }
 
 /**
+ * Detect the tool_result acknowledgment of a `run_in_background` Agent/Task
+ * launch. The agent keeps running after this result arrives — treating the ack
+ * as the tool's final result is what froze background agents as "completed"
+ * cards with no progress. Two producer shapes:
+ *
+ *   - Structured `toolUseResult` (the legacy message path prefers it as the
+ *     result content): `{ isAsync: true, status: "async_launched",
+ *     agentId: "a73…", description, prompt, … }`.
+ *   - Plain ack text (older CLIs / protocol fallbacks): "Async agent launched
+ *     successfully … agentId: a73… … output_file: /tmp/…".
+ *
+ * The agentId doubles as the background task id — the eventual
+ * `<task-notification>` completion carries the same value in `<task-id>`.
+ */
+export function detectBackgroundAgentLaunch(
+    content: unknown,
+): { agentId: string; outputFile: string | null } | null {
+    if (content && typeof content === "object" && !Array.isArray(content)) {
+        const o = content as { isAsync?: unknown; agentId?: unknown };
+        if (o.isAsync === true && typeof o.agentId === "string" && o.agentId.length > 0) {
+            return { agentId: o.agentId, outputFile: null };
+        }
+    }
+    if (typeof content === "string" && /agent launched/i.test(content)) {
+        const idMatch = content.match(/\bagentId:\s*([\w-]+)/);
+        if (idMatch) {
+            const fileMatch = content.match(/\boutput_file:\s*(\S+)/);
+            return { agentId: idMatch[1], outputFile: fileMatch?.[1] ?? null };
+        }
+    }
+    return null;
+}
+
+/**
  * Apply a tool-result content block to a single tool message — but only when
  * that message's tool is still `running`. This is the ONE place the tool-result
  * state transition lives: running → completed/error, plus result, completedAt,

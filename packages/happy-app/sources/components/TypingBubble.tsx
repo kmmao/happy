@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { Text } from "@/components/StyledText";
 import { useLayout } from "./layout";
 const DOT_COUNT = 3;
 const DOT_SIZE = 7;
@@ -11,7 +12,7 @@ const BREATH_DURATION = 1800;
 const BREATH_DOT_SIZE = 10;
 const FADE_IN_DURATION = 200;
 
-export const TypingBubble = React.memo((props: { contentMaxWidth?: number }) => {
+export const TypingBubble = React.memo((props: { contentMaxWidth?: number; label?: string }) => {
     const layout = useLayout();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const breathAnim = useRef(new Animated.Value(0)).current;
@@ -132,6 +133,11 @@ export const TypingBubble = React.memo((props: { contentMaxWidth?: number }) => 
                                 />
                             );
                         })}
+                        {props.label ? (
+                            <Text style={styles.label} numberOfLines={1}>
+                                {props.label}
+                            </Text>
+                        ) : null}
                     </View>
                 </View>
             </Animated.View>
@@ -175,12 +181,18 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: DOT_GAP,
-        height: DOT_SIZE,
+        minHeight: DOT_SIZE,
     },
     dot: {
         width: DOT_SIZE,
         height: DOT_SIZE,
         borderRadius: DOT_SIZE / 2,
         backgroundColor: theme.colors.textSecondary,
+    },
+    label: {
+        marginLeft: 4,
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        flexShrink: 1,
     },
 }));

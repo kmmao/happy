@@ -26,7 +26,12 @@ export type AssociatedSubagent = {
  *     seconds). Returning the whole file each poll lets the caller pick up
  *     new lines; downstream uuid dedup (processedMessageKeys) handles the
  *     already-emitted ones.
- *   - Otherwise, try to match a new agent file. Matching is two-layered:
+ *   - Otherwise, try to match a new agent file. Matching is three-layered:
+ *       Layer 0 (exact): meta.toolUseId equals the tool_use.id. Claude Code
+ *                        writes the spawning tool_use id into meta.json, so
+ *                        the binding is unambiguous — essential for background
+ *                        agents where several same-type/same-description
+ *                        agents run concurrently.
  *       Layer 1 (strict): meta.agentType + meta.description + first-user-prompt all equal input.
  *       Layer 2 (fallback): meta.agentType + meta.description match, pick the
  *                            candidate whose jsonl mtime is earliest (the
@@ -87,6 +92,20 @@ export async function readAssociatedSubagent(
       logger.debug(`[SUBAGENT_READER] meta unreadable: ${metaFile}`)
       continue
     }
+
+    // Layer 0: exact binding via meta.toolUseId.
+    if (meta.toolUseId === toolUseId) {
+      binding.set(toolUseId, agentId)
+      const messages = await parseAllLines(join(subagentsDir, `${agentId}.jsonl`))
+      logger.debug(`[SUBAGENT_READER] HIT(toolUseId) ${agentId} messages=${messages.length}`)
+      return { agentId, messages }
+    }
+    // A meta that names a DIFFERENT tool_use can never belong to this one —
+    // skip it even if type/description/prompt happen to collide.
+    if (typeof meta.toolUseId === 'string' && meta.toolUseId.length > 0) {
+      continue
+    }
+
     const typeOk = meta.agentType === input.subagent_type
     const descOk = meta.description === input.description
     logger.debug(
@@ -130,10 +149,10 @@ export async function readAssociatedSubagent(
 
 async function readMetaSafely(
   metaPath: string,
-): Promise<{ agentType?: string; description?: string } | null> {
+): Promise<{ agentType?: string; description?: string; toolUseId?: string } | null> {
   try {
     const text = await readFile(metaPath, 'utf-8')
-    return JSON.parse(text) as { agentType?: string; description?: string }
+    return JSON.parse(text) as { agentType?: string; description?: string; toolUseId?: string }
   } catch {
     return null
   }

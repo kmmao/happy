@@ -120,12 +120,16 @@ import {
     StoredPermission,
     allocateId,
     applyToolResultToMessage,
+    detectBackgroundAgentLaunch,
     updateMessageWithCompletedPermission,
     createStoredPermission,
     processSidechainToolResult,
     extractSdkResultData,
 } from "./reducerHelpers";
-import { transitionBackgroundTaskEntry } from "@/utils/backgroundTaskStatus";
+import {
+    canTransitionBackgroundTaskStatus,
+    transitionBackgroundTaskEntry,
+} from "@/utils/backgroundTaskStatus";
 
 /** SDK event-driven background task entry, maintained by task-start/progress/end events */
 export type BackgroundTaskEntry = {
@@ -1093,37 +1097,65 @@ export function reducer(
 
           // tool-call-end with backgroundTaskId may arrive AFTER the real tool-result
           // has already set state to "completed". Handle it before the state guard.
-          if (c.backgroundTaskId) {
-            message.tool.backgroundTaskId = c.backgroundTaskId;
-            message.tool.outputFile = c.outputFile;
-            state.backgroundTaskIdToMessageId.set(c.backgroundTaskId, messageId);
+          // Background metadata has two producers: explicit fields on the
+          // protocol tool-call-end (Bash run_in_background, tagged Agent
+          // launches), and the structured/text launch ack carried as the
+          // legacy tool_result content (run_in_background Agent/Task).
+          const isSubagentTool =
+            message.tool.name === "Agent" || message.tool.name === "Task";
+          const agentLaunch = isSubagentTool
+            ? detectBackgroundAgentLaunch(c.content)
+            : null;
+          const backgroundTaskId = c.backgroundTaskId ?? agentLaunch?.agentId;
+          const backgroundOutputFile =
+            c.outputFile ?? agentLaunch?.outputFile ?? undefined;
+          if (backgroundTaskId) {
+            message.tool.backgroundTaskId = backgroundTaskId;
+            // Conditional: the same tool gets this block from BOTH delivery
+            // paths; the one without an outputFile must not clobber the one
+            // that carried it.
+            if (backgroundOutputFile) {
+              message.tool.outputFile = backgroundOutputFile;
+            }
+            state.backgroundTaskIdToMessageId.set(backgroundTaskId, messageId);
 
             // Create or enrich backgroundTasks entry
             const cmd = typeof message.tool.input?.command === "string"
               ? message.tool.input.command : "";
-            const existing = state.backgroundTasks.get(c.backgroundTaskId);
+            const existing = state.backgroundTasks.get(backgroundTaskId);
             if (existing) {
-              if ((!existing.command && cmd) || (!existing.outputFile && c.outputFile)) {
-                state.backgroundTasks.set(c.backgroundTaskId, {
+              if (
+                (!existing.command && cmd) ||
+                (!existing.outputFile && backgroundOutputFile) ||
+                !existing.toolUseId
+              ) {
+                state.backgroundTasks.set(backgroundTaskId, {
                   ...existing,
                   command: existing.command || cmd,
-                  outputFile: existing.outputFile ?? c.outputFile ?? null,
+                  outputFile: existing.outputFile ?? backgroundOutputFile ?? null,
+                  // Lets Phase 3.7 route task status messages into the
+                  // spawning Agent/Task sidechain.
+                  toolUseId: existing.toolUseId ?? c.tool_use_id,
                 });
                 bgTasksDirty = true;
               }
             } else {
               const isWorkflowTool = message.tool.name === "Workflow";
-              state.backgroundTasks.set(c.backgroundTaskId, {
-                taskId: c.backgroundTaskId,
-                toolUseId: null,
+              state.backgroundTasks.set(backgroundTaskId, {
+                taskId: backgroundTaskId,
+                toolUseId: c.tool_use_id,
                 command: cmd,
                 description: typeof message.tool.input?.description === "string"
                   ? message.tool.input.description : cmd,
-                outputFile: c.outputFile ?? null,
+                outputFile: backgroundOutputFile ?? null,
                 startedAt: message.tool.startedAt ?? message.createdAt,
                 status: "running",
                 summary: null,
-                taskType: isWorkflowTool ? "workflow" : null,
+                taskType: isWorkflowTool
+                  ? "workflow"
+                  : isSubagentTool
+                    ? "subagent"
+                    : null,
                 workflowName: isWorkflowTool && typeof message.tool.input?.name === "string"
                   ? message.tool.input.name : null,
               });
@@ -1131,9 +1163,24 @@ export function reducer(
             }
           }
 
-          // Apply the tool-result state transition — the same seam the sidechain
-          // path (processSidechainToolResult) crosses, so the two cannot drift.
-          if (applyToolResultToMessage(message, c, msg.createdAt)) {
+          // A background Agent/Task launch ack is NOT the agent's result —
+          // the agent keeps running and its real completion arrives later as
+          // a task-notification (Phase 3.5 flips the card). Keeping the card
+          // "running" is what lets useRunningSubagents/BackgroundTaskBar
+          // surface it and lets sidechain children keep streaming in. The
+          // second disjunct covers an untagged protocol tool-call-end
+          // (content null, older CLI) arriving after the legacy ack already
+          // registered the background id.
+          const isBackgroundSubagentLaunch =
+            isSubagentTool &&
+            (backgroundTaskId != null ||
+              (message.tool.backgroundTaskId != null && c.content == null));
+          if (isBackgroundSubagentLaunch) {
+            changed.add(messageId);
+          } else if (applyToolResultToMessage(message, c, msg.createdAt)) {
+            // Apply the tool-result state transition — the same seam the
+            // sidechain path (processSidechainToolResult) crosses, so the two
+            // cannot drift.
             changed.add(messageId);
           }
         }
@@ -1224,26 +1271,43 @@ export function reducer(
 
     // task-end → update status in backgroundTasks + update tool-call message state
     if (msg.taskEndInfo) {
-      const { taskId, status } = msg.taskEndInfo;
+      const { taskId, status, toolUseId, summary } = msg.taskEndInfo;
       const entry = state.backgroundTasks.get(taskId);
       if (entry) {
         // Route through the state machine so an out-of-order second task-end
         // (e.g. terminal-to-terminal flip) surfaces as a thrown error during
         // development rather than silently overwriting the prior status.
-        state.backgroundTasks.set(
-          taskId,
-          transitionBackgroundTaskEntry(entry, status),
-        );
-        bgTasksDirty = true;
+        // Exception: the same completion can legitimately arrive twice — the
+        // task-notification relay (legacy stream) and a protocol task-end
+        // both describe one event — so an already-terminal entry is a benign
+        // duplicate, not a bug.
+        if (canTransitionBackgroundTaskStatus(entry.status, status)) {
+          state.backgroundTasks.set(
+            taskId,
+            transitionBackgroundTaskEntry(entry, status),
+          );
+          bgTasksDirty = true;
+        }
       }
-      // Also update the tool-call message for tool bubble UI when the tool is still active.
-      const bgMsgId = state.backgroundTaskIdToMessageId.get(taskId);
+      // Also update the tool-call message for tool bubble UI when the tool is
+      // still active. Fall back to the taskEndInfo.toolUseId (carried by the
+      // task-notification relay) when no launch ack registered the task id —
+      // e.g. history replayed from a point after the launch.
+      const bgMsgId =
+        state.backgroundTaskIdToMessageId.get(taskId) ??
+        (toolUseId ? state.toolIdToMessageId.get(toolUseId) : undefined);
       if (bgMsgId) {
         const bgMessage = state.messages.get(bgMsgId);
         if (bgMessage?.tool && bgMessage.tool.state === "running") {
           bgMessage.tool.state =
             status === "failed" || status === "stopped" ? "error" : "completed";
           bgMessage.tool.completedAt = msg.createdAt;
+          // A background agent's launch ack was deliberately not stored as
+          // the result (Phase 3); stamp the completion summary so the card
+          // doesn't read as completed-with-no-result ("zombie").
+          if (bgMessage.tool.result == null) {
+            bgMessage.tool.result = summary ?? entry?.summary ?? status;
+          }
           changed.add(bgMsgId);
         }
       }

@@ -3,8 +3,13 @@ import { useUnistyles } from "react-native-unistyles";
 import {
   useSession,
   useSessionMessages,
+  useSessionTerminalStatus,
   useSetting,
 } from "@/sync/storage";
+import {
+  formatTerminalLiveStatus,
+  isSessionRunning,
+} from "@/utils/sessionUtils";
 import {
   ActivityIndicator,
   FlatList,
@@ -24,6 +29,7 @@ import { MessageView } from "./MessageView";
 import { ToolGroupView } from "./ToolGroupView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
+import { TypingBubble } from "./TypingBubble";
 import { Message } from "@/sync/typesMessage";
 import {
   buildVisibleChatDisplayItems,
@@ -158,11 +164,29 @@ const OlderMessagesArea = React.memo(
 
 const ListFooter = React.memo((props: { sessionId: string; contentMaxWidth?: number }) => {
   const session = useSession(props.sessionId)!;
+  const terminalStatus = useSessionTerminalStatus(props.sessionId);
+  const controlledByUser = session.agentState?.controlledByUser || false;
+  // While a PTY-mode Claude TUI is working, show a live "thinking" bubble
+  // sourced from the same terminal-signal activity that drives the header
+  // subtitle. It fills the gap between "TUI finished on screen" and "assistant
+  // message landed in JSONL". Gated strictly on there being real activity TEXT
+  // (verb/counters) — when no activity is available we render nothing, never
+  // the bare dots bubble (which was deliberately hidden). Suppressed while the
+  // user is driving the TUI directly.
+  const activityLabel =
+    isSessionRunning(session) && !controlledByUser
+      ? formatTerminalLiveStatus(terminalStatus) ?? undefined
+      : undefined;
   return (
     <>
-      {/* TypingBubble hidden */}
+      {activityLabel ? (
+        <TypingBubble
+          contentMaxWidth={props.contentMaxWidth}
+          label={activityLabel}
+        />
+      ) : null}
       <ChatFooter
-        controlledByUser={session.agentState?.controlledByUser || false}
+        controlledByUser={controlledByUser}
       />
     </>
   );

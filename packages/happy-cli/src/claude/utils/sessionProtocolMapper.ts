@@ -67,6 +67,7 @@ export type DropReason =
   | "system-message"
   | "meta-user-message"
   | "empty-user-content"
+  | "task-notification-relay"
   | "unhandled-message-type";
 
 export type DroppedMessage = {
@@ -336,6 +337,47 @@ function handleAssistantMessage(
   }
 }
 
+/** Flatten a tool_result content (string or array of text blocks) to text. */
+function extractToolResultText(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (b): b is { type: "text"; text: string } =>
+          !!b &&
+          typeof b === "object" &&
+          (b as { type?: unknown }).type === "text" &&
+          typeof (b as { text?: unknown }).text === "string",
+      )
+      .map((b) => b.text)
+      .join("\n");
+  }
+  return "";
+}
+
+/**
+ * Parse the Task/Agent `run_in_background` launch acknowledgment. Claude Code
+ * returns it as the tool_result the moment a background agent spawns; the
+ * agent itself keeps running and writes to `subagents/agent-<id>.jsonl`.
+ * The agentId doubles as the background task id (`<task-id>` in the eventual
+ * `<task-notification>` completion message uses the same value).
+ */
+export function parseBackgroundAgentLaunchAck(
+  text: string,
+): { agentId: string; outputFile?: string } | null {
+  if (!/agent launched/i.test(text)) {
+    return null;
+  }
+  const idMatch = text.match(/\bagentId:\s*([\w-]+)/);
+  if (!idMatch) {
+    return null;
+  }
+  const fileMatch = text.match(/\boutput_file:\s*(\S+)/);
+  return { agentId: idMatch[1], outputFile: fileMatch?.[1] };
+}
+
 /**
  * Emit one user `tool_result` block: auto-stop the matching subagent, build the
  * `tool-call-end` envelope, and lift background-task metadata out of a Bash
@@ -365,15 +407,28 @@ function emitUserToolResult(
     call: block.tool_use_id,
   };
 
-  // Extract background task metadata from Bash tool_result
-  const resultContent =
-    typeof block.content === "string" ? block.content : "";
+  // Extract background task metadata from the tool_result. Two producers:
+  //   - Bash run_in_background acks (string content),
+  //   - Task/Agent run_in_background launch acks (array-of-text-blocks
+  //     content: "Async agent launched successfully … agentId: X …
+  //     output_file: Y"). Tagging the tool-call-end lets the App keep the
+  //     Agent card in the "running" state and register the background task
+  //     instead of treating the launch ack as the agent's final result.
+  const resultContent = extractToolResultText(block.content);
   const bgMatch = resultContent.match(
     /Command running in background with ID: (\S+)\. Output is being written to: (\S+)/,
   );
   if (bgMatch) {
     toolCallEnd.backgroundTaskId = bgMatch[1];
     toolCallEnd.outputFile = bgMatch[2];
+  } else {
+    const agentAck = parseBackgroundAgentLaunchAck(resultContent);
+    if (agentAck) {
+      toolCallEnd.backgroundTaskId = agentAck.agentId;
+      if (agentAck.outputFile) {
+        toolCallEnd.outputFile = agentAck.outputFile;
+      }
+    }
   }
 
   emitContent(
@@ -416,6 +471,18 @@ function handleUserMessage(
         sink.envelopes,
         pickUuid(message),
       );
+    } else if (
+      message.message.content.trimStart().startsWith("<task-notification>")
+    ) {
+      // Background-agent completion relay: Claude Code injects this XML as a
+      // user prompt to wake the main loop when a run_in_background agent
+      // finishes. It is machine metadata, not something the human typed —
+      // emitting it would render raw XML as a user bubble. The App derives
+      // the completion signal itself from the legacy message stream (see
+      // happy-app typesRaw parseTaskNotification), so the protocol path just
+      // closes the turn (the notification does start a new prompt) and drops.
+      closeTurn(state, "completed", sink.envelopes);
+      return "task-notification-relay";
     } else {
       closeTurn(state, "completed", sink.envelopes);
       const userUuid = pickUuid(message);

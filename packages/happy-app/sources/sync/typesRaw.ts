@@ -958,6 +958,13 @@ export type NormalizedMessage = (
   taskEndInfo?: {
     taskId: string;
     status: "completed" | "failed" | "stopped";
+    /** Spawning tool_use id when known (task-notification relay) — lets the
+     *  reducer flip the Agent/Task tool card even when no backgroundTasks
+     *  entry exists (e.g. history replayed without the launch ack). */
+    toolUseId: string | null;
+    /** Final summary — becomes the tool card's result so a completed
+     *  background agent doesn't read as a "no result" zombie. */
+    summary: string | null;
   };
 };
 
@@ -1111,6 +1118,8 @@ function normalizeSessionEnvelopeCore(
       taskEndInfo: {
         taskId: envelope.ev.taskId,
         status: envelope.ev.status,
+        toolUseId: null,
+        summary: envelope.ev.summary || null,
       },
     } satisfies NormalizedMessage;
   }
@@ -1612,6 +1621,54 @@ function extractToolResultText(
   return parts.join("\n") || "[tool result]";
 }
 
+/**
+ * Parse the `<task-notification>` prompt Claude Code injects as a user message
+ * when a `run_in_background` agent (or other background task) finishes:
+ *
+ *   <task-notification>
+ *   <task-id>ae7d20fae0e66dc4d</task-id>
+ *   <tool-use-id>toolu_012EQf…</tool-use-id>
+ *   <output-file>/private/tmp/…/tasks/ae7d20fae0e66dc4d.output</output-file>
+ *   <status>completed</status>
+ *   <summary>Agent "…" finished</summary>
+ *   …
+ *
+ * It is machine metadata, not something the human typed — rendering it as a
+ * user bubble leaks raw XML into chat. Instead the normalizer converts it into
+ * a task-end service message so the reducer can complete the matching
+ * background task and Agent/Task tool card.
+ */
+export function parseTaskNotification(text: string): {
+  taskId: string;
+  toolUseId: string | null;
+  status: "completed" | "failed" | "stopped";
+  summary: string | null;
+} | null {
+  if (!text.trimStart().startsWith("<task-notification>")) {
+    return null;
+  }
+  const tag = (name: string): string | null => {
+    const m = text.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`));
+    return m ? m[1].trim() : null;
+  };
+  const taskId = tag("task-id");
+  if (!taskId) {
+    return null;
+  }
+  const rawStatus = (tag("status") ?? "completed").toLowerCase();
+  const status: "completed" | "failed" | "stopped" = /fail|error/.test(rawStatus)
+    ? "failed"
+    : /stop|kill|cancel|abort/.test(rawStatus)
+      ? "stopped"
+      : "completed";
+  return {
+    taskId,
+    toolUseId: tag("tool-use-id"),
+    status,
+    summary: tag("summary"),
+  };
+}
+
 export function normalizeRawMessage(
   id: string,
   localId: string | null,
@@ -1748,6 +1805,42 @@ export function normalizeRawMessage(
           raw.content.data.message &&
           typeof raw.content.data.message.content === "string"
         ) {
+          // Background-task completion relay — convert to a task-end service
+          // message instead of rendering the raw XML as a user bubble.
+          const notification = parseTaskNotification(
+            raw.content.data.message.content,
+          );
+          if (notification) {
+            const statusHeader =
+              notification.status === "completed"
+                ? "✓ Task completed"
+                : notification.status === "failed"
+                  ? "✗ Task failed"
+                  : "■ Task stopped";
+            return {
+              id,
+              localId,
+              createdAt,
+              role: "agent",
+              isSidechain: false,
+              content: [
+                {
+                  type: "text",
+                  text: `${statusHeader}\n${notification.summary ?? notification.taskId}`,
+                  uuid: raw.content.data.uuid,
+                  parentUUID: raw.content.data.parentUuid ?? null,
+                },
+              ],
+              meta: raw.meta,
+              taskEndInfo: {
+                taskId: notification.taskId,
+                status: notification.status,
+                toolUseId: notification.toolUseId,
+                summary: notification.summary,
+              },
+            };
+          }
+
           return {
             id,
             localId,

@@ -2549,3 +2549,60 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
         });
     });
 });
+
+describe('task-notification user message relay', () => {
+    const notificationXml =
+        '<task-notification>\n' +
+        '<task-id>ae7d20fae0e66dc4d</task-id>\n' +
+        '<tool-use-id>toolu_012EQfqxhwisz3Vhj5SBpWbh</tool-use-id>\n' +
+        '<output-file>/private/tmp/claude-501/proj/sess/tasks/ae7d20fae0e66dc4d.output</output-file>\n' +
+        '<status>completed</status>\n' +
+        '<summary>Agent "scan CLI side" finished</summary>\n' +
+        '<note>A task-notification fired.</note>\n' +
+        '</task-notification>';
+
+    function userRelay(content: string) {
+        return {
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    message: { role: 'user', content },
+                    uuid: 'notif-uuid-1',
+                },
+            },
+        } as any;
+    }
+
+    it('converts the XML into a task-end service message instead of a user bubble', () => {
+        const result = normalizeRawMessage('m1', null, 1000, userRelay(notificationXml));
+        expect(result).not.toBeNull();
+        expect(result!.role).toBe('agent');
+        expect(result!.taskEndInfo).toEqual({
+            taskId: 'ae7d20fae0e66dc4d',
+            status: 'completed',
+            toolUseId: 'toolu_012EQfqxhwisz3Vhj5SBpWbh',
+            summary: 'Agent "scan CLI side" finished',
+        });
+        const first = (result!.content as any[])[0];
+        expect(first.type).toBe('text');
+        expect(first.text).toContain('✓ Task completed');
+        expect(first.text).toContain('Agent "scan CLI side" finished');
+    });
+
+    it('maps failed/killed statuses', () => {
+        const failed = normalizeRawMessage('m2', null, 1000,
+            userRelay(notificationXml.replace('<status>completed</status>', '<status>failed</status>')));
+        expect(failed!.taskEndInfo!.status).toBe('failed');
+        const killed = normalizeRawMessage('m3', null, 1000,
+            userRelay(notificationXml.replace('<status>completed</status>', '<status>killed</status>')));
+        expect(killed!.taskEndInfo!.status).toBe('stopped');
+    });
+
+    it('leaves ordinary user messages untouched', () => {
+        const result = normalizeRawMessage('m4', null, 1000, userRelay('hello there'));
+        expect(result!.role).toBe('user');
+        expect((result!.content as any).text).toBe('hello there');
+    });
+});
