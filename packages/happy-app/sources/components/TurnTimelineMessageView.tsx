@@ -17,21 +17,10 @@ import { t } from "@/text";
 import { useSetting, useSession } from "@/sync/storage";
 import { isSessionRunning } from "@/utils/sessionUtils";
 import { useAppendToInput } from "@/hooks/useInputContext";
+import { formatModelName, formatTokensCompact, formatCostUsd } from "@/utils/formatUsage";
 
-function formatModelName(model: string): string {
-  return model.replace(/-\d{8}$/, "");
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return String(count);
-}
-
+// Turn-timeline duration additionally renders sub-second as "Xms" — kept local
+// on purpose (see ADR-0061); model / token / cost formatting is the shared owner.
 function formatDuration(ms: number): string {
   if (ms >= 60000) {
     return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
@@ -40,13 +29,6 @@ function formatDuration(ms: number): string {
     return `${Math.round(ms)}ms`;
   }
   return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatCost(costUsd: number): string {
-  if (costUsd < 0.01) {
-    return `$${costUsd.toFixed(4)}`;
-  }
-  return `$${costUsd.toFixed(2)}`;
 }
 
 interface ModelUsageInfo {
@@ -136,7 +118,7 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
       for (const s of sorted) {
         models.push({
           model: s.model,
-          tokens: formatTokenCount(s.tokens),
+          tokens: formatTokensCompact(s.tokens),
           cacheHitRate: s.cacheHitRate,
         });
       }
@@ -162,9 +144,9 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
     duration:
       typeof event.durationMs === "number" ? formatDuration(event.durationMs) : null,
     turns: typeof event.numTurns === "number" && event.numTurns > 0 ? event.numTurns : null,
-    totalTokens: totalTokens !== null ? formatTokenCount(totalTokens) : null,
+    totalTokens: totalTokens !== null ? formatTokensCompact(totalTokens) : null,
     cacheHitRate,
-    cost: typeof costUsd === "number" && costUsd > 0 ? formatCost(costUsd) : null,
+    cost: typeof costUsd === "number" && costUsd > 0 ? formatCostUsd(costUsd) : null,
   };
 }
 

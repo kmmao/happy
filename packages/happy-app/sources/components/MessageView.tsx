@@ -21,6 +21,7 @@ import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
 import { useSetting, useProjectForSession, useSession } from "@/sync/storage";
 import { isSessionRunning } from "@/utils/sessionUtils";
+import { formatModelName, formatCostUsd, formatTokensCompact, formatDurationCompact } from "@/utils/formatUsage";
 import { getAutoOptionFeedbackStats } from "@/sync/autoOptionFeedback";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
@@ -768,35 +769,6 @@ function AgentTextBlock(props: {
   );
 }
 
-function formatModelName(model: string): string {
-  // Strip date suffix from model IDs like "claude-sonnet-4-6-20250514" → "claude-sonnet-4-6"
-  return model.replace(/-\d{8}$/, "");
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return String(count);
-}
-
-function formatDuration(ms: number): string {
-  if (ms >= 60000) {
-    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
-  }
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatCost(costUsd: number): string {
-  if (costUsd < 0.01) {
-    return `$${costUsd.toFixed(4)}`;
-  }
-  return `$${costUsd.toFixed(2)}`;
-}
-
 /**
  * Compact token counts for the `/compact` summary bubble. Mirrors the
  * UsagePanel formatter (K / M cutoff) without taking on its full settings
@@ -830,7 +802,7 @@ const CompactBoundaryEvent = React.memo(function CompactBoundaryEvent(props: {
   // Duration only contributes when the TUI reported one (compactMetadata
   // omits durationMs on auto-compact paths in some Claude Code versions).
   const durationStr =
-    props.durationMs > 0 ? formatDuration(props.durationMs) : null;
+    props.durationMs > 0 ? formatDurationCompact(props.durationMs) : null;
   const header =
     props.trigger === "auto"
       ? t("message.compactBoundary.autoHeader")
@@ -946,7 +918,7 @@ function AgentEventBlock(props: {
     const durationMs = props.event.durationMs;
     const modelStr = model ? formatModelName(model) : null;
     const durationStr =
-      durationMs !== undefined ? formatDuration(durationMs) : null;
+      durationMs !== undefined ? formatDurationCompact(durationMs) : null;
 
     // Session total tokens: prefer SDK modelUsage, fallback to reducer cumulative
     let sessionTotalTokens: number | null = null;
@@ -1111,7 +1083,7 @@ function AgentEventBlock(props: {
               ]}
             >
               {t("message.sessionSummary", {
-                tokens: formatTokenCount(sessionTotalTokens),
+                tokens: formatTokensCompact(sessionTotalTokens),
               })}
             </Text>
             {sessionCacheHitRate !== null && (
@@ -1139,7 +1111,7 @@ function AgentEventBlock(props: {
             <Text
               style={[styles.turnStatBadgeText, { color: theme.colors.success }]}
             >
-              {formatCost(sessionCost)}
+              {formatCostUsd(sessionCost)}
             </Text>
           </View>
         )}

@@ -4,7 +4,9 @@ import { z } from "zod";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
-import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import { emitConfiguredSupervisorFixTrigger, buildFixActionTriggerInput } from "@/modules/supervisorFixTrigger";
+import { parseSupervisorConfig } from "@/modules/supervisorConfig";
+import { sessionDeactivate } from "@/app/session/sessionDeactivate";
 import {
     decideApprovalTransition,
     DISMISSED_APPROVALS,
@@ -402,13 +404,9 @@ export function supervisorActionRoutes(app: Fastify) {
             const fixMode = request.body?.mode ?? "fix";
 
             // Read analyzeAutoFix from project config
-            let analyzeAutoFix = false;
-            if (fixMode === "analyze-first" && project.supervisorConfig) {
-                try {
-                    const parsed = JSON.parse(project.supervisorConfig);
-                    analyzeAutoFix = parsed.analyzeAutoFix === true;
-                } catch { /* ignore parse errors */ }
-            }
+            const analyzeAutoFix =
+                fixMode === "analyze-first" &&
+                parseSupervisorConfig(project.supervisorConfig).analyzeAutoFix;
 
             // Update fix status to pending and store fixMode
             await db.supervisorAction.update({
@@ -430,13 +428,7 @@ export function supervisorActionRoutes(app: Fastify) {
                 fixStrategy: project.fixStrategy,
                 fixMode,
                 analyzeAutoFix,
-                fixAction: {
-                    title: action.title,
-                    description: action.description,
-                    suggestedFix: action.suggestedFix,
-                    category: action.category,
-                    severity: action.severity,
-                },
+                fixAction: buildFixActionTriggerInput(action),
             });
 
             return reply.send({
@@ -661,11 +653,7 @@ export function supervisorActionRoutes(app: Fastify) {
 
             // Archive fix session if present
             if (action.fixSessionId) {
-                const now = Date.now();
-                await db.session.updateMany({
-                    where: { id: action.fixSessionId, active: true },
-                    data: { lastActiveAt: new Date(now), active: false },
-                });
+                await sessionDeactivate(userId, action.fixSessionId);
 
                 // Tell CLI daemon to kill the session
                 const project = await db.project.findUnique({

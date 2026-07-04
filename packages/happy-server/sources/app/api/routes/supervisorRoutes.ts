@@ -3,9 +3,8 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { log } from "@/utils/log";
-import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
-import { parseConcurrencyConfig } from "./supervisorRunRoutes";
-import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import { parseAutoApproveSeverities, parseSupervisorConfig } from "@/modules/supervisorConfig";
+import { emitConfiguredSupervisorFixTrigger, buildFixActionTriggerInput } from "@/modules/supervisorFixTrigger";
 import { assertOwnedProject, ownedProject } from "../ownership";
 
 /**
@@ -281,7 +280,7 @@ export function supervisorRoutes(app: Fastify) {
             );
 
             // Trigger fix for each approved action
-            const { maxAnalysis, maxFix } = parseConcurrencyConfig(project.supervisorConfig);
+            const { concurrency } = parseSupervisorConfig(project.supervisorConfig);
             for (const action of pendingActions) {
                 await emitConfiguredSupervisorFixTrigger({
                     userId,
@@ -292,15 +291,9 @@ export function supervisorRoutes(app: Fastify) {
                     supervisorConfig: project.supervisorConfig,
                     fixStrategy: project.fixStrategy,
                     mode,
-                    maxConcurrentAnalysis: maxAnalysis,
-                    maxConcurrentFix: maxFix,
-                    fixAction: {
-                        title: action.title,
-                        description: action.description,
-                        suggestedFix: action.suggestedFix,
-                        category: action.category,
-                        severity: action.severity,
-                    },
+                    maxConcurrentAnalysis: concurrency.maxAnalysisSessions,
+                    maxConcurrentFix: concurrency.maxFixSessions,
+                    fixAction: buildFixActionTriggerInput(action),
                 });
             }
 

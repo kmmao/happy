@@ -17,9 +17,9 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
-import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
+import { parseAutoApproveSeverities, parseSupervisorConfig } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
-import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import { emitConfiguredSupervisorFixTrigger, buildFixActionTriggerInput } from "@/modules/supervisorFixTrigger";
 import { decideAutoApproveAndQueueFix } from "@/modules/supervisorFixStatusLogic";
 
 export async function handleAutoApproval(
@@ -130,13 +130,7 @@ export async function handleAutoApproval(
         }
 
         // Parse supervisor config once before the loop
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let parsedSupervisorConfig: any;
-        if (project.supervisorConfig) {
-            try {
-                parsedSupervisorConfig = JSON.parse(project.supervisorConfig);
-            } catch { /* ignore */ }
-        }
+        const supervisorCfg = parseSupervisorConfig(project.supervisorConfig);
 
         // Trigger fix for each approved action
         log({ module: "supervisor" }, `handleAutoApproval: triggering ${actions.length} fix events for project ${projectId}`);
@@ -165,17 +159,6 @@ export async function handleAutoApproval(
                 }
             }
 
-            // Extract concurrency limits from pre-parsed project config
-            let maxConcurrentAnalysis: number | undefined;
-            let maxConcurrentFix: number | undefined;
-            if (parsedSupervisorConfig) {
-                const c = parsedSupervisorConfig?.concurrency;
-                if (c && typeof c === "object") {
-                    maxConcurrentAnalysis = typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined;
-                    maxConcurrentFix = typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined;
-                }
-            }
-
             await emitConfiguredSupervisorFixTrigger({
                 userId,
                 projectId,
@@ -185,16 +168,9 @@ export async function handleAutoApproval(
                 supervisorConfig: project.supervisorConfig,
                 fixStrategy: project.fixStrategy,
                 mode,
-                maxConcurrentAnalysis,
-                maxConcurrentFix,
-                fixAction: {
-                    title: action.title,
-                    description: action.description,
-                    suggestedFix: action.suggestedFix,
-                    category: action.category,
-                    severity: action.severity,
-                    issueNumber,
-                },
+                maxConcurrentAnalysis: supervisorCfg.concurrency.maxAnalysisSessions,
+                maxConcurrentFix: supervisorCfg.concurrency.maxFixSessions,
+                fixAction: buildFixActionTriggerInput(action, issueNumber),
             });
         }
 

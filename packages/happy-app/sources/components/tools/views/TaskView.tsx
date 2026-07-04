@@ -17,20 +17,7 @@ import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { resolveToolChildTitle } from "@/components/tools/toolMetadataResolve";
-
-function formatTokenCount(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return String(count);
-}
-
-function formatDuration(ms: number): string {
-  if (ms >= 60000) {
-    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
-  }
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+import { formatModelName, formatTokensCompact, formatDurationCompact } from "@/utils/formatUsage";
 
 interface SubTaskStats {
   durationMs: number | null;
@@ -166,8 +153,8 @@ export const TaskView = React.memo<ToolViewProps>(
     const usageInfos: UsageInfo[] =
       usageByModel.size > 0
         ? Array.from(usageByModel.entries()).map(([model, data]) => ({
-            model: model.replace(/-\d{8}$/, ""),
-            tokens: formatTokenCount(data.tokens),
+            model: formatModelName(model),
+            tokens: formatTokensCompact(data.tokens),
             cacheHit:
               data.cacheRead > 0 && data.totalInput > 0
                 ? `↓${Math.round((data.cacheRead / data.totalInput) * 100)}%`
@@ -737,7 +724,7 @@ export const TaskView = React.memo<ToolViewProps>(
                                 { color: theme.colors.accentOrange },
                               ]}
                             >
-                              {formatDuration(item.stats.durationMs)}
+                              {formatDurationCompact(item.stats.durationMs)}
                             </Text>
                           </View>
                         )}
@@ -757,7 +744,7 @@ export const TaskView = React.memo<ToolViewProps>(
                                 { color: theme.colors.accentTeal },
                               ]}
                             >
-                              {formatTokenCount(item.stats.tokenCount)}
+                              {formatTokensCompact(item.stats.tokenCount)}
                             </Text>
                           </View>
                         )}

@@ -2,6 +2,7 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
 import { emitConfiguredSupervisorRunTrigger } from "./supervisorRunTrigger";
+import { parseSupervisorConfig, parseEnabledDimensions } from "./supervisorConfig";
 
 const DEFAULT_SCHEDULE_INTERVAL_HOURS = 24;
 
@@ -175,17 +176,8 @@ export async function checkAndTriggerScheduledRuns(
 
             await incrementDailyRunCount(project.id);
 
-            const dimensions = project.supervisorEnabledDimensions
-                ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
-                : undefined;
-
-            let maxFindings: number | undefined;
-            try {
-                const cfg = project.supervisorConfig ? JSON.parse(project.supervisorConfig) : null;
-                maxFindings = typeof cfg?.maxFindings === "number" ? cfg.maxFindings : undefined;
-            } catch {
-                // ignore malformed config and proceed with defaults
-            }
+            const dimensions = parseEnabledDimensions(project.supervisorEnabledDimensions);
+            const maxFindings = parseSupervisorConfig(project.supervisorConfig).maxFindings;
 
             await emitConfiguredSupervisorRunTrigger({
                 userId,

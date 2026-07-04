@@ -9,7 +9,7 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
-import { activityCache } from "@/app/presence/sessionCache";
+import { sessionDeactivate } from "@/app/session/sessionDeactivate";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 import { decideFixStatusReport, type TerminalFixStatus } from "@/modules/supervisorFixStatusLogic";
@@ -97,24 +97,7 @@ export function supervisorFixStatusHandler(
                 const resolvedFixSessionId =
                     data.fixSessionId ?? action.fixSessionId;
                 if (resolvedFixSessionId) {
-                    const now = Date.now();
-                    await db.session.updateMany({
-                        where: {
-                            id: resolvedFixSessionId,
-                            active: true,
-                        },
-                        data: {
-                            lastActiveAt: new Date(now),
-                            active: false,
-                        },
-                    });
-                    activityCache.invalidateSession(resolvedFixSessionId);
-                    await emitSyncEphemeral(userId, {
-                        t: "session-activity",
-                        sessionId: resolvedFixSessionId,
-                        active: false,
-                        activeAt: now,
-                    });
+                    await sessionDeactivate(userId, resolvedFixSessionId);
                 }
             }
 

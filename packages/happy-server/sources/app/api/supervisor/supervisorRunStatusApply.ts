@@ -48,7 +48,7 @@ import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
-import { activityCache } from "@/app/presence/sessionCache";
+import { sessionDeactivate } from "@/app/session/sessionDeactivate";
 import { maybeAutoStartLoop } from "@/modules/supervisorAutoLoop";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { handleAutoApproval } from "./supervisorAutoApproval";
@@ -375,18 +375,7 @@ export async function supervisorRunStatusApply(
 
         // Archive the supervisor session so it doesn't stay active
         if (resolvedSessionId) {
-            const now = Date.now();
-            await db.session.updateMany({
-                where: { id: resolvedSessionId, active: true },
-                data: { lastActiveAt: new Date(now), active: false },
-            });
-            activityCache.invalidateSession(resolvedSessionId);
-            await emitSyncEphemeral(userId, {
-                t: "session-activity",
-                sessionId: resolvedSessionId,
-                active: false,
-                activeAt: now,
-            });
+            await sessionDeactivate(userId, resolvedSessionId);
         }
     }
 

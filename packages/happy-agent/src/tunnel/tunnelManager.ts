@@ -32,7 +32,10 @@ export class TunnelManager {
         }),
       ),
     );
-    const providers = results.filter((r) => r !== null).map((r) => r!);
+    const providers = results
+      .filter((r) => r !== null)
+      .map((r) => r!);
+
     this.lastState = { providers };
     return this.lastState;
   }
@@ -64,7 +67,9 @@ export class TunnelManager {
     this.refreshTimer = setInterval(async () => {
       const prev = JSON.stringify(this.lastState);
       const next = await this.detectAll();
-      if (JSON.stringify(next) !== prev) onChange(next);
+      if (JSON.stringify(next) !== prev) {
+        onChange(next);
+      }
     }, intervalMs);
 
     // Renew time-limited leases for any provider that declares the capability

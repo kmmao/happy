@@ -11,6 +11,8 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { buildSupervisorLoopBrief } from "@/modules/supervisorLoopBrief";
+import { parseSupervisorConfig, parseEnabledDimensions } from "@/modules/supervisorConfig";
+import { buildFixActionTriggerInput } from "@/modules/supervisorFixTrigger";
 import { pushSupervisorLoopNotification } from "@/modules/pushSend";
 import { inboxCreate } from "@/modules/inboxCreate";
 
@@ -264,11 +266,9 @@ export async function startLoop(
     await incrementDailyRunCount(projectId);
 
     // Emit trigger to CLI daemon
-    const dimensions = project.supervisorEnabledDimensions
-        ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
-        : undefined;
+    const dimensions = parseEnabledDimensions(project.supervisorEnabledDimensions);
 
-    const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+    const supervisorCfg = parseSupervisorConfig(project.supervisorConfig);
     const callbackToken = await auth.createSupervisorCallbackToken({
         userId: accountId,
         projectId,
@@ -288,9 +288,9 @@ export async function startLoop(
         mode: project.supervisorMode ?? undefined,
         dimensions,
         customRules: project.supervisorCustomRules ?? undefined,
-        maxConcurrentAnalysis: concurrency.maxAnalysis,
-        maxConcurrentFix: concurrency.maxFix,
-        maxFindings: concurrency.maxFindings,
+        maxConcurrentAnalysis: supervisorCfg.concurrency.maxAnalysisSessions,
+        maxConcurrentFix: supervisorCfg.concurrency.maxFixSessions,
+        maxFindings: supervisorCfg.maxFindings,
         runtimeProfile: config.runtimeProfile,
     });
 
@@ -702,7 +702,7 @@ async function decideNextStep(
 
     if (!project) return;
 
-    const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+    const supervisorCfg = parseSupervisorConfig(project.supervisorConfig);
 
     // Trigger fix for each approved action
     for (const action of approvableActions) {
@@ -726,16 +726,10 @@ async function decideNextStep(
             repoPath: project.path,
             callbackToken,
             mode: "auto",
-            fixAction: {
-                title: action.title,
-                description: action.description,
-                suggestedFix: action.suggestedFix,
-                category: action.category,
-                severity: action.severity,
-            },
+            fixAction: buildFixActionTriggerInput(action),
             fixStrategy: "direct", // Loop always uses direct strategy
-            maxConcurrentAnalysis: concurrency.maxAnalysis,
-            maxConcurrentFix: concurrency.maxFix,
+            maxConcurrentAnalysis: supervisorCfg.concurrency.maxAnalysisSessions,
+            maxConcurrentFix: supervisorCfg.concurrency.maxFixSessions,
             runtimeProfile,
         });
     }
@@ -810,11 +804,9 @@ async function triggerNextAnalysis(
 
     if (!project) return;
 
-    const dimensions = project.supervisorEnabledDimensions
-        ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
-        : undefined;
+    const dimensions = parseEnabledDimensions(project.supervisorEnabledDimensions);
 
-    const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+    const supervisorCfg = parseSupervisorConfig(project.supervisorConfig);
 
     // Query existing actions for dedup prompt
     const existingActions = await db.supervisorAction.findMany({
@@ -848,8 +840,8 @@ async function triggerNextAnalysis(
         dimensions,
         customRules: project.supervisorCustomRules ?? undefined,
         existingActions,
-        maxConcurrentAnalysis: concurrency.maxAnalysis,
-        maxConcurrentFix: concurrency.maxFix,
+        maxConcurrentAnalysis: supervisorCfg.concurrency.maxAnalysisSessions,
+        maxConcurrentFix: supervisorCfg.concurrency.maxFixSessions,
         runtimeProfile: getStoredLoopRuntimeProfile(
             loop.profileId ?? null,
             loop.runtimeProfile,
@@ -996,27 +988,6 @@ function emitLoopStatus(
         exitReason: loop.exitReason,
         consecutiveFailures: loop.consecutiveFailures,
     });
-}
-
-function parseConcurrencyConfig(configJson: string | null | undefined): {
-    maxAnalysis: number | undefined;
-    maxFix: number | undefined;
-    maxFindings: number | undefined;
-} {
-    if (!configJson) return { maxAnalysis: undefined, maxFix: undefined, maxFindings: undefined };
-    try {
-        const config = JSON.parse(configJson);
-        const c = config?.concurrency;
-        const maxFindings = typeof config?.maxFindings === "number" ? config.maxFindings : undefined;
-        if (!c || typeof c !== "object") return { maxAnalysis: undefined, maxFix: undefined, maxFindings };
-        return {
-            maxAnalysis: typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined,
-            maxFix: typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined,
-            maxFindings,
-        };
-    } catch {
-        return { maxAnalysis: undefined, maxFix: undefined, maxFindings: undefined };
-    }
 }
 
 /**

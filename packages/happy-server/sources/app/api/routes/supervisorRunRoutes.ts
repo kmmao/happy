@@ -5,6 +5,7 @@ import { z } from "zod";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { emitResolvedSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
+import { parseSupervisorConfig, parseEnabledDimensions } from "@/modules/supervisorConfig";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 import { supervisorRunStatusApply } from "../supervisor/supervisorRunStatusApply";
 import { assertOwnedProject, ownedProject } from "../ownership";
@@ -138,8 +139,7 @@ export function supervisorRunRoutes(app: Fastify) {
                 : undefined;
 
             // Extract concurrency limits from supervisorConfig JSON
-            const concurrency = parseConcurrencyConfig(project.supervisorConfig);
-            const maxFindings = parseMaxFindings(project.supervisorConfig);
+            const supervisorCfg = parseSupervisorConfig(project.supervisorConfig);
 
             await emitResolvedSupervisorRunTrigger({
                 userId,
@@ -156,7 +156,7 @@ export function supervisorRunRoutes(app: Fastify) {
                 dimensions:
                     triggerType === "research"
                         ? undefined
-                        : parseDimensions(project.supervisorEnabledDimensions),
+                        : parseEnabledDimensions(project.supervisorEnabledDimensions),
                 customRules:
                     triggerType === "research"
                         ? undefined
@@ -169,9 +169,9 @@ export function supervisorRunRoutes(app: Fastify) {
                     ? JSON.stringify(researchParams)
                     : undefined,
                 existingActions,
-                maxConcurrentAnalysis: concurrency.maxAnalysis,
-                maxConcurrentFix: concurrency.maxFix,
-                maxFindings,
+                maxConcurrentAnalysis: supervisorCfg.concurrency.maxAnalysisSessions,
+                maxConcurrentFix: supervisorCfg.concurrency.maxFixSessions,
+                maxFindings: supervisorCfg.maxFindings,
                 agent: request.body?.agent,
             });
 
@@ -472,47 +472,6 @@ class ConflictError extends Error {
         super("Conflict");
         this.runId = runId;
     }
-}
-
-/**
- * Extract concurrency limits from the supervisorConfig JSON blob.
- * Returns undefined values if not set (CLI will use its defaults).
- */
-export function parseConcurrencyConfig(configJson: string | null | undefined): {
-    maxAnalysis: number | undefined;
-    maxFix: number | undefined;
-} {
-    if (!configJson) return { maxAnalysis: undefined, maxFix: undefined };
-    try {
-        const config = JSON.parse(configJson);
-        const c = config?.concurrency;
-        if (!c || typeof c !== "object") return { maxAnalysis: undefined, maxFix: undefined };
-        return {
-            maxAnalysis: typeof c.maxAnalysisSessions === "number" ? c.maxAnalysisSessions : undefined,
-            maxFix: typeof c.maxFixSessions === "number" ? c.maxFixSessions : undefined,
-        };
-    } catch {
-        return { maxAnalysis: undefined, maxFix: undefined };
-    }
-}
-
-export function parseMaxFindings(configJson: string | null | undefined): number | undefined {
-    if (!configJson) return undefined;
-    try {
-        const config = JSON.parse(configJson);
-        return typeof config?.maxFindings === "number" ? config.maxFindings : undefined;
-    } catch {
-        return undefined;
-    }
-}
-
-export function parseDimensions(raw: string | null | undefined): string[] | undefined {
-    if (!raw) return undefined;
-    const dims = raw
-        .split(",")
-        .map((d) => d.trim())
-        .filter(Boolean);
-    return dims.length > 0 ? dims : undefined;
 }
 
 export function serializeSupervisorRun(run: {

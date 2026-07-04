@@ -9,6 +9,7 @@ import {
   RESOLVED_RUNTIME_PROFILE_SCHEMA_VERSION,
   type ResolvedRuntimeProfile,
 } from "@/types/aiBackendProfile";
+import { parseSupervisorConfig } from "@/modules/supervisorConfig";
 
 export interface ResolvedSupervisorProfile {
   runtimeProfile?: ResolvedRuntimeProfile;
@@ -22,13 +23,7 @@ function isBuiltInProfileId(profileId: string): boolean {
 }
 
 export function parseDefaultProfileId(supervisorConfig: string | null): string | null {
-  if (!supervisorConfig) return null;
-  try {
-    const parsed = JSON.parse(supervisorConfig) as { defaultProfileId?: string | null };
-    return parsed.defaultProfileId ?? null;
-  } catch {
-    return null;
-  }
+  return parseSupervisorConfig(supervisorConfig).defaultProfileId;
 }
 
 export async function resolveSupervisorProfile(

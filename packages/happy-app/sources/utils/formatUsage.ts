@@ -56,3 +56,54 @@ export function formatDurationMs(ms: number): string {
     const m = mins % 60;
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+
+// ---------------------------------------------------------------------------
+// Value formatting owner (ADR-0061)
+//
+// Single home for how the App renders model ids, USD cost, token counts, and
+// durations. Several presentations exist ON PURPOSE and are kept as distinct
+// named variants rather than collapsed:
+//   - tokens: `formatTokenCount` ("1.2K tokens" — with suffix) /
+//     `formatTokenCountShort` ("1.2K") / `formatTokensCompact` ("1.2k" — the
+//     message/turn-timeline style, lowercase unit, no suffix).
+//   - duration: `formatDurationMs` (floor-based h/m/s clock) /
+//     `formatDurationCompact` ("Xm Ys" or "1.4s" decimal seconds).
+//   - cost: `formatCostUsd` (adaptive: 4 decimals under a cent, else 2). The
+//     always-4-decimals "precise" style in the usage/supervisor detail views is
+//     a deliberately different presentation and stays local to those screens.
+// Only byte-identical local copies were folded in here; divergent variants stay
+// put (see the ADR for the full list).
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip a trailing 8-digit date suffix from a raw model id
+ * ("claude-sonnet-4-6-20250514" → "claude-sonnet-4-6"). Returns the raw id, NOT
+ * a prettified label — for "Opus (1M)" / "GPT-5" style labels use
+ * `sessionModelLabel` or `modelModeOptions.formatModelName`.
+ */
+export const formatModelName = (model: string): string => model.replace(/-\d{8}$/, "");
+
+/** Adaptive USD cost: 4 decimals under a cent, else 2 ("$0.0042" / "$1.20"). */
+export const formatCostUsd = (costUsd: number): string =>
+  costUsd < 0.01 ? `$${costUsd.toFixed(4)}` : `$${costUsd.toFixed(2)}`;
+
+/**
+ * Compact token count, lowercase unit, no "tokens" suffix — the message and
+ * turn-timeline style ("1.2M" / "1.2k" / "42"). Distinct from
+ * `formatTokenCountShort` (uppercase K) and `formatTokenCount` (with suffix).
+ */
+export const formatTokensCompact = (count: number): string => {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+  return String(count);
+};
+
+/**
+ * Compact duration: "Xm Ys" over a minute, else decimal seconds ("1.4s").
+ * For the floor-based h/m/s clock form use `formatDurationMs`; the turn timeline
+ * keeps its own variant that additionally renders sub-second as "Xms".
+ */
+export const formatDurationCompact = (ms: number): string => {
+  if (ms >= 60_000) return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+  return `${(ms / 1000).toFixed(1)}s`;
+};

@@ -2,13 +2,39 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { auth } from "@/app/auth/auth";
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 
-interface SupervisorFixActionTriggerInput {
+export interface SupervisorFixActionTriggerInput {
     title: string;
     description: string;
     suggestedFix: string | null;
     category: string;
     severity: string;
     issueNumber?: number;
+}
+
+/**
+ * The single projection of a SupervisorAction row onto the fix-trigger payload.
+ * Owned here so the "which SupervisorAction fields travel to the CLI fix trigger"
+ * mapping has one home — a field add/rename is one edit, not four. `issueNumber`
+ * is supplied separately (it comes from a provider-created issue, not the row).
+ */
+export function buildFixActionTriggerInput(
+    action: {
+        title: string;
+        description: string;
+        suggestedFix: string | null;
+        category: string;
+        severity: string;
+    },
+    issueNumber?: number,
+): SupervisorFixActionTriggerInput {
+    return {
+        title: action.title,
+        description: action.description,
+        suggestedFix: action.suggestedFix,
+        category: action.category,
+        severity: action.severity,
+        ...(issueNumber !== undefined ? { issueNumber } : {}),
+    };
 }
 
 interface EmitConfiguredSupervisorFixTriggerInput {
