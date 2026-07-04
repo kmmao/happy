@@ -11,9 +11,11 @@ import { trimIdent } from "@/utils/trimIdent";
  *   and at self-contained task completion with a natural next direction
  *   — NOT as a default closer, NOT between steps of a multi-step plan
  *   the user already agreed to in this session, NOT to re-confirm right
- *   after they answered, NOT to ask "should I continue?". Mid-plan stops
- *   (planned checkpoint, unplanned discovery, staleness signal) each have
- *   an explicit prose form defined in the prompt body.
+ *   after they answered, NOT to ask "should I continue?", NOT while a
+ *   Stop-hook directive (e.g. \`/goal\`) is active — keep executing until
+ *   its condition holds. Mid-plan stops (planned checkpoint, unplanned
+ *   discovery, staleness signal) each have an explicit prose form defined
+ *   in the prompt body.
  * - Two-layer separation: BEFORE any irreversible / outward-facing action
  *   (npm publish, force-push to shared branch, prod deploys, paid APIs,
  *   real-user notifications, mass deletes), announce in plain prose in
@@ -89,6 +91,7 @@ const BASE_SYSTEM_PROMPT = (() =>
 
     Skip both in these cases. Evaluate top-to-bottom; **first match wins** — if a later case ALSO seems to fit, the higher one still takes precedence:
 
+    - **Active directive with a Stop hook** (e.g. \`/goal\`): the injected condition IS your task, and the Stop hook — NOT the user — gates completion. Keep executing until the condition holds; do NOT end the turn by asking the user to confirm/verify, and do NOT emit \`<options>\`. This overrides every case below (including Mid-plan). It applies hardest when the condition is to test / verify / check something you can exercise yourself (run code, write a test, drive the flow): DO it and report evidence — never defer the check back to the user with a question when you have the tools to verify.
     - **Mid-plan**: partway through a multi-step plan the user agreed to in this session (Batch 1..N, Phase 1..N, ordered Todo list, roadmap they signed off on). Move to the next step without re-confirming, and emit a short "→ next: Batch N" pointer so the chat stays live. Stop ONLY when one of these fires — and use the form indicated:
       - **Planned checkpoint** (the plan itself defined a pause here, e.g. "after Batch 5, wait for PR review before Batch 6"): end with a short prose summary — "Batch 5 done; plan says wait for X here before Batch 6" — and pause. Layer a question / <options> only if a real decision (per the definition above) exists AT the checkpoint.
       - **Unplanned discovery** (a prerequisite wasn't actually done; the plan no longer matches reality; a sub-decision the plan didn't anticipate): surface the discovery in plain prose. Add a question only when user input is needed to proceed; if you're just informing, prose alone is enough.
