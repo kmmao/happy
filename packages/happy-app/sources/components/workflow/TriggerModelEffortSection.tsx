@@ -26,7 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { PresetChip } from "@/components/BottomSheet";
-import { getAvailableModels } from "@/components/modelModeOptions";
+import { getAvailableModels, type ModelMode } from "@/components/modelModeOptions";
 import { getVisibleEffortLevels } from "@/components/reasoningEffort";
 import { t } from "@/text";
 
@@ -53,6 +53,13 @@ interface TriggerModelEffortSectionProps {
      * NOT change the selected value. Omit to skip the hint.
      */
     settingsDefaultModelKey?: string;
+    /**
+     * Explicit model list to show instead of the internal Claude set. Passed
+     * by callers that want the model options to follow a selected profile
+     * (e.g. a custom MiniMax/GLM profile surfaces its own `customModels`).
+     * Omit to keep the hardcoded Claude list.
+     */
+    models?: ModelMode[];
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -99,16 +106,17 @@ export const TriggerModelEffortSection = React.memo(function TriggerModelEffortS
     effortLevel,
     onSelectEffort,
     settingsDefaultModelKey,
+    models: propModels,
 }: TriggerModelEffortSectionProps) {
     const { theme } = useUnistyles();
     // Model grid collapsed by default — see file header.
     const [expanded, setExpanded] = React.useState(false);
 
-    // Triggers always spawn Claude sessions, so the model list is the static
-    // Claude set (incl. the 1M variants added in phase 1). No metadata needed.
+    // Prefer the caller-supplied list (profile-driven); otherwise fall back to
+    // the static Claude set (incl. the 1M variants). No metadata needed.
     const models = React.useMemo(
-        () => getAvailableModels("claude", null, t),
-        [],
+        () => propModels ?? getAvailableModels("claude", null, t),
+        [propModels],
     );
     // Effort levels available for the picked model — Opus 4.7/4.8 + Fable 5
     // surface xhigh, others stay low/medium/high/max.

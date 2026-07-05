@@ -83,6 +83,9 @@ export const en = {
     modelFollowsSettings: "Follows your Settings default",
     loopEditModalTitle: "Edit Loop",
     detailEdit: "Edit",
+    sectionProfile: "Profile",
+    profileDefaultOption: "Default (Anthropic)",
+    profileConfigEmpty: "The selected profile has no environment configured.",
     // Detail page rows
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",

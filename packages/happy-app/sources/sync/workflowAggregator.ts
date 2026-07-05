@@ -45,6 +45,8 @@ export type WorkflowAgentLoopSummary = AgentLoopSummary & {
   /** Per-loop model-mode KEY + reasoning effort (server loops only). */
   modelMode?: string | null;
   effort?: string | null;
+  /** AI backend profile bound to this loop (provider config); null = default. */
+  profileId?: string | null;
   /** Optional first-message slash command, hoisted from genericConfig. */
   bootstrapSlashCommand?: string;
   /**
@@ -194,6 +196,7 @@ function serializedToSummary(
     agent: loop.agent ?? "claude",
     modelMode: loop.modelMode ?? null,
     effort: loop.effort ?? null,
+    profileId: loop.profileId ?? null,
     bootstrapSlashCommand: bootstrapFromConfig,
     genericConfig,
   };

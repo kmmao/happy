@@ -30,12 +30,26 @@ import { createAgentLoop, updateAgentLoop } from "@/sync/apiAgentLoops";
 import { sessionAdopt } from "@/sync/apiSessionAdopt";
 import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
 import { resolveAgentDefaultConfig } from "@/sync/agentDefaults";
+import {
+    createResolvedRuntimeProfile,
+    getProfileEnvironmentVariables,
+} from "@kmmao/happy-wire";
 import type {
     CreateGenericAgentLoopBody,
     UpdateGenericAgentLoopBody,
 } from "@kmmao/happy-wire";
 import type { Session } from "@/sync/storageTypes";
 import type { LoopWorkflow } from "@/hooks/useWorkflows";
+import { DEFAULT_PROFILES, getBuiltInProfile } from "@/sync/profileUtils";
+import { validateProfileForAgent } from "@/sync/settings";
+import type { AIBackendProfile } from "@/sync/settings";
+import {
+    getAvailableModels,
+    resolveCurrentOption,
+    type ModelMode,
+} from "@/components/modelModeOptions";
+import { ProfilePicker } from "@/components/ProfilePicker";
+import type { SupervisorProfileOption } from "@/components/project/supervisorProfileSelection";
 
 interface CreateLoopModalProps {
     visible: boolean;
@@ -522,12 +536,58 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     // Per-loop model + reasoning effort (Claude only). "default"/null = no override.
     const [modelModeKey, setModelModeKey] = React.useState<string>("default");
     const [effortLevel, setEffortLevel] = React.useState<string | null>(null);
+    // AI backend profile (provider config) bound to this loop. null = daemon
+    // default (Anthropic). Determines which provider env the daemon injects.
+    const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
     // Issue-hint fold-out: the "tell the Agent to run `happy issue create`"
     // tip is useful for first-time users but becomes noise once you know
     // about it. Default collapsed; one tap reveals the full text.
     const [issueHintOpen, setIssueHintOpen] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
+
+    // --- AI backend profiles (provider configs) --------------------------
+    // Merge built-in templates (Anthropic/DeepSeek/GLM/MiniMax…) with the
+    // user's custom profiles, exactly like the new-session wizard, so a loop
+    // can run on any provider — not just the daemon's Anthropic default.
+    const profilesSetting = useSetting("profiles");
+    const allProfiles = React.useMemo<AIBackendProfile[]>(() => {
+        const builtIns = DEFAULT_PROFILES.map((bp) => getBuiltInProfile(bp.id)).filter(
+            (p): p is AIBackendProfile => Boolean(p),
+        );
+        const merged = new Map<string, AIBackendProfile>(
+            builtIns.map((p) => [p.id, p]),
+        );
+        (profilesSetting ?? []).forEach((p) => merged.set(p.id, p));
+        return Array.from(merged.values());
+    }, [profilesSetting]);
+    const profileMap = React.useMemo(
+        () => new Map(allProfiles.map((p) => [p.id, p])),
+        [allProfiles],
+    );
+    // Options shown in the picker — only profiles valid for the chosen agent.
+    const profileOptions = React.useMemo<SupervisorProfileOption[]>(
+        () =>
+            allProfiles
+                .filter((p) => validateProfileForAgent(p, agent))
+                .map((p) => ({ id: p.id, name: p.name, isBuiltIn: p.isBuiltIn })),
+        [allProfiles, agent],
+    );
+    const resolvedProfile = React.useMemo(
+        () =>
+            selectedProfileId
+                ? (profileMap.get(selectedProfileId) ??
+                  getBuiltInProfile(selectedProfileId))
+                : null,
+        [selectedProfileId, profileMap],
+    );
+    // Model list follows the profile: a custom profile surfaces its own
+    // customModels; the default Anthropic profile falls back to the Claude set.
+    const profileCustomModels = resolvedProfile?.customModels;
+    const availableModels = React.useMemo<ModelMode[]>(
+        () => getAvailableModels("claude", null, t, profileCustomModels),
+        [profileCustomModels],
+    );
 
     // Reset form state only on a fresh open (false → true transition).
     // Without the ref guard, the effect re-fires whenever `machines`
@@ -552,6 +612,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // default so a plain "Save" upgrades them to a 1M model.
                 setModelModeKey(editLoop.loop.modelMode ?? claudeDefaults.modelMode);
                 setEffortLevel(editLoop.loop.effort ?? null);
+                setSelectedProfileId(editLoop.loop.profileId ?? null);
                 // Reverse-map the persisted schedule back into the form.
                 if (editLoop.loop.cronExpression) {
                     setSchedule("cron");
@@ -585,6 +646,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // the bare "default", which would spawn at 200K).
                 setModelModeKey(session.modelMode ?? claudeDefaults.modelMode);
                 setEffortLevel(session.effortLevel ?? claudeDefaults.effortLevel);
+                // Adopt inherits the Session; profile defaults to daemon default
+                // and can be overridden in the picker below.
+                setSelectedProfileId(null);
                 setSchedule("1h");
                 setCronExpression("*/30 * * * *");
                 setAgent("claude");
@@ -598,6 +662,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // fresh loop inherits the user's model (1M), not "default".
                 setModelModeKey(claudeDefaults.modelMode);
                 setEffortLevel(claudeDefaults.effortLevel);
+                setSelectedProfileId(null);
                 setSchedule("1h");
                 setCronExpression("*/30 * * * *");
                 setAgent("claude");
@@ -608,6 +673,25 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
         }
         wasVisible.current = visible;
     });
+
+    // When the selected profile (or agent) changes the available model set,
+    // snap the model pick to something valid: keep it if still present,
+    // else the profile's default model, else the Settings default. Functional
+    // updater so it never reads a stale modelModeKey.
+    React.useEffect(() => {
+        if (!visible) return;
+        setModelModeKey((current) => {
+            if (availableModels.some((m) => m.key === current)) return current;
+            return (
+                resolveCurrentOption(availableModels, [
+                    resolvedProfile?.defaultModelMode ?? null,
+                    claudeDefaults.modelMode,
+                ])?.key ??
+                availableModels[0]?.key ??
+                "default"
+            );
+        });
+    }, [availableModels, resolvedProfile, claudeDefaults.modelMode, visible]);
 
     // Best-effort auto-pick when the modal was opened before machines
     // arrived. Only fires when there's no pick yet.
@@ -672,6 +756,28 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             const cron =
                 schedule === "cron" ? cronExpression.trim() : undefined;
 
+            // Resolve the selected AI backend profile into a runtime profile.
+            // A non-default provider must have env configured, else the daemon
+            // would spawn with no credentials — fail loudly instead.
+            const profileIdToSend = resolvedProfile?.id;
+            let runtimeProfile:
+                | ReturnType<typeof createResolvedRuntimeProfile>
+                | undefined;
+            if (resolvedProfile) {
+                if (resolvedProfile.id !== "anthropic") {
+                    const env = getProfileEnvironmentVariables(resolvedProfile);
+                    if (!env || Object.keys(env).length === 0) {
+                        throw new Error(t("workflows.profileConfigEmpty"));
+                    }
+                }
+                runtimeProfile = createResolvedRuntimeProfile(resolvedProfile, {
+                    source: resolvedProfile.isBuiltIn
+                        ? "built-in-profile"
+                        : "account-profile",
+                    trust: "trusted",
+                });
+            }
+
             if (isEditMode && editLoop) {
                 if (!editLoop.projectId) {
                     throw new Error(t("workflows.loopProjectNone"));
@@ -696,6 +802,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     editLoop.loop.agent === "claude" && effortLevel
                         ? effortLevel
                         : null;
+                // Provider profile — null clears it (back to daemon default).
+                body.profileId = profileIdToSend ?? null;
+                if (runtimeProfile) body.runtimeProfile = runtimeProfile;
                 // Merge name/bootstrap into the EXISTING genericConfig so any
                 // server/CLI-managed keys (channels, quiet hours…) survive.
                 const mergedGeneric: Record<string, unknown> = {
@@ -762,6 +871,10 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 };
                 if (cron) body.cronExpression = cron;
                 if (intervalMs !== undefined) body.intervalMs = intervalMs;
+                // Provider profile — which AI backend the daemon runs this
+                // loop on (built-in Anthropic or a custom MiniMax/GLM/… config).
+                if (profileIdToSend) body.profileId = profileIdToSend;
+                if (runtimeProfile) body.runtimeProfile = runtimeProfile;
                 // Model + effort are Claude-only overrides. Persisted on the
                 // loop row; CLI injects them onto the first-turn EnhancedMode.
                 if (agent === "claude" && modelModeKey !== "default") {
@@ -1097,13 +1210,32 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 effort, and CreateLoopModal pre-fills both from the source
                 Session's current picks (see the visibility effect above).
                 Standalone create keeps its historical defaults. */}
+            {/* AI backend profile — which provider config the loop runs on.
+                null = daemon default (Anthropic). The daemon resolves this
+                profileId from synced settings.profiles and injects that
+                provider's env (base URL / key / model). */}
+            <View>
+                <Text style={styles.sectionLabel}>{t("workflows.sectionProfile")}</Text>
+                <View style={{ marginTop: 6 }}>
+                    <ProfilePicker
+                        value={selectedProfileId}
+                        onChange={setSelectedProfileId}
+                        profiles={profileOptions}
+                        defaultOptionLabel={t("workflows.profileDefaultOption")}
+                    />
+                </View>
+            </View>
+
             {agent === "claude" ? (
                 <TriggerModelEffortSection
                     modelModeKey={modelModeKey}
                     onSelectModel={setModelModeKey}
                     effortLevel={effortLevel}
                     onSelectEffort={setEffortLevel}
-                    settingsDefaultModelKey={claudeDefaults.modelMode}
+                    models={availableModels}
+                    settingsDefaultModelKey={
+                        selectedProfileId ? undefined : claudeDefaults.modelMode
+                    }
                 />
             ) : null}
 
