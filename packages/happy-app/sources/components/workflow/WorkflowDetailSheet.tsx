@@ -8,7 +8,7 @@ import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import type { Workflow } from "@/hooks/useWorkflows";
+import type { Workflow, LoopWorkflow } from "@/hooks/useWorkflows";
 import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { updateTriggerSchedule } from "@/sync/apiTriggerSchedules";
@@ -23,6 +23,12 @@ interface WorkflowDetailSheetProps {
     visible: boolean;
     workflow: Workflow | null;
     onClose: () => void;
+    /**
+     * Open the full loop editor (prompt / schedule / model / …). The sheet
+     * closes first, then hands the loop back so the parent can mount the
+     * edit-mode CreateLoopModal. Only offered for server-backed loops.
+     */
+    onEditLoop?: (workflow: LoopWorkflow) => void;
 }
 
 function formatDate(timestamp: number | null | undefined): string {
@@ -97,6 +103,7 @@ export const WorkflowDetailSheet = React.memo(function WorkflowDetailSheet({
     visible,
     workflow,
     onClose,
+    onEditLoop,
 }: WorkflowDetailSheetProps) {
     const { theme } = useUnistyles();
     const sheetRef = React.useRef<BottomSheetHandle>(null);
@@ -194,6 +201,27 @@ export const WorkflowDetailSheet = React.memo(function WorkflowDetailSheet({
             ) : null}
 
             {workflow.kind === "loop" ? (
+                <>
+                {workflow.projectId && onEditLoop ? (
+                    <Pressable
+                        style={[styles.button, styles.buttonPrimary, styles.editButton]}
+                        onPress={() => {
+                            const loopWorkflow = workflow;
+                            sheetRef.current?.requestClose(() =>
+                                onEditLoop(loopWorkflow),
+                            );
+                        }}
+                    >
+                        <Ionicons
+                            name="create-outline"
+                            size={16}
+                            color={theme.colors.button.primary.tint}
+                        />
+                        <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                            {t("workflows.detailEdit")}
+                        </Text>
+                    </Pressable>
+                ) : null}
                 <Section title={t("workflows.sectionLoop")}>
                     <DetailRow label={t("workflows.detailDirectory")} value={workflow.loop.directory} mono />
                     <DetailRow label={t("workflows.detailAgent")} value={workflow.loop.agent} />
@@ -215,6 +243,7 @@ export const WorkflowDetailSheet = React.memo(function WorkflowDetailSheet({
                     ) : null}
                     {workflow.loop.prompt ? <PromptBlock prompt={workflow.loop.prompt} /> : null}
                 </Section>
+                </>
             ) : null}
 
             <WorkflowModelEffortEditor workflow={workflow} />
@@ -457,6 +486,12 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
         ...webInteractive,
+    },
+    editButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        alignSelf: "flex-start",
     },
     buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
     buttonPrimary: { backgroundColor: theme.colors.button.primary.background },

@@ -757,7 +757,17 @@ export async function runClaude(
           promptContent,
           {
             permissionMode: "bypassPermissions",
-            ...(initialModelMode && initialModelMode !== "default" ? { model: initialModelMode } : {}),
+            // Automation-spawned sessions (agent loops / webhooks / schedules)
+            // that carry no explicit model must still pin a concrete 1M-capable
+            // model — otherwise the first turn falls back to Claude Code's own
+            // machine default (often a 200K model like Haiku) and the whole
+            // loop silently runs at 200K. DEFAULT_CLAUDE_MODEL ("opus") is
+            // 1M-capable, so this rescues legacy loops with modelMode=null
+            // without needing the row to be edited from the App.
+            model:
+              initialModelMode && initialModelMode !== "default"
+                ? initialModelMode
+                : DEFAULT_CLAUDE_MODEL,
             ...(initialEffort ? { effort: initialEffort } : {}),
             ...(currentMaxBudgetUsd !== undefined ? { maxBudgetUsd: currentMaxBudgetUsd } : {}),
           } as EnhancedMode,

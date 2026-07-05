@@ -80,6 +80,9 @@ export const en = {
     sectionModel: "Model",
     sectionEffort: "Reasoning effort",
     effortDefault: "Default",
+    modelFollowsSettings: "Follows your Settings default",
+    loopEditModalTitle: "Edit Loop",
+    detailEdit: "Edit",
     // Detail page rows
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",

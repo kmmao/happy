@@ -45,6 +45,14 @@ export type WorkflowAgentLoopSummary = AgentLoopSummary & {
   /** Per-loop model-mode KEY + reasoning effort (server loops only). */
   modelMode?: string | null;
   effort?: string | null;
+  /** Optional first-message slash command, hoisted from genericConfig. */
+  bootstrapSlashCommand?: string;
+  /**
+   * Raw long-tail config bag (name, bootstrapSlashCommand, notification
+   * channels, etc.). Carried through so the edit form can merge unknown
+   * keys back into a PATCH instead of clobbering them.
+   */
+  genericConfig?: Record<string, unknown> | null;
 };
 
 interface BaseWorkflow {
@@ -160,6 +168,10 @@ function serializedToSummary(
     genericConfig && typeof genericConfig.name === "string"
       ? (genericConfig.name as string)
       : undefined;
+  const bootstrapFromConfig =
+    genericConfig && typeof genericConfig.bootstrapSlashCommand === "string"
+      ? (genericConfig.bootstrapSlashCommand as string)
+      : undefined;
   return {
     id: loop.id,
     name: nameFromConfig,
@@ -182,6 +194,8 @@ function serializedToSummary(
     agent: loop.agent ?? "claude",
     modelMode: loop.modelMode ?? null,
     effort: loop.effort ?? null,
+    bootstrapSlashCommand: bootstrapFromConfig,
+    genericConfig,
   };
 }
 

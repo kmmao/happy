@@ -19,18 +19,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
-import { useAllMachines, useProjects } from "@/sync/storage";
+import { useAllMachines, useProjects, useSetting } from "@/sync/storage";
 import type { Machine } from "@/sync/storageTypes";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
 import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { createAgentLoop } from "@/sync/apiAgentLoops";
+import { createAgentLoop, updateAgentLoop } from "@/sync/apiAgentLoops";
 import { sessionAdopt } from "@/sync/apiSessionAdopt";
 import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
-import type { CreateGenericAgentLoopBody } from "@kmmao/happy-wire";
+import { resolveAgentDefaultConfig } from "@/sync/agentDefaults";
+import type {
+    CreateGenericAgentLoopBody,
+    UpdateGenericAgentLoopBody,
+} from "@kmmao/happy-wire";
 import type { Session } from "@/sync/storageTypes";
+import type { LoopWorkflow } from "@/hooks/useWorkflows";
 
 interface CreateLoopModalProps {
     visible: boolean;
@@ -49,6 +54,13 @@ interface CreateLoopModalProps {
      * user message; directory comes from session.metadata.path.
      */
     session?: Session;
+    /**
+     * Edit mode (Part 2). When given, the modal prefills from this existing
+     * loop and PATCHes via updateAgentLoop instead of creating. Machine /
+     * project / agent pickers are hidden (immutable for a live loop); the
+     * schedule is reverse-mapped back into the interval-chip / cron form.
+     */
+    editLoop?: LoopWorkflow;
 }
 
 type AgentChoice = "claude" | "codex" | "gemini";
@@ -474,6 +486,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     onClose,
     onCreated,
     session,
+    editLoop,
 }: CreateLoopModalProps) {
     const { theme } = useUnistyles();
     const sheetRef = React.useRef<BottomSheetHandle>(null);
@@ -485,6 +498,18 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     // lifetime. The machine/project pickers are slaved to the Session in
     // this mode and the picker UI is hidden entirely.
     const isAdoptMode = !!session;
+    // Edit mode — prefill from an existing loop and PATCH on submit.
+    const isEditMode = !!editLoop;
+
+    // Settings → Agents default model + effort for Claude. New/adopted loops
+    // seed from this instead of the bare "default" (which silently spawns a
+    // 200K session); the folding model picker also shows a "follows Settings"
+    // hint while the pick still matches this value.
+    const agentDefaultOverrides = useSetting("agentDefaultOverrides");
+    const claudeDefaults = React.useMemo(
+        () => resolveAgentDefaultConfig(agentDefaultOverrides, "claude"),
+        [agentDefaultOverrides],
+    );
 
     const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
     const [pickedProjectServerId, setPickedProjectServerId] = React.useState<string>("");
@@ -515,7 +540,33 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
         if (visible && !wasVisible.current) {
             // Adopt mode seeds from the Session; create-from-scratch
             // mode falls back to the historical defaults.
-            if (session) {
+            if (editLoop) {
+                // Edit mode — prefill every field from the existing loop.
+                setPickedMachineId(editLoop.machineId);
+                setPickedProjectServerId(editLoop.projectId ?? "");
+                setPrompt(editLoop.loop.prompt ?? "");
+                setName(editLoop.loop.name ?? "");
+                setBootstrapSlashCommand(editLoop.loop.bootstrapSlashCommand ?? "");
+                setAgent((editLoop.loop.agent as AgentChoice) ?? "claude");
+                // Legacy loops carry modelMode=null (→ 200K). Seed the Settings
+                // default so a plain "Save" upgrades them to a 1M model.
+                setModelModeKey(editLoop.loop.modelMode ?? claudeDefaults.modelMode);
+                setEffortLevel(editLoop.loop.effort ?? null);
+                // Reverse-map the persisted schedule back into the form.
+                if (editLoop.loop.cronExpression) {
+                    setSchedule("cron");
+                    setCronExpression(editLoop.loop.cronExpression);
+                } else {
+                    const ms = editLoop.loop.intervalMs ?? 0;
+                    const matched = (
+                        Object.entries(SCHEDULE_INTERVALS_MS) as Array<
+                            [Exclude<ScheduleChoice, "cron">, number]
+                        >
+                    ).find(([, value]) => value === ms);
+                    setSchedule(matched ? matched[0] : "1h");
+                    setCronExpression("*/30 * * * *");
+                }
+            } else if (session) {
                 setPickedMachineId(session.metadata?.machineId ?? "");
                 // pickedProjectServerId is filled by the machineProjects
                 // effect below once projects are filtered. Leave blank
@@ -527,24 +578,30 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                         "",
                 );
                 setName(session.metadata?.summary?.text?.trim()?.slice(0, 60) ?? "");
+                setBootstrapSlashCommand("");
                 // Inherit the source Session's model + effort picks so the
                 // adopted loop keeps running on whatever the user was using
-                // before promotion. Without this default, every adopted
-                // loop fell back to the CLI baseline (Sonnet 4.6 + medium)
-                // regardless of how the user had configured the chat.
-                setModelModeKey(session.modelMode ?? "default");
-                setEffortLevel(session.effortLevel ?? null);
+                // before promotion; fall back to the Settings default (never
+                // the bare "default", which would spawn at 200K).
+                setModelModeKey(session.modelMode ?? claudeDefaults.modelMode);
+                setEffortLevel(session.effortLevel ?? claudeDefaults.effortLevel);
+                setSchedule("1h");
+                setCronExpression("*/30 * * * *");
+                setAgent("claude");
             } else {
                 setPickedMachineId(machines[0]?.id ?? "");
                 setPickedProjectServerId("");
                 setPrompt("");
                 setName("");
-                setModelModeKey("default");
-                setEffortLevel(null);
+                setBootstrapSlashCommand("");
+                // Standalone create seeds from Settings → Agents default so a
+                // fresh loop inherits the user's model (1M), not "default".
+                setModelModeKey(claudeDefaults.modelMode);
+                setEffortLevel(claudeDefaults.effortLevel);
+                setSchedule("1h");
+                setCronExpression("*/30 * * * *");
+                setAgent("claude");
             }
-            setSchedule("1h");
-            setCronExpression("*/30 * * * *");
-            setAgent("claude");
             setAdvancedOpen(false);
             setIssueHintOpen(false);
             setSubmitting(false);
@@ -602,7 +659,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
         (schedule !== "cron" || cronExpression.trim().length > 0);
 
     const handleConfirm = async () => {
-        if (!valid || submitting || !pickedProject?.serverId) return;
+        if (!valid || submitting) return;
+        // Create/adopt need a resolved server project; edit already carries one.
+        if (!isEditMode && !pickedProject?.serverId) return;
         setSubmitting(true);
         try {
             const trimmedPrompt = prompt.trim();
@@ -613,7 +672,49 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             const cron =
                 schedule === "cron" ? cronExpression.trim() : undefined;
 
-            if (isAdoptMode && session) {
+            if (isEditMode && editLoop) {
+                if (!editLoop.projectId) {
+                    throw new Error(t("workflows.loopProjectNone"));
+                }
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) throw new Error("Not authenticated");
+
+                const body: UpdateGenericAgentLoopBody = { prompt: trimmedPrompt };
+                if (schedule === "cron") {
+                    body.cronExpression = cron;
+                    body.intervalMs = null;
+                } else {
+                    body.intervalMs = intervalMs;
+                    body.cronExpression = null;
+                }
+                // Model + effort are Claude-only overrides; null clears them.
+                body.modelMode =
+                    editLoop.loop.agent === "claude" && modelModeKey !== "default"
+                        ? modelModeKey
+                        : null;
+                body.effort =
+                    editLoop.loop.agent === "claude" && effortLevel
+                        ? effortLevel
+                        : null;
+                // Merge name/bootstrap into the EXISTING genericConfig so any
+                // server/CLI-managed keys (channels, quiet hours…) survive.
+                const mergedGeneric: Record<string, unknown> = {
+                    ...(editLoop.loop.genericConfig ?? {}),
+                };
+                if (trimmedName) mergedGeneric.name = trimmedName;
+                else delete mergedGeneric.name;
+                if (trimmedBootstrap)
+                    mergedGeneric.bootstrapSlashCommand = trimmedBootstrap;
+                else delete mergedGeneric.bootstrapSlashCommand;
+                body.genericConfig = mergedGeneric;
+
+                await updateAgentLoop(
+                    credentials,
+                    editLoop.projectId,
+                    editLoop.loop.id,
+                    body,
+                );
+            } else if (isAdoptMode && session) {
                 // Phase 2 sessionAdopt — server creates the loop AND
                 // binds this Session to it (single round-trip; daemon
                 // ephemeral updates GuardianSessionRegistry so next
@@ -621,6 +722,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // through requires wire 0.35.0+; on older servers the
                 // fields are silently ignored (zod schema allows unknown
                 // input gracefully when transmitted).
+                if (!pickedProject?.serverId) {
+                    throw new Error(t("workflows.loopProjectNone"));
+                }
                 const result = await sessionAdopt({
                     sessionId: session.id,
                     target: {
@@ -646,6 +750,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // Standalone "create loop" path — no Session to adopt.
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) throw new Error("Not authenticated");
+                if (!pickedProject?.serverId) {
+                    throw new Error(t("workflows.loopProjectNone"));
+                }
 
                 const body: CreateGenericAgentLoopBody = {
                     prompt: trimmedPrompt,
@@ -697,7 +804,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             visible={visible}
             onClose={onClose}
             busy={submitting}
-            title={t("workflows.loopModalTitle")}
+            title={isEditMode ? t("workflows.loopEditModalTitle") : t("workflows.loopModalTitle")}
             subtitle={t("workflows.loopModalSubtitle")}
             desktopMaxHeightFraction={0.9}
             footer={
@@ -733,13 +840,16 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                                     ? styles.buttonTextPrimary
                                     : styles.buttonTextPrimaryDisabled,
                             ]}>
-                                {t("workflows.loopFormSubmit")}
+                                {isEditMode
+                                    ? t("common.save")
+                                    : t("workflows.loopFormSubmit")}
                             </Text>
                         )}
                     </Pressable>
                 </>
             }
         >
+            {isEditMode ? null : (
             <View style={styles.info}>
                 <Ionicons
                     name="information-circle"
@@ -775,6 +885,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     )}
                 </View>
             </View>
+            )}
 
             {/* Machine + Project pickers — only visible in standalone
                 ("create from scratch") mode. Adopt mode inherits both
@@ -782,7 +893,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 noise and a foot-gun. The pickedMachineId / pickedProjectServerId
                 state still gets auto-set from session metadata via the
                 open-effect, so handleConfirm has everything it needs. */}
-            {isAdoptMode ? null : (
+            {(isAdoptMode || isEditMode) ? null : (
                 <>
                     <View>
                         <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
@@ -958,7 +1069,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 `agent` field today (server hard-codes claude); to keep
                 the UI honest we hide the picker so the user can't pick
                 codex/gemini and expect it to stick. */}
-            {isAdoptMode ? null : (
+            {(isAdoptMode || isEditMode) ? null : (
                 <View>
                     <Text style={styles.sectionLabel}>{t("workflows.loopSectionAgent")}</Text>
                     <View style={styles.presetGrid}>
@@ -992,6 +1103,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     onSelectModel={setModelModeKey}
                     effortLevel={effortLevel}
                     onSelectEffort={setEffortLevel}
+                    settingsDefaultModelKey={claudeDefaults.modelMode}
                 />
             ) : null}
 

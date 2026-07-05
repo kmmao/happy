@@ -2,22 +2,29 @@
  * TriggerModelEffortSection — shared "Model" + "Reasoning effort" pickers
  * for the three trigger create/edit modals (schedule / webhook / loop).
  *
- * Both rows are plain PresetChip grids (mirroring the cron/machine/project
- * pickers already in those modals) rather than the full chat-input selector,
- * because triggers only need a quick point-and-pick that persists onto the
- * trigger row. The model value is an App model-mode KEY (e.g. "opus-4-8-1m")
- * — the CLI uses the key, not a raw model id, so 1M variants stay distinct.
+ * The reasoning-effort row is a plain PresetChip grid. The model row is
+ * COLLAPSED by default: it shows the currently-selected model on a single
+ * tappable header row, and only expands the full chip grid on demand. This
+ * keeps the ~15-variant Claude model list (incl. 1M variants) from dominating
+ * the form — the common case is "just use my Settings → Agents default", so we
+ * surface that default inline and let power users tap to override per-trigger.
  *
- * Defaults: modelModeKey "default" = CLI's configured model; effortLevel null
- * = the agent's default (medium). Picking "Default" on either row restores
- * that no-op behaviour, keeping legacy creates byte-identical.
+ * The model value is an App model-mode KEY (e.g. "opus-4-8-1m") — the CLI uses
+ * the key, not a raw model id, so 1M variants stay distinct.
+ *
+ * `settingsDefaultModelKey` is the caller's Settings → Agents default (via
+ * resolveAgentDefaultConfig). When the current pick still equals it, the
+ * collapsed row shows a "follows your Settings default" hint so the user knows
+ * the model is inherited, not hard-pinned.
  */
 
 import * as React from "react";
-import { View } from "react-native";
+import { View, Pressable } from "react-native";
 import { Text } from "@/components/StyledText";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { webInteractive } from "@/utils/interactiveSurface";
 import { PresetChip } from "@/components/BottomSheet";
 import { getAvailableModels } from "@/components/modelModeOptions";
 import { getVisibleEffortLevels } from "@/components/reasoningEffort";
@@ -40,6 +47,12 @@ interface TriggerModelEffortSectionProps {
     /** Reasoning effort level, or null for the agent default (medium). */
     effortLevel: string | null;
     onSelectEffort: (level: string | null) => void;
+    /**
+     * Settings → Agents default model KEY (resolveAgentDefaultConfig). Used
+     * only for the "follows your Settings default" collapsed-row hint; does
+     * NOT change the selected value. Omit to skip the hint.
+     */
+    settingsDefaultModelKey?: string;
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -51,6 +64,33 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
     },
     presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    modelHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+        paddingVertical: 6,
+        ...webInteractive,
+    },
+    modelHeaderRight: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        flexShrink: 1,
+        minWidth: 0,
+    },
+    modelHeaderValue: {
+        fontSize: 13,
+        color: theme.colors.text,
+        ...Typography.default("semiBold"),
+        flexShrink: 1,
+    },
+    modelFollowsHint: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        marginTop: 2,
+    },
 }));
 
 export const TriggerModelEffortSection = React.memo(function TriggerModelEffortSection({
@@ -58,7 +98,12 @@ export const TriggerModelEffortSection = React.memo(function TriggerModelEffortS
     onSelectModel,
     effortLevel,
     onSelectEffort,
+    settingsDefaultModelKey,
 }: TriggerModelEffortSectionProps) {
+    const { theme } = useUnistyles();
+    // Model grid collapsed by default — see file header.
+    const [expanded, setExpanded] = React.useState(false);
+
     // Triggers always spawn Claude sessions, so the model list is the static
     // Claude set (incl. the 1M variants added in phase 1). No metadata needed.
     const models = React.useMemo(
@@ -72,20 +117,53 @@ export const TriggerModelEffortSection = React.memo(function TriggerModelEffortS
         [modelModeKey],
     );
 
+    const selectedName = React.useMemo(() => {
+        const found = models.find((m) => m.key === modelModeKey);
+        return found?.name ?? modelModeKey;
+    }, [models, modelModeKey]);
+
+    // Current pick still matches the Settings → Agents default (user hasn't
+    // overridden it for this trigger).
+    const followsSettings =
+        settingsDefaultModelKey != null && modelModeKey === settingsDefaultModelKey;
+
     return (
         <>
             <View>
-                <Text style={styles.sectionLabel}>{t("workflows.sectionModel")}</Text>
-                <View style={styles.presetGrid}>
-                    {models.map((m) => (
-                        <PresetChip
-                            key={m.key}
-                            label={m.name}
-                            active={modelModeKey === m.key}
-                            onPress={() => onSelectModel(m.key)}
+                <Pressable
+                    style={styles.modelHeader}
+                    onPress={() => setExpanded((v) => !v)}
+                    accessibilityRole="button"
+                >
+                    <Text style={styles.sectionLabel}>{t("workflows.sectionModel")}</Text>
+                    <View style={styles.modelHeaderRight}>
+                        <Text style={styles.modelHeaderValue} numberOfLines={1}>
+                            {selectedName}
+                        </Text>
+                        <Ionicons
+                            name={expanded ? "chevron-up" : "chevron-down"}
+                            size={14}
+                            color={theme.colors.textSecondary}
                         />
-                    ))}
-                </View>
+                    </View>
+                </Pressable>
+                {followsSettings && !expanded ? (
+                    <Text style={styles.modelFollowsHint}>
+                        {t("workflows.modelFollowsSettings")}
+                    </Text>
+                ) : null}
+                {expanded ? (
+                    <View style={styles.presetGrid}>
+                        {models.map((m) => (
+                            <PresetChip
+                                key={m.key}
+                                label={m.name}
+                                active={modelModeKey === m.key}
+                                onPress={() => onSelectModel(m.key)}
+                            />
+                        ))}
+                    </View>
+                ) : null}
             </View>
 
             <View>

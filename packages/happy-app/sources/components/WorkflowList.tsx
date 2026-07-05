@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { Typography } from "@/constants/Typography";
-import { useWorkflows, type Workflow, type WorkflowKind } from "@/hooks/useWorkflows";
+import { useWorkflows, type Workflow, type WorkflowKind, type LoopWorkflow } from "@/hooks/useWorkflows";
 import { useSetting } from "@/sync/storage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { SharedStateView } from "./SharedStateView";
@@ -501,6 +501,9 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
     // common case zero-click.
     const [collapsedIds, setCollapsedIds] = React.useState<Record<string, boolean>>({});
     const [detailWorkflow, setDetailWorkflow] = React.useState<Workflow | null>(null);
+    // Edit-mode target for the loop editor. Set from the detail sheet's
+    // "Edit" affordance; drives the edit-mode CreateLoopModal mounted below.
+    const [editLoopWorkflow, setEditLoopWorkflow] = React.useState<LoopWorkflow | null>(null);
     // Standalone-mode visibility for the create-X modals. Reachable from
     // the kind-specific empty state CTA below, and mirrored to the
     // existing header "+" CreateWorkflowMenu (both routes converge on
@@ -647,6 +650,15 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
                 visible={detailWorkflow !== null}
                 workflow={detailWorkflow}
                 onClose={() => setDetailWorkflow(null)}
+                onEditLoop={(w) => setEditLoopWorkflow(w)}
+            />
+            {/* Edit-mode loop editor — opened from the detail sheet. Kept at
+                this level (sibling to the detail sheet) so it isn't a
+                BottomSheet nested inside another BottomSheet. */}
+            <CreateLoopModal
+                editLoop={editLoopWorkflow ?? undefined}
+                visible={editLoopWorkflow !== null}
+                onClose={() => setEditLoopWorkflow(null)}
             />
             {/* Standalone-mode creation modals. Mounted at this level
                 (not inside individual rows) so the empty-state CTAs above
