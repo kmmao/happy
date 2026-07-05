@@ -49,6 +49,8 @@ export type WorkflowAgentLoopSummary = AgentLoopSummary & {
   profileId?: string | null;
   /** Optional first-message slash command, hoisted from genericConfig. */
   bootstrapSlashCommand?: string;
+  /** When true, each iteration spawns a fresh session (no guardian reuse). */
+  freshSessionPerIteration?: boolean;
   /**
    * Raw long-tail config bag (name, bootstrapSlashCommand, notification
    * channels, etc.). Carried through so the edit form can merge unknown
@@ -174,6 +176,10 @@ function serializedToSummary(
     genericConfig && typeof genericConfig.bootstrapSlashCommand === "string"
       ? (genericConfig.bootstrapSlashCommand as string)
       : undefined;
+  const freshSessionFromConfig =
+    genericConfig && typeof genericConfig.freshSessionPerIteration === "boolean"
+      ? (genericConfig.freshSessionPerIteration as boolean)
+      : undefined;
   return {
     id: loop.id,
     name: nameFromConfig,
@@ -198,6 +204,7 @@ function serializedToSummary(
     effort: loop.effort ?? null,
     profileId: loop.profileId ?? null,
     bootstrapSlashCommand: bootstrapFromConfig,
+    freshSessionPerIteration: freshSessionFromConfig,
     genericConfig,
   };
 }

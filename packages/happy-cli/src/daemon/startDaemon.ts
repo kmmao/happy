@@ -2440,6 +2440,12 @@ export async function startDaemon(): Promise<void> {
         agentLoop: {
           spawnSession,
           resolveGuardianSessionId: (data) => {
+            // Opt-out of guardian reuse: spawn a fresh session every iteration
+            // so an edited prompt takes effect cleanly. Durable state still
+            // carries via memory.md (AgentLoopMemory), not the transcript.
+            if (data.freshSessionPerIteration) {
+              return undefined;
+            }
             const guardianKey = `agent-loop:${data.loopId}`;
             const rawResolved = guardianSessionRegistry.resolveByKey(guardianKey);
             const resolved = resolveGuardianSession({

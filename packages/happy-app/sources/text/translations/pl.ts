@@ -87,6 +87,11 @@ export const pl: TranslationStructure = {
     sectionProfile: "Profil",
     profileDefaultOption: "Domyślny (Anthropic)",
     profileConfigEmpty: "Wybrany profil nie ma skonfigurowanych zmiennych środowiskowych.",
+    loopSectionSessionMode: "Tryb sesji",
+    loopSessionReuse: "Użyj ponownie",
+    loopSessionFresh: "Nowa co uruchomienie",
+    loopSessionModeHint:
+        "Ponowne użycie zachowuje kontekst rozmowy między uruchomieniami. Nowa sesja przy każdej iteracji — zmieniony prompt działa czysto; trwały stan jest przenoszony przez memory.md.",
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",
     detailRuns: "Runs",

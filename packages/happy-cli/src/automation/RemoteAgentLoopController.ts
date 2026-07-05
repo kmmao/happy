@@ -253,6 +253,9 @@ function spreadGenericConfig(
     if (typeof cfg.bootstrapSlashCommand === "string") {
         out.bootstrapSlashCommand = cfg.bootstrapSlashCommand;
     }
+    if (typeof cfg.freshSessionPerIteration === "boolean") {
+        out.freshSessionPerIteration = cfg.freshSessionPerIteration;
+    }
     if (cfg.environmentVariables && typeof cfg.environmentVariables === "object") {
         out.environmentVariables = cfg.environmentVariables as Record<string, string>;
     }

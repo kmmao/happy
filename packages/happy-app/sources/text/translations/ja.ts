@@ -77,6 +77,11 @@ export const ja: TranslationStructure = {
     sectionProfile: "プロファイル",
     profileDefaultOption: "デフォルト (Anthropic)",
     profileConfigEmpty: "選択したプロファイルに環境変数が設定されていません。",
+    loopSectionSessionMode: "セッションモード",
+    loopSessionReuse: "セッション再利用",
+    loopSessionFresh: "毎回新規",
+    loopSessionModeHint:
+        "再利用は実行間で会話コンテキストを保持します。毎回新規は反復ごとに新しいセッションを開始し、編集したプロンプトがそのまま反映されます。永続状態は memory.md で引き継がれます。",
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",
     detailRuns: "Runs",

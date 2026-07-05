@@ -84,6 +84,14 @@ export interface AgentLoopTriggerData {
    * the skill before the iteration's main prompt is delivered.
    */
   bootstrapSlashCommand?: string;
+  /**
+   * When true, every iteration spawns a FRESH Claude session instead of
+   * resuming the guardian session. Durable state is carried across runs via
+   * memory.md (see AgentLoopMemory) rather than the conversation transcript.
+   * Lets an edited prompt take effect cleanly without the prior iterations'
+   * context bleeding in. See resolveGuardianSessionId in startDaemon.
+   */
+  freshSessionPerIteration?: boolean;
 }
 
 export interface TaskTriggerData {

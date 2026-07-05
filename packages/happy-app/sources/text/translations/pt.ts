@@ -74,6 +74,11 @@ export const pt: TranslationStructure = {
     sectionProfile: "Perfil",
     profileDefaultOption: "Padrão (Anthropic)",
     profileConfigEmpty: "O perfil selecionado não tem ambiente configurado.",
+    loopSectionSessionMode: "Modo de sessão",
+    loopSessionReuse: "Reutilizar sessão",
+    loopSessionFresh: "Nova a cada vez",
+    loopSessionModeHint:
+        "Reutilizar mantém o contexto entre execuções. Nova inicia uma sessão a cada iteração: um prompt editado é aplicado de forma limpa; o estado persiste via memory.md.",
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",
     detailRuns: "Runs",

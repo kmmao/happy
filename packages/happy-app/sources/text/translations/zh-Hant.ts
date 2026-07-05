@@ -75,6 +75,11 @@ export const zhHant: TranslationStructure = {
     sectionProfile: "設定檔",
     profileDefaultOption: "預設 (Anthropic)",
     profileConfigEmpty: "所選設定檔未設定環境變數。",
+    loopSectionSessionMode: "會話模式",
+    loopSessionReuse: "複用會話",
+    loopSessionFresh: "每輪全新",
+    loopSessionModeHint:
+        "複用會話會跨迭代保留對話上下文；每輪全新則每次迭代都開新會話——改過的提示詞會乾淨生效，長期狀態透過 memory.md 傳遞。",
     detailCronExpression: "Cron 表达式",
     detailNextFire: "下次触发",
     detailRuns: "运行次数",

@@ -539,6 +539,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     // AI backend profile (provider config) bound to this loop. null = daemon
     // default (Anthropic). Determines which provider env the daemon injects.
     const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
+    // When true, each iteration spawns a fresh Claude session (no guardian
+    // reuse) — an edited prompt takes effect cleanly; state carries via memory.md.
+    const [freshSessionPerIteration, setFreshSessionPerIteration] = React.useState(false);
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
     // Issue-hint fold-out: the "tell the Agent to run `happy issue create`"
     // tip is useful for first-time users but becomes noise once you know
@@ -613,6 +616,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 setModelModeKey(editLoop.loop.modelMode ?? claudeDefaults.modelMode);
                 setEffortLevel(editLoop.loop.effort ?? null);
                 setSelectedProfileId(editLoop.loop.profileId ?? null);
+                setFreshSessionPerIteration(
+                    editLoop.loop.freshSessionPerIteration ?? false,
+                );
                 // Reverse-map the persisted schedule back into the form.
                 if (editLoop.loop.cronExpression) {
                     setSchedule("cron");
@@ -649,6 +655,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // Adopt inherits the Session; profile defaults to daemon default
                 // and can be overridden in the picker below.
                 setSelectedProfileId(null);
+                setFreshSessionPerIteration(false);
                 setSchedule("1h");
                 setCronExpression("*/30 * * * *");
                 setAgent("claude");
@@ -663,6 +670,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 setModelModeKey(claudeDefaults.modelMode);
                 setEffortLevel(claudeDefaults.effortLevel);
                 setSelectedProfileId(null);
+                setFreshSessionPerIteration(false);
                 setSchedule("1h");
                 setCronExpression("*/30 * * * *");
                 setAgent("claude");
@@ -815,6 +823,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 if (trimmedBootstrap)
                     mergedGeneric.bootstrapSlashCommand = trimmedBootstrap;
                 else delete mergedGeneric.bootstrapSlashCommand;
+                if (freshSessionPerIteration)
+                    mergedGeneric.freshSessionPerIteration = true;
+                else delete mergedGeneric.freshSessionPerIteration;
                 body.genericConfig = mergedGeneric;
 
                 await updateAgentLoop(
@@ -885,11 +896,14 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 }
                 // Stash optional name + bootstrap slash command in the
                 // generic-config bag (same path the daemon promotes from).
-                if (trimmedName || trimmedBootstrap) {
+                if (trimmedName || trimmedBootstrap || freshSessionPerIteration) {
                     body.genericConfig = {
                         ...(trimmedName ? { name: trimmedName } : {}),
                         ...(trimmedBootstrap
                             ? { bootstrapSlashCommand: trimmedBootstrap }
+                            : {}),
+                        ...(freshSessionPerIteration
+                            ? { freshSessionPerIteration: true }
                             : {}),
                     };
                 }
@@ -1238,6 +1252,31 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     }
                 />
             ) : null}
+
+            {/* Session mode — reuse the guardian session across iterations
+                (default; keeps conversation context) vs a fresh session every
+                iteration (an edited prompt applies cleanly; durable state
+                carries via memory.md). */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopSectionSessionMode")}
+                </Text>
+                <View style={styles.presetGrid}>
+                    <PresetChip
+                        label={t("workflows.loopSessionReuse")}
+                        active={!freshSessionPerIteration}
+                        onPress={() => setFreshSessionPerIteration(false)}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopSessionFresh")}
+                        active={freshSessionPerIteration}
+                        onPress={() => setFreshSessionPerIteration(true)}
+                    />
+                </View>
+                <Text style={[styles.infoHint, { marginTop: 4 }]}>
+                    {t("workflows.loopSessionModeHint")}
+                </Text>
+            </View>
 
             {/* Prompt textarea. */}
             <View>

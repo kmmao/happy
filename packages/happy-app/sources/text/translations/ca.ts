@@ -74,6 +74,11 @@ export const ca: TranslationStructure = {
     sectionProfile: "Perfil",
     profileDefaultOption: "Predeterminat (Anthropic)",
     profileConfigEmpty: "El perfil seleccionat no té entorn configurat.",
+    loopSectionSessionMode: "Mode de sessió",
+    loopSessionReuse: "Reutilitza la sessió",
+    loopSessionFresh: "Nova cada cop",
+    loopSessionModeHint:
+        "Reutilitzar manté el context entre execucions. Nova inicia una sessió a cada iteració: un prompt editat s'aplica net; l'estat perdura via memory.md.",
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",
     detailRuns: "Runs",

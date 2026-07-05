@@ -86,6 +86,11 @@ export const en = {
     sectionProfile: "Profile",
     profileDefaultOption: "Default (Anthropic)",
     profileConfigEmpty: "The selected profile has no environment configured.",
+    loopSectionSessionMode: "Session mode",
+    loopSessionReuse: "Reuse session",
+    loopSessionFresh: "Fresh each run",
+    loopSessionModeHint:
+        "Reuse keeps conversation context across runs. Fresh starts a new session every iteration — an edited prompt applies cleanly; durable state carries via memory.md.",
     // Detail page rows
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",

@@ -87,6 +87,11 @@ export const ru: TranslationStructure = {
     sectionProfile: "Профиль",
     profileDefaultOption: "По умолчанию (Anthropic)",
     profileConfigEmpty: "У выбранного профиля не настроены переменные окружения.",
+    loopSectionSessionMode: "Режим сессии",
+    loopSessionReuse: "Повторно использовать",
+    loopSessionFresh: "Новая каждый раз",
+    loopSessionModeHint:
+        "Повторное использование сохраняет контекст между запусками. Новая сессия при каждой итерации — изменённый промпт применяется чисто; состояние переносится через memory.md.",
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",
     detailRuns: "Runs",
