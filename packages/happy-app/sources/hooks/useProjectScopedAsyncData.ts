@@ -3,6 +3,7 @@ import type { AuthCredentials } from "@/auth/tokenStorage";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { t } from "@/text";
 import { getErrorMessage } from "@/utils/errors";
+import { useLatestRequest } from "./useLatestRequest";
 
 interface UseProjectScopedAsyncDataParams<TData> {
     readonly projectServerId: string | null | undefined;
@@ -32,7 +33,7 @@ export function useProjectScopedAsyncData<TData>({
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const mountedRef = React.useRef(true);
-    const latestRequestTokenRef = React.useRef(0);
+    const request = useLatestRequest();
     const latestProjectIdRef = React.useRef<string | null>(null);
 
     React.useEffect(() => {
@@ -41,7 +42,7 @@ export function useProjectScopedAsyncData<TData>({
 
     React.useEffect(() => {
         if (!projectServerId) {
-            latestRequestTokenRef.current += 1;
+            request.invalidate();
             latestProjectIdRef.current = null;
             setData(createEmptyData());
             setLoading(false);
@@ -50,7 +51,7 @@ export function useProjectScopedAsyncData<TData>({
         }
 
         if (latestProjectIdRef.current !== projectServerId) {
-            latestRequestTokenRef.current += 1;
+            request.invalidate();
             latestProjectIdRef.current = projectServerId;
             setData(createEmptyData());
             setLoading(false);
@@ -61,8 +62,7 @@ export function useProjectScopedAsyncData<TData>({
     const refresh = React.useCallback(async () => {
         if (!projectServerId) return;
 
-        const requestToken = latestRequestTokenRef.current + 1;
-        latestRequestTokenRef.current = requestToken;
+        const token = request.begin();
         setLoading(true);
         setError(null);
 
@@ -73,19 +73,19 @@ export function useProjectScopedAsyncData<TData>({
             }
 
             const nextData = await load(credentials, projectServerId);
-            if (!mountedRef.current || requestToken !== latestRequestTokenRef.current) {
+            if (!mountedRef.current || !request.isCurrent(token)) {
                 return;
             }
 
             setData(nextData);
         } catch (loadFailure) {
-            if (!mountedRef.current || requestToken !== latestRequestTokenRef.current) {
+            if (!mountedRef.current || !request.isCurrent(token)) {
                 return;
             }
 
             setError(getErrorMessage(loadFailure, t("common.error")));
         } finally {
-            if (!mountedRef.current || requestToken !== latestRequestTokenRef.current) {
+            if (!mountedRef.current || !request.isCurrent(token)) {
                 return;
             }
 

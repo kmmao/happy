@@ -18,10 +18,8 @@ import {
     deriveCollectionViewState,
     type CollectionViewState,
 } from "@/utils/collectionViewState";
-import {
-    shouldApplyKnowledgeRequestResult,
-    shouldResetSessionKnowledgeState,
-} from "./sessionKnowledgeState";
+import { shouldResetSessionKnowledgeState } from "./sessionKnowledgeState";
+import { useLatestRequest } from "./useLatestRequest";
 
 export interface SessionKnowledgeEntry {
     id: string;
@@ -54,7 +52,7 @@ export function useSessionKnowledge(
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const mountedRef = React.useRef(true);
-    const latestRequestTokenRef = React.useRef(0);
+    const request = useLatestRequest();
     const latestStateKeyRef = React.useRef<string | null>(null);
 
     React.useEffect(() => {
@@ -68,7 +66,7 @@ export function useSessionKnowledge(
                 : null;
 
         if (shouldResetSessionKnowledgeState({ projectServerId, sessionId })) {
-            latestRequestTokenRef.current += 1;
+            request.invalidate();
             latestStateKeyRef.current = null;
             setEntries([]);
             setLoading(false);
@@ -77,7 +75,7 @@ export function useSessionKnowledge(
         }
 
         if (latestStateKeyRef.current !== stateKey) {
-            latestRequestTokenRef.current += 1;
+            request.invalidate();
             latestStateKeyRef.current = stateKey;
             setEntries([]);
             setLoading(false);
@@ -91,8 +89,7 @@ export function useSessionKnowledge(
         if (!credentials) return;
 
         const API_ENDPOINT = getServerUrl();
-        const requestToken = latestRequestTokenRef.current + 1;
-        latestRequestTokenRef.current = requestToken;
+        const token = request.begin();
         setLoading(true);
         setError(null);
         try {
@@ -110,19 +107,13 @@ export function useSessionKnowledge(
             });
 
             if (!mountedRef.current) return;
-            if (!shouldApplyKnowledgeRequestResult({
-                requestToken,
-                latestRequestToken: latestRequestTokenRef.current,
-            })) {
+            if (!request.isCurrent(token)) {
                 return;
             }
             setEntries(result.entries);
         } catch (fetchError) {
             if (!mountedRef.current) return;
-            if (!shouldApplyKnowledgeRequestResult({
-                requestToken,
-                latestRequestToken: latestRequestTokenRef.current,
-            })) {
+            if (!request.isCurrent(token)) {
                 return;
             }
             setError(
@@ -132,10 +123,7 @@ export function useSessionKnowledge(
             );
         } finally {
             if (!mountedRef.current) return;
-            if (!shouldApplyKnowledgeRequestResult({
-                requestToken,
-                latestRequestToken: latestRequestTokenRef.current,
-            })) {
+            if (!request.isCurrent(token)) {
                 return;
             }
             setLoading(false);

@@ -2,7 +2,7 @@ import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
 import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
-import { apiRequest } from "./apiRequest";
+import { apiRequest, apiRequestParsed } from "./apiRequest";
 import * as z from "zod";
 
 /**
@@ -91,7 +91,7 @@ export async function fetchProjects(
     let cursor: string | undefined;
 
     do {
-        const json = await apiRequest<unknown>(credentials, "/v1/projects", {
+        const data = await apiRequestParsed(credentials, "/v1/projects", ProjectListResponseSchema, {
             query: {
                 limit: 100,
                 archived: archived !== undefined ? archived : undefined,
@@ -99,13 +99,9 @@ export async function fetchProjects(
             },
             errorMessage: "Failed to fetch projects",
         });
-        const parsed = ProjectListResponseSchema.safeParse(json);
-        if (!parsed.success) {
-            throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
-        }
 
-        all.push(...(parsed.data.projects as unknown as ServerProject[]));
-        cursor = parsed.data.nextCursor ?? undefined;
+        all.push(...(data.projects as unknown as ServerProject[]));
+        cursor = data.nextCursor ?? undefined;
     } while (cursor);
 
     return all;

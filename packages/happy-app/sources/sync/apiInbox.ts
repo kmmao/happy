@@ -1,6 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import * as z from "zod";
-import { apiRequest, apiRequestVoid } from "./apiRequest";
+import { apiRequestParsed, apiRequestVoid } from "./apiRequest";
 
 export interface ServerInboxItem {
     id: string;
@@ -45,7 +45,7 @@ export async function fetchInboxItems(
         offset?: number;
     },
 ): Promise<{ items: ServerInboxItem[]; total: number }> {
-    const json = await apiRequest<unknown>(credentials, "/v1/inbox", {
+    return apiRequestParsed(credentials, "/v1/inbox", InboxListResponseSchema, {
         query: {
             category: opts?.category || undefined,
             read: opts?.read,
@@ -54,24 +54,15 @@ export async function fetchInboxItems(
         },
         errorMessage: "Failed to fetch inbox",
     });
-    const parsed = InboxListResponseSchema.safeParse(json);
-    if (!parsed.success) {
-        throw new Error(`Invalid inbox response: ${parsed.error.issues[0]?.message}`);
-    }
-    return parsed.data;
 }
 
 export async function fetchInboxUnreadCount(
     credentials: AuthCredentials,
 ): Promise<number> {
-    const json = await apiRequest<unknown>(credentials, "/v1/inbox/count", {
+    const { count } = await apiRequestParsed(credentials, "/v1/inbox/count", InboxCountResponseSchema, {
         errorMessage: "Failed to fetch inbox count",
     });
-    const parsed = InboxCountResponseSchema.safeParse(json);
-    if (!parsed.success) {
-        throw new Error(`Invalid inbox count response: ${parsed.error.issues[0]?.message}`);
-    }
-    return parsed.data.count;
+    return count;
 }
 
 export async function markInboxItemRead(

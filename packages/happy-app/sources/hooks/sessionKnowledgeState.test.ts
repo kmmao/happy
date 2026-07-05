@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-    shouldApplyKnowledgeRequestResult,
-    shouldResetSessionKnowledgeState,
-} from "./sessionKnowledgeState";
+import { shouldResetSessionKnowledgeState } from "./sessionKnowledgeState";
 
 describe("shouldResetSessionKnowledgeState", () => {
     it("resets when project or session becomes unavailable", () => {
@@ -28,23 +25,5 @@ describe("shouldResetSessionKnowledgeState", () => {
                 sessionId: "session-1",
             }),
         ).toBe(false);
-    });
-});
-
-describe("shouldApplyKnowledgeRequestResult", () => {
-    it("applies only the latest async response", () => {
-        expect(
-            shouldApplyKnowledgeRequestResult({
-                requestToken: 2,
-                latestRequestToken: 3,
-            }),
-        ).toBe(false);
-
-        expect(
-            shouldApplyKnowledgeRequestResult({
-                requestToken: 3,
-                latestRequestToken: 3,
-            }),
-        ).toBe(true);
     });
 });

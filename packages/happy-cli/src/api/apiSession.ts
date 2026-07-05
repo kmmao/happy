@@ -18,7 +18,8 @@ import {
   type SessionCryptoCodec,
 } from "./sessionCryptoCodec";
 import { createUsageReporter, type UsageReporter } from "./usageReporter";
-import { backoff, delay } from "@/utils/time";
+import { delay } from "@/utils/time";
+import { runVersionedUpdate } from "./versionedUpdate";
 import { configuration } from "@/configuration";
 import { RawJSONLines } from "@/claude/types";
 import { randomUUID } from "node:crypto";
@@ -1566,29 +1567,26 @@ export class ApiSessionClient extends EventEmitter {
    * @param handler - Handler function that returns the updated metadata
    */
   updateMetadata(handler: (metadata: Metadata) => Metadata) {
-    this.metadataLock.inLock(async () => {
-      await backoff(async () => {
-        let updated = handler(this.metadata!); // Weird state if metadata is null - should never happen but here we are
+    runVersionedUpdate<Metadata>({
+      lock: this.metadataLock,
+      currentVersion: () => this.metadataVersion,
+      attempt: async (expectedVersion) => {
+        const updated = handler(this.metadata!); // Weird state if metadata is null - should never happen but here we are
         const answer = await this.socket.emitWithAck("update-metadata", {
           sid: this.sessionId,
-          expectedVersion: this.metadataVersion,
+          expectedVersion,
           metadata: this.cipher.encryptMetadata(updated),
         });
-        if (answer.result === "success") {
+        if (answer.result === "success" || answer.result === "version-mismatch") {
           const decrypted = this.cipher.decodeMetadata(answer.metadata);
-          this.metadata = decrypted.ok ? decrypted.value : null;
-          this.metadataVersion = answer.version;
-        } else if (answer.result === "version-mismatch") {
-          if (answer.version > this.metadataVersion) {
-            this.metadataVersion = answer.version;
-            const decrypted = this.cipher.decodeMetadata(answer.metadata);
-            this.metadata = decrypted.ok ? decrypted.value : null;
-          }
-          throw new Error("Metadata version mismatch");
-        } else if (answer.result === "error") {
-          // Hard error - ignore
+          return { result: answer.result, version: answer.version, value: decrypted.ok ? decrypted.value : null };
         }
-      });
+        return { result: "error" };
+      },
+      commit: (version, value) => {
+        this.metadataVersion = version;
+        this.metadata = value;
+      },
     });
   }
 
@@ -1598,34 +1596,29 @@ export class ApiSessionClient extends EventEmitter {
    */
   updateAgentState(handler: (metadata: AgentState) => AgentState) {
     logger.debugLargeJson("Updating agent state", this.agentState);
-    this.agentStateLock.inLock(async () => {
-      await backoff(async () => {
-        let updated = handler(this.agentState || {});
+    runVersionedUpdate<AgentState>({
+      lock: this.agentStateLock,
+      currentVersion: () => this.agentStateVersion,
+      attempt: async (expectedVersion) => {
+        const updated = handler(this.agentState || {});
         const answer = await this.socket.emitWithAck("update-state", {
           sid: this.sessionId,
-          expectedVersion: this.agentStateVersion,
+          expectedVersion,
           agentState: updated ? this.cipher.encryptAgentState(updated) : null,
         });
-        if (answer.result === "success") {
+        if (answer.result === "success" || answer.result === "version-mismatch") {
           const decrypted = answer.agentState
             ? this.cipher.decodeAgentState(answer.agentState)
             : null;
-          this.agentState = decrypted?.ok ? decrypted.value : null;
-          this.agentStateVersion = answer.version;
-          logger.debug("Agent state updated", this.agentState);
-        } else if (answer.result === "version-mismatch") {
-          if (answer.version > this.agentStateVersion) {
-            this.agentStateVersion = answer.version;
-            const decrypted = answer.agentState
-              ? this.cipher.decodeAgentState(answer.agentState)
-              : null;
-            this.agentState = decrypted?.ok ? decrypted.value : null;
-          }
-          throw new Error("Agent state version mismatch");
-        } else if (answer.result === "error") {
-          // Hard error - ignore
+          return { result: answer.result, version: answer.version, value: decrypted?.ok ? decrypted.value : null };
         }
-      });
+        return { result: "error" };
+      },
+      commit: (version, value) => {
+        this.agentStateVersion = version;
+        this.agentState = value;
+        logger.debug("Agent state updated", this.agentState);
+      },
     });
   }
 

@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
 import { throwIfNotOk } from '@/utils/http';
@@ -92,6 +93,31 @@ export async function apiRequest<T>(
         return (await response.json()) as T;
     };
     return options.retry === false ? await run() : await backoff(run);
+}
+
+/**
+ * Perform a request and validate the JSON response against `schema`, returning
+ * the parsed value or throwing a descriptive error.
+ *
+ * This is the runtime-validated peer of {@link apiRequest} (which casts the JSON
+ * to `T` unchecked). It owns the "raw response → validated typed value, or throw"
+ * invariant that endpoint wrappers otherwise re-implement inline as
+ * `schema.safeParse(json)` + `throw`. Prefer this over `apiRequest<T>` whenever a
+ * response schema exists; the error names the endpoint path and the first Zod
+ * issue.
+ */
+export async function apiRequestParsed<T>(
+    credentials: AuthCredentials,
+    path: string,
+    schema: z.ZodType<T>,
+    options: ApiRequestOptions = {},
+): Promise<T> {
+    const json = await apiRequest<unknown>(credentials, path, options);
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) {
+        throw new Error(`Invalid response from ${path}: ${parsed.error.issues[0]?.message}`);
+    }
+    return parsed.data;
 }
 
 /** Perform a request that returns no body (or whose body is ignored). */

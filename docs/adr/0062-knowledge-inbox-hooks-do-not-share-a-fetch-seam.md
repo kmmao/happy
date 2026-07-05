@@ -1,6 +1,12 @@
 ---
 status: accepted
+amended-by: 0068
 ---
+
+> **Amended by ADR-0068**: the latest-request-wins *guard* was later extracted
+> into `useLatestRequest` once a fourth adapter appeared (the trigger this ADR
+> named). The core ruling below — do NOT merge the data hooks themselves — still
+> stands; only the "one adapter, don't extract the guard" premise is superseded.
 
 # The knowledge / inbox data hooks deliberately do NOT share a fetch/dedup seam
 

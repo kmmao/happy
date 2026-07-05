@@ -23,6 +23,31 @@ const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = "new-session-draft-v1";
 const DISMISSED_TASKS_PREFIX = "dismissed-tasks:";
 
+/**
+ * Load a JSON-encoded MMKV value under `key`, run `parse` on the decoded value,
+ * and return its result — or `fallback` when the key is absent or parsing throws.
+ *
+ * Concentrates the `getString → JSON.parse → validate → catch→fallback` envelope
+ * that the simple `loadX` accessors previously repeated inline (with drifting
+ * amounts of validation — some ran a `*Parse` helper, some cast unchecked).
+ * `parse` decides the validation: an identity cast keeps the prior unchecked
+ * behavior; a `*Parse`/Zod call validates and may throw, which is caught and
+ * logged here. Specialized loaders that also delete stale keys, migrate legacy
+ * formats, or filter fields keep their own bodies.
+ */
+function loadJson<T>(key: string, parse: (value: unknown) => T, fallback: T): T {
+  const raw = mmkv.getString(key);
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    return parse(JSON.parse(raw));
+  } catch (e) {
+    log.error(`Failed to parse ${key}`, e);
+    return fallback;
+  }
+}
+
 export type NewSessionAgentType = "claude" | "codex" | "gemini";
 export type NewSessionSessionType = "simple" | "worktree";
 
@@ -37,20 +62,14 @@ export interface NewSessionDraft {
 }
 
 export function loadSettings(): { settings: Settings; version: number | null } {
-  const settings = mmkv.getString("settings");
-  if (settings) {
-    try {
-      const parsed = JSON.parse(settings);
-      return {
-        settings: settingsParse(parsed.settings),
-        version: parsed.version,
-      };
-    } catch (e) {
-      log.error("Failed to parse settings", e);
-      return { settings: { ...settingsDefaults }, version: null };
-    }
-  }
-  return { settings: { ...settingsDefaults }, version: null };
+  return loadJson(
+    "settings",
+    (v) => {
+      const parsed = v as { settings: unknown; version: number | null };
+      return { settings: settingsParse(parsed.settings), version: parsed.version };
+    },
+    { settings: { ...settingsDefaults }, version: null },
+  );
 }
 
 export function saveSettings(settings: Settings, version: number) {
@@ -64,17 +83,7 @@ export function saveSettings(settings: Settings, version: number) {
 }
 
 export function loadPendingSettings(): Partial<Settings> {
-  const pending = mmkv.getString("pending-settings");
-  if (pending) {
-    try {
-      const parsed = JSON.parse(pending);
-      return SettingsSchema.partial().parse(parsed);
-    } catch (e) {
-      log.error("Failed to parse pending settings", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("pending-settings", (v) => SettingsSchema.partial().parse(v), {});
 }
 
 export function savePendingSettings(settings: Partial<Settings>) {
@@ -90,16 +99,11 @@ export function loadPendingSessionPreferences(): Record<
   string,
   SessionPreferences
 > {
-  const raw = mmkv.getString("pending-session-preferences");
-  if (raw) {
-    try {
-      return PendingSessionPreferencesMapSchema.parse(JSON.parse(raw));
-    } catch (e) {
-      log.error("Failed to parse pending session preferences", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson(
+    "pending-session-preferences",
+    (v) => PendingSessionPreferencesMapSchema.parse(v),
+    {},
+  );
 }
 
 export function savePendingSessionPreferences(
@@ -109,17 +113,7 @@ export function savePendingSessionPreferences(
 }
 
 export function loadLocalSettings(): LocalSettings {
-  const localSettings = mmkv.getString("local-settings");
-  if (localSettings) {
-    try {
-      const parsed = JSON.parse(localSettings);
-      return localSettingsParse(parsed);
-    } catch (e) {
-      log.error("Failed to parse local settings", e);
-      return { ...localSettingsDefaults };
-    }
-  }
-  return { ...localSettingsDefaults };
+  return loadJson("local-settings", localSettingsParse, { ...localSettingsDefaults });
 }
 
 export function saveLocalSettings(settings: LocalSettings) {
@@ -127,32 +121,15 @@ export function saveLocalSettings(settings: LocalSettings) {
 }
 
 export function loadThemePreference(): "light" | "dark" | "adaptive" {
-  const localSettings = mmkv.getString("local-settings");
-  if (localSettings) {
-    try {
-      const parsed = JSON.parse(localSettings);
-      const settings = localSettingsParse(parsed);
-      return settings.themePreference;
-    } catch (e) {
-      log.error("Failed to parse local settings for theme preference", e);
-      return localSettingsDefaults.themePreference;
-    }
-  }
-  return localSettingsDefaults.themePreference;
+  return loadJson(
+    "local-settings",
+    (v) => localSettingsParse(v).themePreference,
+    localSettingsDefaults.themePreference,
+  );
 }
 
 export function loadPurchases(): Purchases {
-  const purchases = mmkv.getString("purchases");
-  if (purchases) {
-    try {
-      const parsed = JSON.parse(purchases);
-      return purchasesParse(parsed);
-    } catch (e) {
-      log.error("Failed to parse purchases", e);
-      return { ...purchasesDefaults };
-    }
-  }
-  return { ...purchasesDefaults };
+  return loadJson("purchases", purchasesParse, { ...purchasesDefaults });
 }
 
 export function savePurchases(purchases: Purchases) {
@@ -160,16 +137,7 @@ export function savePurchases(purchases: Purchases) {
 }
 
 export function loadSessionDrafts(): Record<string, string> {
-  const drafts = mmkv.getString("session-drafts");
-  if (drafts) {
-    try {
-      return JSON.parse(drafts);
-    } catch (e) {
-      log.error("Failed to parse session drafts", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-drafts", (v) => v as Record<string, string>, {});
 }
 
 export function saveSessionDrafts(drafts: Record<string, string>) {
@@ -179,16 +147,7 @@ export function saveSessionDrafts(drafts: Record<string, string>) {
 export type PendingQueueItem = { localId: string; message: string; displayText?: string };
 
 export function loadPendingQueues(): Record<string, PendingQueueItem[]> {
-  const raw = mmkv.getString("session-pending-queues");
-  if (raw) {
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      log.error("Failed to parse pending queues", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-pending-queues", (v) => v as Record<string, PendingQueueItem[]>, {});
 }
 
 export function savePendingQueues(queues: Record<string, PendingQueueItem[]>) {
@@ -209,16 +168,7 @@ export function savePendingQueues(queues: Record<string, PendingQueueItem[]>) {
  * "Send now" pill. Persisted so the choice survives reloads.
  */
 export function loadPendingQueuePaused(): Record<string, boolean> {
-  const raw = mmkv.getString("session-pending-queue-paused");
-  if (raw) {
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      log.error("Failed to parse pending queue paused", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-pending-queue-paused", (v) => v as Record<string, boolean>, {});
 }
 
 export function savePendingQueuePaused(paused: Record<string, boolean>) {
@@ -287,16 +237,7 @@ export function clearNewSessionDraft() {
 }
 
 export function loadSessionPermissionModes(): Record<string, string> {
-  const modes = mmkv.getString("session-permission-modes");
-  if (modes) {
-    try {
-      return JSON.parse(modes);
-    } catch (e) {
-      log.error("Failed to parse session permission modes", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-permission-modes", (v) => v as Record<string, string>, {});
 }
 
 export function saveSessionPermissionModes(modes: Record<string, string>) {
@@ -304,16 +245,7 @@ export function saveSessionPermissionModes(modes: Record<string, string>) {
 }
 
 export function loadSessionModelModes(): Record<string, string> {
-  const modes = mmkv.getString("session-model-modes");
-  if (modes) {
-    try {
-      return JSON.parse(modes);
-    } catch (e) {
-      log.error("Failed to parse session model modes", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-model-modes", (v) => v as Record<string, string>, {});
 }
 
 export function saveSessionModelModes(modes: Record<string, string>) {
@@ -360,16 +292,7 @@ export interface SessionSdkSettings {
 }
 
 export function loadSessionSdkSettings(): Record<string, SessionSdkSettings> {
-  const data = mmkv.getString("session-sdk-settings");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session SDK settings", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-sdk-settings", (v) => v as Record<string, SessionSdkSettings>, {});
 }
 
 export function saveSessionSdkSettings(
@@ -379,16 +302,7 @@ export function saveSessionSdkSettings(
 }
 
 export function loadSessionNeedsAttention(): Record<string, boolean> {
-  const data = mmkv.getString("session-needs-attention");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session needs attention", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-needs-attention", (v) => v as Record<string, boolean>, {});
 }
 
 export function saveSessionNeedsAttention(attention: Record<string, boolean>) {
@@ -397,16 +311,7 @@ export function saveSessionNeedsAttention(attention: Record<string, boolean>) {
 
 // Starred sessions (user-bookmarked, device-local)
 export function loadSessionStarred(): Record<string, boolean> {
-  const data = mmkv.getString("session-starred");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session starred", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-starred", (v) => v as Record<string, boolean>, {});
 }
 
 export function saveSessionStarred(starred: Record<string, boolean>) {
@@ -418,16 +323,7 @@ export function loadSessionModelMappings(): Record<
   string,
   Record<string, string>
 > {
-  const data = mmkv.getString("session-model-mappings");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session model mappings", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-model-mappings", (v) => v as Record<string, Record<string, string>>, {});
 }
 
 export function saveSessionModelMappings(
@@ -444,16 +340,7 @@ type CustomModelEntry = Array<{
 }>;
 
 export function loadSessionCustomModels(): Record<string, CustomModelEntry> {
-  const data = mmkv.getString("session-custom-models");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session custom models", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-custom-models", (v) => v as Record<string, CustomModelEntry>, {});
 }
 
 export function saveSessionCustomModels(
@@ -466,16 +353,7 @@ export function saveSessionCustomModels(
 type SessionProfileEntry = { profileId: string; profileName: string };
 
 export function loadSessionProfiles(): Record<string, SessionProfileEntry> {
-  const data = mmkv.getString("session-profiles");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      log.error("Failed to parse session profiles", e);
-      return {};
-    }
-  }
-  return {};
+  return loadJson("session-profiles", (v) => v as Record<string, SessionProfileEntry>, {});
 }
 
 export function saveSessionProfiles(
@@ -485,17 +363,7 @@ export function saveSessionProfiles(
 }
 
 export function loadProfile(): Profile {
-  const profile = mmkv.getString("profile");
-  if (profile) {
-    try {
-      const parsed = JSON.parse(profile);
-      return profileParse(parsed);
-    } catch (e) {
-      log.error("Failed to parse profile", e);
-      return { ...profileDefaults };
-    }
-  }
-  return { ...profileDefaults };
+  return loadJson("profile", profileParse, { ...profileDefaults });
 }
 
 export function saveProfile(profile: Profile) {

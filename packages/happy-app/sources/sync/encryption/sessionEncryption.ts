@@ -12,7 +12,7 @@ import {
 } from "../storageTypes";
 import { EncryptionCache } from "./encryptionCache";
 import { Decryptor, Encryptor } from "./encryptor";
-import { decryptValue, decryptValueSafe, encryptValue } from "./codec";
+import { decryptAndParse, decryptValueSafe, encryptValue } from "./codec";
 
 /**
  * Why a message could not be surfaced as decrypted content. The per-session
@@ -192,19 +192,13 @@ export class SessionEncryption {
       return cached;
     }
 
-    // Decrypt if not cached
-    const decrypted = await decryptValue(this.encryptor, encrypted);
-    if (decrypted === null) {
+    // Decrypt + validate; cache only a successful result (failures re-attempt).
+    const result = await decryptAndParse(this.encryptor, encrypted, MetadataSchema);
+    if (!result.ok) {
       return null;
     }
-    const parsed = MetadataSchema.safeParse(decrypted);
-    if (!parsed.success) {
-      return null;
-    }
-
-    // Cache the result
-    this.cache.setCachedMetadata(this.sessionId, version, parsed.data);
-    return parsed.data;
+    this.cache.setCachedMetadata(this.sessionId, version, result.value);
+    return result.value;
   }
 
   /**
@@ -231,19 +225,13 @@ export class SessionEncryption {
       return cached;
     }
 
-    // Decrypt if not cached
-    const decrypted = await decryptValue(this.encryptor, encrypted);
-    if (decrypted === null) {
+    // Decrypt + validate; cache only a successful result. Failure → {} default.
+    const result = await decryptAndParse(this.encryptor, encrypted, AgentStateSchema);
+    if (!result.ok) {
       return {};
     }
-    const parsed = AgentStateSchema.safeParse(decrypted);
-    if (!parsed.success) {
-      return {};
-    }
-
-    // Cache the result
-    this.cache.setCachedAgentState(this.sessionId, version, parsed.data);
-    return parsed.data;
+    this.cache.setCachedAgentState(this.sessionId, version, result.value);
+    return result.value;
   }
 
   /**
@@ -263,16 +251,11 @@ export class SessionEncryption {
       return null;
     }
 
+    // Preferences keep their own try/catch — soft failure on decrypt errors —
+    // and do not cache (unlike metadata/agentState).
     try {
-      const decrypted = await decryptValue(this.encryptor, encrypted);
-      if (decrypted === null) {
-        return null;
-      }
-      const parsed = SessionPreferencesSchema.safeParse(decrypted);
-      if (!parsed.success) {
-        return null;
-      }
-      return parsed.data;
+      const result = await decryptAndParse(this.encryptor, encrypted, SessionPreferencesSchema);
+      return result.ok ? result.value : null;
     } catch {
       return null;
     }

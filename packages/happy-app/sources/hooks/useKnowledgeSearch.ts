@@ -12,6 +12,7 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { throwIfNotOk } from "@/utils/http";
+import { useLatestRequest } from "./useLatestRequest";
 
 export interface KnowledgeSearchResult {
     id: string;
@@ -40,7 +41,7 @@ export function useKnowledgeSearch() {
     const [loading, setLoading] = React.useState(false);
     const [query, setQuery] = React.useState("");
     const offsetRef = React.useRef(0);
-    const requestIdRef = React.useRef(0);
+    const request = useLatestRequest();
     const timerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const fetchResults = React.useCallback(async (
@@ -57,7 +58,7 @@ export function useKnowledgeSearch() {
         const credentials = await TokenStorage.getCredentials();
         if (!credentials) return;
 
-        const currentRequestId = ++requestIdRef.current;
+        const token = request.begin();
         setLoading(true);
 
         try {
@@ -78,7 +79,7 @@ export function useKnowledgeSearch() {
             );
 
             // Discard stale responses
-            if (requestIdRef.current !== currentRequestId) return;
+            if (!request.isCurrent(token)) return;
 
             throwIfNotOk(response, 'Search failed');
 
@@ -93,11 +94,11 @@ export function useKnowledgeSearch() {
         } catch {
             // Keep current results on failure
         } finally {
-            if (requestIdRef.current === currentRequestId) {
+            if (request.isCurrent(token)) {
                 setLoading(false);
             }
         }
-    }, []);
+    }, [request]);
 
     const search = React.useCallback((q: string) => {
         setQuery(q);
@@ -123,8 +124,8 @@ export function useKnowledgeSearch() {
         setResults([]);
         setTotal(0);
         offsetRef.current = 0;
-        requestIdRef.current++;
-    }, []);
+        request.invalidate();
+    }, [request]);
 
     // Cleanup timer on unmount
     React.useEffect(() => {

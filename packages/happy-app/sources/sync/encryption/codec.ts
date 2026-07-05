@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { decodeBase64, encodeBase64 } from "@/encryption/base64";
 import type { Decryptor, Encryptor } from "./encryptor";
 
@@ -50,4 +51,32 @@ export async function decryptValueSafe(
   } catch {
     return null;
   }
+}
+
+/**
+ * Discriminated result of decrypt-then-validate. `{ ok: false }` is the single
+ * shape for all three ways a value fails to materialize (empty input, a null
+ * decrypt / auth failure, or a schema mismatch) so the caller decides both the
+ * fallback value AND whether to cache — only an `ok` result is safe to cache.
+ */
+export type DecryptParseResult<T> = { ok: true; value: T } | { ok: false };
+
+/**
+ * Decrypt one base64 string and validate it against `schema`. Concentrates the
+ * decrypt → null-check → safeParse cycle that each per-entity decrypt method
+ * (metadata, agentState, preferences) previously re-implemented. Decode/decrypt
+ * errors propagate, exactly like {@link decryptValue}; callers wanting a soft
+ * failure (as `decryptPreferences` does) wrap the call in try/catch. Testable
+ * with a fake `Decryptor` and any schema — no real crypto backend needed.
+ */
+export async function decryptAndParse<T>(
+  decryptor: Decryptor,
+  encrypted: string | null | undefined,
+  schema: z.ZodType<T>,
+): Promise<DecryptParseResult<T>> {
+  if (!encrypted) return { ok: false };
+  const decrypted = await decryptValue(decryptor, encrypted);
+  if (decrypted === null) return { ok: false };
+  const parsed = schema.safeParse(decrypted);
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
 }

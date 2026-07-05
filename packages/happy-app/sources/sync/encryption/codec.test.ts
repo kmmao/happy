@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { encryptValue, decryptValue, decryptValueSafe } from "./codec";
+import { z } from "zod";
+import { encryptValue, decryptValue, decryptValueSafe, decryptAndParse } from "./codec";
 import type { Decryptor, Encryptor } from "./encryptor";
 import { encodeBase64 } from "@/encryption/base64";
 
@@ -55,5 +56,38 @@ describe("encryption codec", () => {
             },
         };
         expect(await decryptValueSafe(throwing, "AAAA")).toBeNull();
+    });
+});
+
+describe("decryptAndParse", () => {
+    const schema = z.object({ v: z.number() });
+
+    it("returns { ok: true, value } for a decrypt that validates", async () => {
+        const enc = await encryptValue(jsonAdapter, { v: 5 });
+        expect(await decryptAndParse(jsonAdapter, enc, schema)).toEqual({ ok: true, value: { v: 5 } });
+    });
+
+    it("returns { ok: false } when the schema rejects the decrypted value", async () => {
+        const enc = await encryptValue(jsonAdapter, { v: "not a number" });
+        expect(await decryptAndParse(jsonAdapter, enc, schema)).toEqual({ ok: false });
+    });
+
+    it("returns { ok: false } for empty/nullish input without touching the adapter", async () => {
+        let called = false;
+        const spy: Decryptor = { async decrypt(d) { called = true; return d.map(() => null); } };
+        expect(await decryptAndParse(spy, null, schema)).toEqual({ ok: false });
+        expect(await decryptAndParse(spy, undefined, schema)).toEqual({ ok: false });
+        expect(await decryptAndParse(spy, "", schema)).toEqual({ ok: false });
+        expect(called).toBe(false);
+    });
+
+    it("returns { ok: false } when the adapter yields null (auth failure)", async () => {
+        const nullAdapter: Decryptor = { async decrypt() { return [null]; } };
+        expect(await decryptAndParse(nullAdapter, encodeBase64(new Uint8Array([1, 2, 3])), schema)).toEqual({ ok: false });
+    });
+
+    it("propagates adapter errors (soft-failure is the caller's choice)", async () => {
+        const throwing: Decryptor = { async decrypt() { throw new Error("boom"); } };
+        await expect(decryptAndParse(throwing, "AAAA", schema)).rejects.toThrow("boom");
     });
 });

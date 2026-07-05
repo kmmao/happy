@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { AuthCredentials } from "@/auth/tokenStorage";
 
 vi.mock("./serverConfig", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/utils/time", async (importOriginal) => ({
 
 let apiRequest: typeof import("./apiRequest").apiRequest;
 let apiRequestVoid: typeof import("./apiRequest").apiRequestVoid;
+let apiRequestParsed: typeof import("./apiRequest").apiRequestParsed;
 
 const credentials: AuthCredentials = { token: "test-token", secret: null };
 
@@ -26,7 +28,7 @@ describe("apiRequest seam", () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         global.fetch = vi.fn();
-        ({ apiRequest, apiRequestVoid } = await import("./apiRequest"));
+        ({ apiRequest, apiRequestVoid, apiRequestParsed } = await import("./apiRequest"));
     });
 
     it("joins the base URL, attaches the bearer token, and parses JSON", async () => {
@@ -95,5 +97,29 @@ describe("apiRequest seam", () => {
         expect(response.json).not.toHaveBeenCalled();
         const [, init] = (global.fetch as any).mock.calls[0];
         expect(init.method).toBe("DELETE");
+    });
+
+    describe("apiRequestParsed", () => {
+        const schema = z.object({ count: z.number() });
+
+        it("returns the validated value when the response matches the schema", async () => {
+            global.fetch = vi.fn().mockResolvedValue(okJson({ count: 7 }) as never);
+            const result = await apiRequestParsed(credentials, "/v1/count", schema);
+            expect(result).toEqual({ count: 7 });
+        });
+
+        it("throws a path-tagged error when the response fails validation", async () => {
+            global.fetch = vi.fn().mockResolvedValue(okJson({ count: "nope" }) as never);
+            await expect(
+                apiRequestParsed(credentials, "/v1/count", schema),
+            ).rejects.toThrow(/Invalid response from \/v1\/count/);
+        });
+
+        it("still surfaces the HTTP error (not a validation error) on a non-ok response", async () => {
+            global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: vi.fn() } as never);
+            await expect(
+                apiRequestParsed(credentials, "/v1/count", schema, { errorMessage: "boom" }),
+            ).rejects.toThrow("boom: 500");
+        });
     });
 });
