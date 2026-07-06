@@ -943,25 +943,25 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(mockAxiosGet.mock.calls[0][1].params.after_seq).toBe(1);
     });
 
-    it('invalidates receive sync on first message when lastSeq is 0', async () => {
-        void new ApiSessionClient('fake-token', session);
+    it('routes the first live message immediately in a fresh session (lastSeq 0, upstream #1408)', () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const onUserMessage = vi.fn();
+        client.onUserMessage(onUserMessage);
 
-        mockAxiosGet.mockResolvedValueOnce({
-            data: {
-                messages: [],
-                hasMore: false
-            }
-        });
-
-        emitSocketEvent('update', createNewMessageUpdate(1, encryptContent(session, {
+        expect((client as any).lastSeq).toBe(0);
+        const userMessage = {
             role: 'user',
             content: { type: 'text', text: 'first' }
-        })));
+        };
 
-        await waitForCheck(() => {
-            expect(mockAxiosGet).toHaveBeenCalledTimes(1);
-        });
-        expect(mockAxiosGet.mock.calls[0][1].params.after_seq).toBe(0);
+        emitSocketEvent('update', createNewMessageUpdate(1, encryptContent(session, userMessage)));
+
+        // seq:1 === lastSeq(0) + 1, so it must route through the fast path
+        // instead of being dropped and waiting for a REST catch-up.
+        expect(onUserMessage).toHaveBeenCalledTimes(1);
+        expect(onUserMessage).toHaveBeenCalledWith(userMessage);
+        expect((client as any).lastSeq).toBe(1);
+        expect(mockAxiosGet).not.toHaveBeenCalled();
     });
 
     it('invalidates receive sync for duplicate and stale seq values', async () => {

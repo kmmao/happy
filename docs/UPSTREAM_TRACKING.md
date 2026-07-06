@@ -45,6 +45,9 @@
 | `72226c73a` | fix: stabilize Claude remote control permissions | (本期 sdk-watch port) | 2026-06-13 | 仅 port `permissionMode.ts` 新增 `resolveRemoteClaudePermissionMode` + `runClaude.ts` 调用点；`claudeLocalLauncher.ts` 等价行为本地已实现，未 port；`currentRunMode` 守卫不适用本地 PTY 架构 |
 | — | bump fastify-type-provider-zod 4.0.2→5 for zod 4 compat (相当于上游 `4930809e7` 修复) | (本期 sdk-watch port) | 2026-06-13 | 与 happy-server 已用版本对齐，避免 monorepo 内 4/6 版本分裂；controlServer.ts API 用法兼容 |
 | — | settingsParser 拦截 `disableBundledSkills`（claude-code 2.1.169 安全加固） | (本期 sdk-watch port) | 2026-06-13 | 与 `skillOverrides` 同性质，列入 `BLOCKED_KEYS` + 测试 |
+| #1408 (`5c804c8a6`) | fix: 首条远程消息在新会话中被丢弃 | (2026-07-06 sdk-watch port) | 2026-07-06 | 删除 `apiSession.ts` 里 `lastSeq === 0` 特判 —— 新会话 socket 送达的首条加密 `seq:1` 消息不再被 `invalidate()+return` 丢弃、改走既有顺序校验立即路由；替换旧的"断言坏行为"测试为"首条消息立即路由、不走 REST catch-up"；与上游字节对齐；本地 1691 测试全过。#1410 其余部分（/goal UX、codexSkills、slash chip 渲染）未 port（本地 /goal 已由 #1428 覆盖，codexSkills 为 Codex 专属，列入监视） |
+| #1428 (`d9c0c734c`) | Add authoritative agent goal support | (`912699c55` 已 port) | 2026-07-06 复核 | `claudeGoalStatus.ts` 与上游字节一致；App 端 `agentGoalStatus.ts`/`AgentGoalBar` 齐备 |
+| #1470 (`f6adffb42`) | feat(app): add Fable 5 to Claude model picker | (本地已有) | 2026-07-06 复核 | `modelModeOptions.ts:231`、`claudeRemote.ts:157` 已含 Fable 5 |
 
 ---
 
@@ -82,11 +85,11 @@
 
 ---
 
-## 运行时依赖对齐（2026-06-13）
+## 运行时依赖对齐（2026-07-06 更新）
 
 | 包 | 项目当前 | npm 最新 | 状态 |
 |---|---|---|---|
-| `@anthropic-ai/sandbox-runtime` | `0.0.54` | `0.0.54` | ✅ 跟上 |
+| `@anthropic-ai/sandbox-runtime` | `0.0.54` | `0.0.63` | 🔍 落后 9 补丁；0.0.55→63 均补丁，`0.0.63` 移除 `shell-quote` 依赖、无破坏性 API 变更；列入 P2 可选跟进（dev 分支验证后再升） |
 | `@modelcontextprotocol/sdk` | `^1.29.0` | `1.29.0` | ✅ 跟上 |
 | `node-pty` | `^1.1.0` | `1.1.0` | ✅ 跟上 |
 | `fastify-type-provider-zod`（happy-cli） | `5` | `6.1.0` | ✅ 本期升 `4.0.2 → 5` 修 zod 4 兼容（与 happy-server 对齐）；后续若升 server 到 6.x 再统一 |
@@ -95,6 +98,26 @@
 | `@anthropic-ai/claude-code`（codium 内嵌） | `2.1.177` | `2.1.177` | ✅ 本期升 `2.1.165 → 2.1.177`；`@anthropic-ai/claude-agent-sdk` 同步至 `^0.3.177`；codium typecheck + 4 测试文件 100 用例全过 |
 
 > 注：本项目走 PTY 模式，**不追踪** `@anthropic-ai/claude-agent-sdk` 与 `claude -p` headless 路径。
+
+---
+
+## claude-code 2.1.177 → 2.1.201 PTY 形态复核（2026-07-06）
+
+本机 `claude --version` = **2.1.201**（npm 最新亦为 2.1.201）。逐条比对官方 changelog 的形态变化与本地适配点：
+
+| 形态变更 | 版本 | 类别 | 本地适配点 | 结论 |
+|---|---|---|---|---|
+| Claude Sonnet 5（新默认，原生 1M） | 2.1.197 | 模型 | `claudeRemote.ts:142-144` `sonnet-5`/`sonnet-5-1m`→`claude-sonnet-5[1m]`；`modelModeOptions.ts:211` | ✅ 已支持 |
+| Fable 5 加入模型选择器 | 上游 #1470 | 模型 | `claudeRemote.ts:157`、`modelModeOptions.ts:231` | ✅ 已支持 |
+| permission mode `default`→`manual` 重命名（仍接受 `default`） | 2.1.200 | settings/CLI | `permissionMode.ts:31,137` 仅识别 `"default"` | 🔍 P2 监视 — 向后兼容，`default` 仍可用；若 App/新 claude 改发 `manual` 才需加别名 |
+| hook matcher 连字符精确匹配 / 逗号分隔修复 | 2.1.195/191 | hooks | `generateHookSettings.ts:92` 仅用 `matcher:"*"` | ✅ 不适用（未用连字符/逗号匹配） |
+| `Notification` hook 新增 `agent_needs_input`/`agent_completed` payload | 2.1.198 | hooks | `jsonlMessageTypes.ts:81,369` 已有 `Notification` 类型 | 🔍 P2 监视（仅 `claude agents` 后台代理触发） |
+| `respondToBashCommands:false` — `!` 命令默认触发 Claude 回应输出 | 2.1.186 | settings | `! <cmd>` 透传路径 | 🔍 P2 监视 — 可能改变本地 `!` 后台 shell 体验 |
+| 中断保留部分响应（不再报错） | 2.1.179 | JSONL | `jsonl/` 扫描器 | 🔍 P2 抽查扫描器对部分 assistant 消息的健壮性 |
+| `SessionStart`/`Setup`/`SubagentStart` 退出码 2 时 stderr 显示到 transcript | 2.1.199 | hooks | 本地 hook 脚本退出码 | 🔍 P2 确认 hook 脚本不以码 2 退出产生噪音 |
+| 新 settings 字段：`sandbox.credentials`、`sandbox.allowAppleEvents`、`autoMode.classifyAllShell`、`attribution.sessionUrl`、`Tool(param:value)` 权限语法 | 2.1.178-193 | settings | 透传，无消费 | 🔍 监视，无需适配 |
+
+**结论**：2.1.177→201 形态变化中，模型矩阵（Sonnet 5 / Fable 5）本地已支持；hook matcher 变更因本地只用 `"*"` 免疫；其余均为 P2 监视项，无 P0/P1 适配缺口。
 
 ---
 
@@ -109,6 +132,8 @@
 - 删除本地 `packages/happy-codium/CLAUDE.md` 82 行约定文档（不采纳）
 
 **结论**：本期 codium 上游变更全部不合入。上游处于退路模式，本地全面领先。
+
+> **2026-07-06 复核**：本地 `packages/happy-codium`（146 文件）vs 上游 `packages/codium`（145 文件），差异仅本地多一个 `CLAUDE.md`；本地 deps 仍领先（`@anthropic-ai/claude-code` 本地 `2.1.177` > 上游 `2.1.143`，`claude-agent-sdk` 本地 `^0.3.177` > 上游 `^0.3.143`）。结论不变：全部不合入。
 
 ---
 

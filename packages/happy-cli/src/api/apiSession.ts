@@ -488,10 +488,6 @@ export class ApiSessionClient extends EventEmitter {
         if (data.body.t === "new-message") {
           const socketReceivedAt = Date.now();
           const messageSeq = data.body.message?.seq;
-          if (this.lastSeq === 0) {
-            this.receiveSync.invalidate();
-            return;
-          }
           if (
             typeof messageSeq !== "number" ||
             messageSeq !== this.lastSeq + 1 ||
