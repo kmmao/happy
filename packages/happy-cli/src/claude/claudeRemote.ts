@@ -369,6 +369,38 @@ export function isSlashCommand(message: string): boolean {
   return trimmed.startsWith("/") && trimmed.length < 200;
 }
 
+/**
+ * Guard for the single turn-loop driver `handleResult`. A result may be
+ * processed (drive `onTurnComplete → onReady → nextMessage`) only when the run
+ * is live and no other result is already mid-flight.
+ *
+ * This is the exact invariant that makes the graceful-interrupt loop nudge
+ * safe: on Esc we synthesize an interrupted-turn result (see
+ * `interruptTurnResult`) to advance the loop, but if the loop is ALREADY
+ * idle-waiting inside `nextMessage()` from a just-completed real turn,
+ * `resultInFlight` is still true and this returns false — so the synthetic
+ * result is a no-op and we never double-consume the queue. `aborted` guards
+ * against acting on a PTY that was already torn down.
+ */
+export function canProcessTurnResult(
+  resultInFlight: boolean,
+  aborted: boolean,
+): boolean {
+  return !resultInFlight && !aborted;
+}
+
+/**
+ * The synthetic `result` record used to advance the turn loop after a graceful
+ * Esc interrupt (which emits no real `turn_duration` marker). Kept minimal on
+ * purpose: no `num_turns`, no cost/`modelUsage`, and a non-`error_max_turns`
+ * subtype, so `handleResult` runs only the loop-advancing tail
+ * (`onTurnComplete → onReady → nextMessage`) without firing the local-command
+ * forward, `onMaxTurnsReached`, or `onResult` cost side effects.
+ */
+export function interruptTurnResult(): { type: "result"; subtype: "interrupted" } {
+  return { type: "result", subtype: "interrupted" };
+}
+
 function writePromptWithEchoConfirm(
   pty: ClaudePtyHandle,
   message: string,
@@ -1121,6 +1153,24 @@ export async function claudeRemote(opts: {
   controller.interrupt = async () => {
     await writeInterrupt();
     updateThinking(false);
+    // Advance the turn loop past the interrupted turn. A graceful Esc stops
+    // the TUI mid-turn but never writes a `turn_duration` marker, so
+    // `handleResult` — the only caller of `nextMessage()` after the first —
+    // never fires: the `for await` parks, the mid-turn drain from this turn
+    // stays alive, and the next queued message that needs a cold restart flips
+    // the execution guard to `restarting` with nothing left to service it →
+    // permanent STALL (reproduced after a plan-mode continuation is auto-sent
+    // and the user interrupts it; PID 33211 session 7d7334ec). Synthesize an
+    // interrupted-turn result so the loop reaches `nextMessage()`, which stops
+    // the stale drain and services the queue through the normal
+    // restart/dispatch machinery — exactly like the real `turn_duration` path.
+    //
+    // Fire-and-forget: `handleResult` blocks on `nextMessage()` until the next
+    // message arrives, so awaiting it here would hang the interrupt RPC. The
+    // `canProcessTurnResult` latch inside `handleResult` makes this a no-op when
+    // the loop is already idle-waiting in `nextMessage()` (a real turn just
+    // completed), so we never double-consume the queue.
+    void handleResult(interruptTurnResult());
   };
 
   // Single chokepoint for writing a user prompt to the PTY. Marking thinking
@@ -1248,7 +1298,7 @@ export async function claudeRemote(opts: {
   // Handle a single `result` record — drives the turn loop.
   let resultInFlight = false;
   const handleResult = async (raw: { type: "result" } & Record<string, unknown>) => {
-    if (aborted || resultInFlight) return;
+    if (!canProcessTurnResult(resultInFlight, aborted)) return;
     resultInFlight = true;
     try {
       updateThinking(false);

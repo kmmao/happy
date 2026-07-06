@@ -97,6 +97,7 @@ import {
 import {
   type SessionUpdate,
   type HandlerContext,
+  type ToolCallState,
   handleAgentMessageChunk,
   handleAgentThoughtChunk,
   handleToolCallUpdate,
@@ -320,16 +321,10 @@ export class AcpBackend implements AgentBackend {
   private disposed = false;
   /** Track active tool calls to prevent duplicate events */
   private activeToolCalls = new Set<string>();
-  private toolCallTimeouts = new Map<string, NodeJS.Timeout>();
-  /** Track tool call start times for performance monitoring */
-  private toolCallStartTimes = new Map<string, number>();
+  /** Per-tool-call tracking state (name, start time, timeout) keyed by tool call ID */
+  private toolCalls = new Map<string, ToolCallState>();
   /** Pending permission requests that need response */
   private pendingPermissions = new Map<string, (response: RequestPermissionResponse) => void>();
-
-  /** Map from permission request ID to real tool call ID for tracking */
-
-  /** Map from real tool call ID to tool name for auto-approval */
-  private toolCallIdToNameMap = new Map<string, string>();
 
   /** Track if we just sent a prompt with change_title instruction */
   private recentPromptHadChangeTitle = false;
@@ -870,9 +865,7 @@ export class AcpBackend implements AgentBackend {
     return {
       transport: this.transport,
       activeToolCalls: this.activeToolCalls,
-      toolCallStartTimes: this.toolCallStartTimes,
-      toolCallTimeouts: this.toolCallTimeouts,
-      toolCallIdToNameMap: this.toolCallIdToNameMap,
+      toolCalls: this.toolCalls,
       idleTimeout: this.idleTimeout,
       toolCallCountSincePrompt: this.toolCallCountSincePrompt,
       emit: (msg) => this.emit(msg),
@@ -1322,12 +1315,13 @@ export class AcpBackend implements AgentBackend {
     this.connection = null;
     this.acpSessionId = null;
     this.activeToolCalls.clear();
-    // Clear all tool call timeouts
-    for (const timeout of this.toolCallTimeouts.values()) {
-      clearTimeout(timeout);
+    // Clear all pending tool call timeouts
+    for (const state of this.toolCalls.values()) {
+      if (state.timeout) {
+        clearTimeout(state.timeout);
+      }
     }
-    this.toolCallTimeouts.clear();
-    this.toolCallStartTimes.clear();
+    this.toolCalls.clear();
     this.pendingPermissions.clear();
   }
 }

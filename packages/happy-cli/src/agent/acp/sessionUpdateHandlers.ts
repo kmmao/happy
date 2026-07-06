@@ -46,19 +46,33 @@ export interface SessionUpdate {
 }
 
 /**
+ * Consolidated per-tool-call tracking state.
+ *
+ * The start time, timeout handle, and resolved tool name always share one
+ * lifetime with an active tool call (added in startToolCall, dropped in
+ * complete/fail/timeout), so they live in a single entry rather than three
+ * parallel maps keyed by the same id. `activeToolCalls` stays a separate Set
+ * because it is part of the TransportHandler contract (see StderrContext).
+ */
+export interface ToolCallState {
+  /** Resolved tool name (used for permission requests and logging) */
+  name: string;
+  /** Timestamp (ms) when the tool call started */
+  startTime: number;
+  /** Timeout handle firing if the tool call never completes */
+  timeout?: NodeJS.Timeout;
+}
+
+/**
  * Context for session update handlers
  */
 export interface HandlerContext {
   /** Transport handler for agent-specific behavior */
   transport: TransportHandler;
-  /** Set of active tool call IDs */
+  /** Set of active tool call IDs (exposed via the TransportHandler contract) */
   activeToolCalls: Set<string>;
-  /** Map of tool call ID to start time */
-  toolCallStartTimes: Map<string, number>;
-  /** Map of tool call ID to timeout handle */
-  toolCallTimeouts: Map<string, NodeJS.Timeout>;
-  /** Map of tool call ID to tool name */
-  toolCallIdToNameMap: Map<string, string>;
+  /** Per-tool-call tracking state (name, start time, timeout) keyed by tool call ID */
+  toolCalls: Map<string, ToolCallState>;
   /** Current idle timeout handle */
   idleTimeout: NodeJS.Timeout | null;
   /** Tool call counter since last prompt */
@@ -250,11 +264,12 @@ export function startToolCall(
   const extractedName = ctx.transport.extractToolNameFromId?.(toolCallId);
   const realToolName = extractedName ?? (toolKindStr || 'unknown');
 
-  // Store mapping for permission requests
-  ctx.toolCallIdToNameMap.set(toolCallId, realToolName);
-
   ctx.activeToolCalls.add(toolCallId);
-  ctx.toolCallStartTimes.set(toolCallId, startTime);
+  // Track start time + resolved name together; preserve any timeout already set
+  // for this id (the timeout guard below matches the previous per-map behavior).
+  const existing = ctx.toolCalls.get(toolCallId);
+  const state: ToolCallState = { name: realToolName, startTime, timeout: existing?.timeout };
+  ctx.toolCalls.set(toolCallId, state);
 
   logger.debug(`[AcpBackend] ⏱️ Set startTime for ${toolCallId} at ${new Date(startTime).toISOString()} (from ${source})`);
   logger.debug(`[AcpBackend] 🔧 Tool call START: ${toolCallId} (${toolKind} -> ${realToolName})${isInvestigation ? ' [INVESTIGATION TOOL]' : ''}`);
@@ -266,14 +281,14 @@ export function startToolCall(
   // Set timeout for tool call completion
   const timeoutMs = ctx.transport.getToolCallTimeout?.(toolCallId, toolKindStr) ?? DEFAULT_TOOL_CALL_TIMEOUT_MS;
 
-  if (!ctx.toolCallTimeouts.has(toolCallId)) {
-    const timeout = setTimeout(() => {
-      const duration = formatDuration(ctx.toolCallStartTimes.get(toolCallId));
+  if (state.timeout === undefined) {
+    state.timeout = setTimeout(() => {
+      const current = ctx.toolCalls.get(toolCallId);
+      const duration = formatDuration(current?.startTime);
       logger.debug(`[AcpBackend] ⏱️ Tool call TIMEOUT (from ${source}): ${toolCallId} (${toolKind}) after ${(timeoutMs / 1000).toFixed(0)}s - Duration: ${duration}, removing from active set`);
 
       ctx.activeToolCalls.delete(toolCallId);
-      ctx.toolCallStartTimes.delete(toolCallId);
-      ctx.toolCallTimeouts.delete(toolCallId);
+      ctx.toolCalls.delete(toolCallId);
 
       if (ctx.activeToolCalls.size === 0) {
         logger.debug('[AcpBackend] No more active tool calls after timeout, emitting idle status');
@@ -281,7 +296,6 @@ export function startToolCall(
       }
     }, timeoutMs);
 
-    ctx.toolCallTimeouts.set(toolCallId, timeout);
     logger.debug(`[AcpBackend] ⏱️ Set timeout for ${toolCallId}: ${(timeoutMs / 1000).toFixed(0)}s${isInvestigation ? ' (investigation tool)' : ''}`);
   } else {
     logger.debug(`[AcpBackend] Timeout already set for ${toolCallId}, skipping`);
@@ -323,18 +337,15 @@ export function completeToolCall(
   content: unknown,
   ctx: HandlerContext
 ): void {
-  const startTime = ctx.toolCallStartTimes.get(toolCallId);
-  const duration = formatDuration(startTime);
+  const state = ctx.toolCalls.get(toolCallId);
+  const duration = formatDuration(state?.startTime);
   const toolKindStr = typeof toolKind === 'string' ? toolKind : 'unknown';
 
   ctx.activeToolCalls.delete(toolCallId);
-  ctx.toolCallStartTimes.delete(toolCallId);
-
-  const timeout = ctx.toolCallTimeouts.get(toolCallId);
-  if (timeout) {
-    clearTimeout(timeout);
-    ctx.toolCallTimeouts.delete(toolCallId);
+  if (state?.timeout) {
+    clearTimeout(state.timeout);
   }
+  ctx.toolCalls.delete(toolCallId);
 
   logger.debug(`[AcpBackend] ✅ Tool call COMPLETED: ${toolCallId} (${toolKindStr}) - Duration: ${duration}. Active tool calls: ${ctx.activeToolCalls.size}`);
 
@@ -363,11 +374,12 @@ export function failToolCall(
   content: unknown,
   ctx: HandlerContext
 ): void {
-  const startTime = ctx.toolCallStartTimes.get(toolCallId);
+  const state = ctx.toolCalls.get(toolCallId);
+  const startTime = state?.startTime;
   const duration = startTime ? Date.now() - startTime : null;
   const toolKindStr = typeof toolKind === 'string' ? toolKind : 'unknown';
   const isInvestigation = ctx.transport.isInvestigationTool?.(toolCallId, toolKindStr) ?? false;
-  const hadTimeout = ctx.toolCallTimeouts.has(toolCallId);
+  const hadTimeout = state?.timeout !== undefined;
 
   // Log detailed timing for investigation tools BEFORE cleanup
   if (isInvestigation) {
@@ -391,16 +403,13 @@ export function failToolCall(
 
   // Cleanup
   ctx.activeToolCalls.delete(toolCallId);
-  ctx.toolCallStartTimes.delete(toolCallId);
-
-  const timeout = ctx.toolCallTimeouts.get(toolCallId);
-  if (timeout) {
-    clearTimeout(timeout);
-    ctx.toolCallTimeouts.delete(toolCallId);
+  if (state?.timeout) {
+    clearTimeout(state.timeout);
     logger.debug(`[AcpBackend] Cleared timeout for ${toolCallId} (tool call ${status})`);
   } else {
     logger.debug(`[AcpBackend] No timeout found for ${toolCallId} (tool call ${status}) - timeout may not have been set`);
   }
+  ctx.toolCalls.delete(toolCallId);
 
   const durationStr = formatDuration(startTime);
   logger.debug(`[AcpBackend] ❌ Tool call ${status.toUpperCase()}: ${toolCallId} (${toolKindStr}) - Duration: ${durationStr}. Active tool calls: ${ctx.activeToolCalls.size}`);

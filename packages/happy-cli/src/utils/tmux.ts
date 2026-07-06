@@ -19,7 +19,8 @@
  * Ensures consistent tmux handling across happy-cli with proper session naming
  */
 
-import { spawn, SpawnOptions } from 'child_process';
+import { SpawnOptions } from 'child_process';
+import { spawnAndCollect } from '@/utils/spawnAndCollect';
 import { logger } from '@/ui/logger';
 
 export enum TmuxControlState {
@@ -480,36 +481,11 @@ export class TmuxUtilities {
      * Run command using Node.js child_process.spawn
      */
     private runCommand(args: string[], options: SpawnOptions = {}): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-        return new Promise((resolve, reject) => {
-            const child = spawn(args[0], args.slice(1), {
-                stdio: ['ignore', 'pipe', 'pipe'],
-                timeout: 5000,
-                shell: false,
-                ...options
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            child.stdout?.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            child.stderr?.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            child.on('close', (code) => {
-                resolve({
-                    exitCode: code || 0,
-                    stdout,
-                    stderr
-                });
-            });
-
-            child.on('error', (error) => {
-                reject(error);
-            });
+        return spawnAndCollect(args[0], args.slice(1), {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: 5000,
+            shell: false,
+            ...options
         });
     }
 

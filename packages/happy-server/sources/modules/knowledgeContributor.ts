@@ -1,8 +1,6 @@
 import { log } from "@/utils/log";
 import { consolidate } from "./knowledgeConsolidate";
-import { inTx } from "@/storage/inTx";
-import { storeKnowledgeEmbedding } from "./knowledgeEmbedding";
-import { supersedeEntry } from "./knowledgeRelation";
+import { writeKnowledgeEntry } from "./knowledgeWrite";
 
 const MAX_ENTRIES_PER_RUN = 5;
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -62,30 +60,22 @@ export async function contributeSupervisorKnowledge(
                 continue;
             }
 
-            const entry = await inTx(async (tx) => {
-                const row = await tx.projectKnowledge.create({
-                    data: {
-                        projectId,
-                        entryType,
-                        contributorType: "supervisor",
-                        action: dedupResult.type === "update" ? "supersede" : "create",
-                        title: action.title.slice(0, 200),
-                        content: content.slice(0, 10000),
-                        tags: JSON.stringify([action.category, "supervisor"]),
-                        confidence,
-                        sessionId: runId,
-                        affectedFiles: "[]",
-                        relatedIds: "[]",
-                        supersedesId: dedupResult.type === "update" ? dedupResult.existingId : null,
-                    },
-                });
-                if (dedupResult.type === "update" && dedupResult.existingId) {
-                    await supersedeEntry(tx, row.id, dedupResult.existingId);
-                }
-                return row;
+            // Route through the single owner of the create→supersede→embed spine;
+            // it forces action/supersedesId from dedupResult on update and fires the embedding.
+            await writeKnowledgeEntry(dedupResult, {
+                projectId,
+                entryType,
+                contributorType: "supervisor",
+                action: "create",
+                title: action.title.slice(0, 200),
+                content: content.slice(0, 10000),
+                tags: JSON.stringify([action.category, "supervisor"]),
+                confidence,
+                sessionId: runId,
+                affectedFiles: "[]",
+                relatedIds: "[]",
+                supersedesId: null,
             });
-
-            void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
 
             created++;
         }
