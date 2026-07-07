@@ -44,6 +44,7 @@ import type {
 } from "@/claude/jsonl";
 import { AbortError } from "@/claude/jsonl";
 import type { OnElicitation } from "@/claude/jsonl/types";
+import { PLAN_FAKE_RESTART } from "./jsonl/prompts";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import {
   applyFlagSettingsFromModeDiff,
@@ -258,6 +259,89 @@ function flattenUserContent(msg: ClaudeJsonlUserMessage): string {
  * This costs ~6 extra bytes per write and matches what every modern terminal
  * does when the user actually pastes.
  */
+/**
+ * Cool-down before writing the PLAN_FAKE_RESTART continuation prompt.
+ *
+ * Why: after ExitPlanMode we cold-restart Claude TUI with `--resume` and
+ * immediately push `"PlEaZe Continue with plan."`. The next model call
+ * therefore carries the FULL resumed history — including the plan body
+ * that was just delivered as an ExitPlanMode tool_result — in a single
+ * request. Users behind a self-hosted mirror / proxy (OneAPI, new-api,
+ * anything that terminates `ANTHROPIC_BASE_URL` locally) routinely hit
+ * that mirror's TPM ceiling on this one request and get a 429
+ * "Upstream rate limit exceeded" that the mirror synthesizes without
+ * the structured `rate_limit_info` payload Anthropic's own API would
+ * emit — so happy has no `resetsAt` to defer against.
+ *
+ * The fix is deliberately narrow: sleep briefly BEFORE writing the
+ * continuation prompt (post-cold-restart, pre-model-call) so the
+ * mirror's per-minute window has a chance to clear. Zero by default
+ * (no cost to users on the official API); set
+ * `HAPPY_PLAN_RESTART_DELAY_MS=30000` to opt in.
+ *
+ * Matching semantics — `String.includes(PLAN_FAKE_RESTART)` rather than
+ * identity: `MessageQueue2.collectBatch` joins same-modeHash urgent items
+ * with `\n`, so the delivered string can be
+ * `"PlEaZe Continue with plan.\n<sibling>"` when two PLAN_FAKE_RESTART
+ * unshifts (or another sparse-mode urgent push) coalesce. An identity
+ * check silently drops the throttle in that case; substring match
+ * keeps it active without touching the batching logic itself. Every
+ * hit at `permissionHandler.ts` and `claudeRemoteLauncherCore.ts` also
+ * uses `unshift` — the throttled path is exclusively the plan-mode
+ * continuation, no cross-flow leakage.
+ *
+ * AbortSignal — the sleep listens to `opts.signal` so stop / teardown
+ * hits during the delay abort promptly instead of freezing the CLI for
+ * the full window (`utils/time.ts:delay` is an unstoppable setTimeout).
+ * Aborting simply resolves the promise; the caller then falls through
+ * to `writePromptAndMarkThinking`, whose own PTY-exit guard drops the
+ * write cleanly.
+ */
+export const MAX_PLAN_RESTART_DELAY_MS = 600_000; // 10 min ceiling — well under setTimeout TIMEOUT_MAX (2^31-1 ≈ 24.8d) and above any real rate-limit window.
+
+// Exported for unit-test access — see maybeDelayPlanRestartWrite.test.ts.
+// The two production call sites remain the only in-tree consumers.
+export async function maybeDelayPlanRestartWrite(
+  message: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!message.includes(PLAN_FAKE_RESTART)) return;
+  const raw = process.env.HAPPY_PLAN_RESTART_DELAY_MS;
+  if (!raw) return;
+  // Strict integer parse — reject "30s", "5.5", "30000ms", etc. loudly
+  // instead of silently degrading via parseInt's numeric-prefix accept.
+  if (!/^\d+$/.test(raw)) {
+    logger.warn(
+      `[claudeRemote] HAPPY_PLAN_RESTART_DELAY_MS=${JSON.stringify(raw)} is not a non-negative integer; throttle ignored`,
+    );
+    return;
+  }
+  let ms = Number.parseInt(raw, 10);
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  // Clamp: values above TIMEOUT_MAX are silently downgraded to 1ms by
+  // Node's setTimeout — a mis-set env var would defeat the throttle.
+  if (ms > MAX_PLAN_RESTART_DELAY_MS) {
+    logger.warn(
+      `[claudeRemote] HAPPY_PLAN_RESTART_DELAY_MS=${ms} exceeds max ${MAX_PLAN_RESTART_DELAY_MS}ms; clamping`,
+    );
+    ms = MAX_PLAN_RESTART_DELAY_MS;
+  }
+  if (signal?.aborted) return;
+  logger.debug(
+    `[claudeRemote] PLAN_FAKE_RESTART throttle: sleeping ${ms}ms before prompt write (HAPPY_PLAN_RESTART_DELAY_MS)`,
+  );
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    if (!signal) return;
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /**
  * Returns true on successful write. Returning the boolean (instead of `void`)
  * is what lets `writePromptAndMarkThinking` skip the "thinking=true" flip on
@@ -1519,6 +1603,7 @@ export async function claudeRemote(opts: {
         await controller.setModel(modelToApply);
         await new Promise<void>((r) => setTimeout(r, 300));
       }
+      await maybeDelayPlanRestartWrite(next.message, opts.signal);
       writePromptAndMarkThinking(next.message);
     } finally {
       resultInFlight = false;
@@ -1717,6 +1802,7 @@ export async function claudeRemote(opts: {
   // funnelled through one chokepoint.
   if (!initial.mode.continue) {
     await ptyReady;
+    await maybeDelayPlanRestartWrite(initial.message, opts.signal);
     writePromptAndMarkThinking(initial.message);
   }
 
