@@ -54,6 +54,11 @@ import {
   type StreamEventMapperState,
 } from "./utils/streamEventMapper";
 import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "./jsonl/prompts";
+import { sleepWithAbort } from "@/utils/sleepWithAbort";
+import {
+  MAX_PLAN_CONTINUE_RETRIES,
+  decidePlanContinueRetry,
+} from "./utils/planContinueRetryPolicy";
 import {
   markDisabledMcpServers,
   readClaudeDisabledMcpServers,
@@ -1171,6 +1176,30 @@ export async function claudeRemoteLauncher(
    */
   let planModeLockdownActive = false;
 
+  /**
+   * Reactive auto-retry for ExitPlanMode continuation turns that die
+   * on mirror-side 429. See utils/planContinueRetryPolicy.ts for the
+   * decision rules; here we just hold per-launcher state:
+   *
+   *   currentTurnIsPlanContinue          — the current turn was
+   *     triggered by a `source: "exit-plan-continue"` or
+   *     `"exit-plan-retry"` unshift (set when we consume such a msg;
+   *     cleared when we consume any other msg).
+   *   planContinueTurnProducedRealOutput — the current turn has
+   *     already emitted at least one non-rate_limit assistant
+   *     content (text / tool_use / thinking). Once true, we stop
+   *     auto-retrying so we don't double-consume a partial response.
+   *   planContinueRetryCount             — cumulative retries fired
+   *     for this chain (0..MAX). Reset to 0 the moment the chain
+   *     yields real output (chain succeeded).
+   *
+   * Declared at launcher scope so the value survives the cold
+   * restarts and turn boundaries the retry itself may drive.
+   */
+  let currentTurnIsPlanContinue = false;
+  let planContinueTurnProducedRealOutput = false;
+  let planContinueRetryCount = 0;
+
   function onMessage(message: ClaudeJsonlMessage) {
     // A parsed JSONL message is one liveness source for the stranded-turn
     // watchdog (the load-bearing one is raw PTY byte activity — see
@@ -2158,6 +2187,101 @@ export async function claudeRemoteLauncher(
       }
     }
 
+    // ─── Reactive 429 auto-retry for plan-continuation turns ────────────
+    //
+    // When the current turn was triggered by a `source: "exit-plan-*"`
+    // unshift AND the JSONL carries an `assistant` message whose
+    // `error === "rate_limit"`, Claude TUI has exhausted its own 10-
+    // attempt native backoff and the mirror is still 429'ing us. Drive
+    // the recovery in-CLI (sleep + re-unshift PLAN_FAKE_RESTART)
+    // instead of stranding the user with a red error and no way
+    // forward except "type Continue by hand". Decision is a pure
+    // function — see utils/planContinueRetryPolicy.ts.
+    //
+    // The rearm branch (non-error assistant content on a continuation
+    // turn) mirrors strand recovery's `rearmRedeliverBudget` semantics:
+    // once real output is on the wire, we MUST NOT re-fire; the user
+    // has already seen it.
+    if (message.type === "assistant" && currentTurnIsPlanContinue) {
+      const aMsg = message as ClaudeJsonlAssistantMessage;
+      if (aMsg.error === "rate_limit") {
+        const decision = decidePlanContinueRetry({
+          isPlanContinuationTurn: true,
+          retryCount: planContinueRetryCount,
+          turnProducedNonRateLimitOutput: planContinueTurnProducedRealOutput,
+        });
+        if (decision.action === "retry") {
+          const { attempt, delayMs, reason } = decision;
+          logger.debug(
+            `[plan-retry] ${reason} → sleeping ${delayMs}ms before re-unshift`,
+          );
+          // Surface the wait via the same keep-alive channel Claude TUI's
+          // native api_retry uses (App already renders this shape).
+          session.client.keepAlive(true, "remote", true, {
+            attempt,
+            maxRetries: MAX_PLAN_CONTINUE_RETRIES,
+            retryDelayMs: delayMs,
+            errorStatus: 429,
+          });
+          // fire-and-forget — the launcher's main loop is already
+          // parked in waitForMessagesAndGetAsString(), our unshift
+          // wakes it up when the sleep resolves. AbortSignal ties into
+          // the launcher's abortController so a user stop mid-sleep
+          // resolves promptly.
+          void (async () => {
+            await sleepWithAbort(delayMs, abortController?.signal);
+            if (abortController?.signal.aborted) {
+              logger.debug(
+                "[plan-retry] aborted mid-sleep — skipping re-unshift",
+              );
+              return;
+            }
+            planContinueRetryCount++;
+            session.queue.unshift(
+              PLAN_FAKE_RESTART,
+              { permissionMode: permissionHandler.getPermissionMode() },
+              {
+                priority: "urgent",
+                kind: "notification",
+                source: "exit-plan-retry",
+              },
+            );
+            logger.debug(
+              `[plan-retry] re-unshifted PLAN_FAKE_RESTART (attempt ${attempt}/${MAX_PLAN_CONTINUE_RETRIES})`,
+            );
+          })();
+        } else if (decision.action === "give-up") {
+          logger.debug(`[plan-retry] ${decision.reason}`);
+          // Final ping so the App can render "3/3 failed" instead of
+          // leaving the last "waiting X s" state hanging.
+          session.client.keepAlive(true, "remote", true, {
+            attempt: MAX_PLAN_CONTINUE_RETRIES,
+            maxRetries: MAX_PLAN_CONTINUE_RETRIES,
+            retryDelayMs: 0,
+            errorStatus: 429,
+          });
+          planContinueRetryCount = 0;
+        }
+      } else if (!aMsg.error) {
+        const content = aMsg.message.content;
+        const hasRealContent =
+          Array.isArray(content) &&
+          content.some(
+            (c: any) =>
+              c.type === "text" ||
+              c.type === "tool_use" ||
+              c.type === "thinking",
+          );
+        if (hasRealContent && !planContinueTurnProducedRealOutput) {
+          planContinueTurnProducedRealOutput = true;
+          planContinueRetryCount = 0;
+          logger.debug(
+            "[plan-retry] turn produced non-rate-limit output — disarming auto-retry, resetting count",
+          );
+        }
+      }
+    }
+
     // Forward API retry status via keep-alive ephemeral channel
     if (
       message.type === "system" &&
@@ -2877,11 +3001,22 @@ export async function claudeRemoteLauncher(
               // read below picks up the new value. Idempotent: if the flag
               // is already false (opt-in path already flipped it), this is
               // a no-op.
-              if (msg.source === "exit-plan-continue" && planModeLockdownActive) {
+              const isPlanContinueSource =
+                msg.source === "exit-plan-continue" ||
+                msg.source === "exit-plan-retry";
+              if (isPlanContinueSource && planModeLockdownActive) {
                 planModeLockdownActive = false;
                 logger.debug(
-                  "[remote]: consumed exit-plan-continue message → releasing plan-mode lockdown",
+                  `[remote]: consumed ${msg.source} message → releasing plan-mode lockdown`,
                 );
+              }
+              // Mark the imminent turn as a plan-continuation so the
+              // reactive 429 auto-retry policy applies. Cleared on any
+              // non-continuation msg below — we do NOT want a normal
+              // user prompt inheriting the flag from a previous turn.
+              currentTurnIsPlanContinue = isPlanContinueSource;
+              if (isPlanContinueSource) {
+                planContinueTurnProducedRealOutput = false;
               }
 
               // Check if mode has changed

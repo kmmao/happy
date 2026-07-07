@@ -54,6 +54,7 @@ import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { resolve as resolvePath } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
+import { sleepWithAbort } from "@/utils/sleepWithAbort";
 import { logger } from "@/lib";
 import { systemPrompt } from "./utils/systemPrompt";
 import { buildLocaleInstruction } from "./utils/localeInstruction";
@@ -334,16 +335,7 @@ export async function maybeDelayPlanRestartWrite(
   logger.debug(
     `[claudeRemote] PLAN_FAKE_RESTART throttle: sleeping ${ms}ms before prompt write (HAPPY_PLAN_RESTART_DELAY_MS)`,
   );
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    if (!signal) return;
-    const onAbort = () => {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
+  await sleepWithAbort(ms, signal);
 }
 
 /**
