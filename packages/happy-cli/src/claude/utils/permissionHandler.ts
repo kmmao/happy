@@ -6,6 +6,7 @@
  */
 
 import { logger } from "@/lib";
+import { randomUUID } from "node:crypto";
 import { ClaudeJsonlMessage } from "../jsonl";
 import type { PermissionResult, PermissionDecisionClassification } from "../jsonl/types";
 import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "../jsonl/prompts";
@@ -35,6 +36,58 @@ interface PendingRequest {
   input: unknown;
 }
 
+/**
+ * Outcome delivered to the ExitPlanMode approval-forwarder hook. Shaped
+ * so the hookServer callback can build a `hookSpecificOutput` response
+ * body directly without re-parsing the raw permission wire format.
+ *
+ *   - `approved: true`  → `permissionDecision: "allow"` + `updatedInput`
+ *   - `approved: false` → `permissionDecision: "deny"`  + `reason`
+ *
+ * `mode` (when present, always alongside `approved: true`) tells the
+ * launcher which permission mode to unshift the PLAN_FAKE_RESTART
+ * continuation in, matching the App picker's Approve / "Approve &
+ * Auto-approve All" split.
+ */
+export interface ExitPlanApprovalResult {
+  approved: boolean;
+  mode?: PermissionMode;
+  reason?: string;
+  updatedInput?: unknown;
+}
+
+interface ExitPlanPending {
+  resolve: (value: ExitPlanApprovalResult) => void;
+  toolInput: unknown;
+  timeoutHandle: NodeJS.Timeout;
+}
+
+/**
+ * Prefix identifying an ExitPlanMode approval request in the shared
+ * agentState.requests id space. The RPC `permission` handler routes on
+ * this prefix to distinguish App picker → hook-bridge responses from
+ * classic SDK canCallTool responses (they share the same wire but need
+ * different resolution paths).
+ */
+const EXIT_PLAN_REQUEST_ID_PREFIX = "exit-plan-";
+
+/**
+ * Modes the App may legitimately request when approving an ExitPlanMode
+ * picker. Matches the whitelist the SDK-path branch of
+ * `handlePermissionResponse` enforces (see the `["default", "acceptEdits",
+ * "bypassPermissions", "auto", "dontAsk"].includes(...)` check). Mirrored
+ * here so the App-picker RPC path stops any garbage / future-shape mode
+ * value before it reaches `PLAN_FAKE_RESTART` and the `--permission-mode`
+ * CLI flag downstream.
+ */
+const EXIT_PLAN_APPROVAL_ALLOWED_MODES: readonly PermissionMode[] = [
+  "default",
+  "acceptEdits",
+  "bypassPermissions",
+  "auto",
+  "dontAsk",
+];
+
 /** Modes that auto-approve all tools except AskUserQuestion */
 const BYPASS_MODES: ReadonlySet<string> = new Set(["bypassPermissions", "yolo"]);
 
@@ -43,6 +96,18 @@ export class PermissionHandler {
   private tracker = createToolCallTracker();
   private responses = new Map<string, PermissionResponse>();
   private pendingRequests = new Map<string, PendingRequest>();
+  /**
+   * Pending ExitPlanMode approvals waiting on the App picker.
+   *
+   * Kept in a separate map from `pendingRequests` because the resolve
+   * shape is different: `pendingRequests` resolves to `PermissionResult`
+   * (an SDK-facing allow/deny), whereas this map resolves to the
+   * high-level `{approved, mode, reason}` the hookServer callback
+   * consumes to build its response body. Sharing the map would force a
+   * lossy union type or drive branches on toolName across the whole
+   * response-handling code path.
+   */
+  private exitPlanPending = new Map<string, ExitPlanPending>();
   private session: Session;
   // Session-wide "already granted" grant/check invariant lives behind this pure seam.
   private allowed = createAllowedToolMatcher();
@@ -392,6 +457,133 @@ export class PermissionHandler {
   }
 
   /**
+   * Register an ExitPlanMode approval request whose response is driven
+   * from the App picker (via the `exit_plan_approval_forwarder.cjs` hook
+   * bridge, NOT via SDK canCallTool).
+   *
+   * Flow:
+   *   1. Push an entry into `agentState.requests[id]` — the App renders
+   *      `PermissionFooter` with its dedicated `ExitPlanButtons`, giving
+   *      the user Approve / Approve-and-auto-approve / Reject-with-reason.
+   *   2. Send a push notification so a background user gets pinged.
+   *   3. BLOCK on the returned promise. The `permission` RPC handler
+   *      resolves it when the App responds; a `timeoutMs` fallback
+   *      resolves it as denied so we never hold the hook forever.
+   *   4. Regardless of outcome, migrate the entry from `requests` to
+   *      `completedRequests` so the App shows the correct final state.
+   *
+   * The caller (hookServer's `onExitPlanApproval`) turns the result into
+   * a `hookSpecificOutput` body and hands it back to the forwarder,
+   * which writes it to stdout for the TUI.
+   */
+  async registerExitPlanApproval(
+    toolInput: unknown,
+    timeoutMs: number,
+  ): Promise<ExitPlanApprovalResult> {
+    const id = `${EXIT_PLAN_REQUEST_ID_PREFIX}${randomUUID()}`;
+
+    return new Promise<ExitPlanApprovalResult>((resolve) => {
+      const finalize = (
+        result: ExitPlanApprovalResult,
+        status: "approved" | "denied" | "canceled",
+      ) => {
+        clearTimeout(pending.timeoutHandle);
+        if (this.exitPlanPending.get(id) === pending) {
+          this.exitPlanPending.delete(id);
+        }
+        this.moveExitPlanRequestToCompleted(id, status, result.reason);
+        resolve(result);
+      };
+
+      const timeoutHandle = setTimeout(() => {
+        finalize(
+          { approved: false, reason: "Approval timeout" },
+          "denied",
+        );
+      }, timeoutMs);
+
+      const pending: ExitPlanPending = {
+        // The RPC handler calls this with the final result once the App
+        // responds. It also runs the same completedRequests migration
+        // via `finalize`, so both paths converge on identical state.
+        // Both "user rejected" and "approval timeout" surface as
+        // completedRequests[id].status="denied" — the reason field
+        // carries the distinction for the App to render.
+        resolve: (result) => {
+          finalize(result, result.approved ? "approved" : "denied");
+        },
+        toolInput,
+        timeoutHandle,
+      };
+
+      this.exitPlanPending.set(id, pending);
+
+      // Surface to the App via the shared `agentState.requests` channel.
+      this.session.client.updateAgentState((currentState) => ({
+        ...currentState,
+        requests: {
+          ...currentState.requests,
+          [id]: {
+            tool: "ExitPlanMode",
+            arguments: toolInput,
+            createdAt: Date.now(),
+          },
+        },
+      }));
+
+      // Fire push notification (fire-and-forget, mirrors handlePermissionRequest).
+      this.session.api
+        .push()
+        .sendToAllDevices(
+          "Plan ready to review",
+          "Claude has a plan awaiting your approval",
+          {
+            sessionId: this.session.client.sessionId,
+            requestId: id,
+            tool: "ExitPlanMode",
+            type: "permission_request",
+          },
+        );
+
+      logger.debug(
+        `[permission] ExitPlanMode approval request registered id=${id} timeout=${timeoutMs}ms`,
+      );
+    });
+  }
+
+  /**
+   * Migrate an ExitPlanMode request entry from `requests` → `completedRequests`
+   * on the App-visible agent state. Called by both the RPC-response and the
+   * timeout paths so the App always sees a terminal state, never a stuck
+   * "pending" card.
+   */
+  private moveExitPlanRequestToCompleted(
+    id: string,
+    status: "approved" | "denied" | "canceled",
+    reason?: string,
+  ): void {
+    this.session.client.updateAgentState((currentState) => {
+      const request = currentState.requests?.[id];
+      if (!request) return currentState;
+      const nextRequests = { ...currentState.requests };
+      delete nextRequests[id];
+      return {
+        ...currentState,
+        requests: nextRequests,
+        completedRequests: {
+          ...currentState.completedRequests,
+          [id]: {
+            ...request,
+            completedAt: Date.now(),
+            status,
+            ...(reason ? { reason } : {}),
+          },
+        },
+      };
+    });
+  }
+
+  /**
    * Handles messages to track tool calls. Delegates to the pure tool-call
    * tracker seam (toolCallTracker.ts).
    */
@@ -430,6 +622,16 @@ export class PermissionHandler {
       pending.reject(new Error("Session reset"));
     }
     this.pendingRequests.clear();
+
+    // Also cancel any in-flight ExitPlanMode approvals. Resolving as
+    // denied (rather than rejecting) keeps the hookServer callback's
+    // caller path simple — a canceled session is functionally identical
+    // to the user rejecting the plan.
+    for (const [, pending] of this.exitPlanPending.entries()) {
+      clearTimeout(pending.timeoutHandle);
+      pending.resolve({ approved: false, reason });
+    }
+    this.exitPlanPending.clear();
 
     // Move all pending requests to completedRequests with canceled status
     this.session.client.updateAgentState((currentState) => {
@@ -503,6 +705,53 @@ export class PermissionHandler {
       logger.debug(`Permission response: ${JSON.stringify(message)}`);
 
       const id = message.id;
+
+      // ExitPlanMode hook-bridge path — the App picker resolving a request
+      // that was registered via `registerExitPlanApproval` (Yolo without
+      // opt-in). Routed by id prefix so we can key on a plain-string
+      // rather than a stateful pool lookup + branch.
+      if (id.startsWith(EXIT_PLAN_REQUEST_ID_PREFIX)) {
+        const pendingExitPlan = this.exitPlanPending.get(id);
+        if (!pendingExitPlan) {
+          // Timed out or double-answered — either way, ignore.
+          logger.debug(
+            `Permission response for exit-plan id=${id} arrived after resolution`,
+          );
+          return;
+        }
+        // Whitelist the mode value the App sent (defense-in-depth: the sibling
+        // SDK-path branch at ~L163 already does this for regular tool
+        // permissions). Anything unrecognised is treated as unset so we fall
+        // back to the CURRENT permission mode rather than downgrading to
+        // "default" — the App's "Approve Plan" button intentionally sends
+        // mode=undefined to mean "keep whatever mode the session was in",
+        // and a Yolo user pressing that button should stay in Yolo, not
+        // silently drop into default. See docs/investigations/plan-mode-429.md
+        // and PermissionFooter.tsx ExitPlanButtons approve-vs-approve-all
+        // wiring.
+        const requestedMode: PermissionMode | undefined =
+          message.mode &&
+          EXIT_PLAN_APPROVAL_ALLOWED_MODES.includes(
+            message.mode as PermissionMode,
+          )
+            ? (message.mode as PermissionMode)
+            : undefined;
+        const result: ExitPlanApprovalResult = message.approved
+          ? {
+              approved: true,
+              // Preserve the current permission mode when the App didn't
+              // pick one — critical for Yolo users hitting plain "Approve".
+              mode: requestedMode ?? this.permissionMode,
+              updatedInput: pendingExitPlan.toolInput,
+            }
+          : {
+              approved: false,
+              reason: message.reason || "User rejected plan",
+            };
+        pendingExitPlan.resolve(result);
+        return;
+      }
+
       const pending = this.pendingRequests.get(id);
 
       if (!pending) {

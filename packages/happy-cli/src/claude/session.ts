@@ -36,6 +36,12 @@ export class Session {
   readonly _onAbort?: () => void;
   /** Path to temporary settings file with SessionStart hook (required for session tracking) */
   readonly hookSettingsPath: string;
+  /**
+   * Port the local `hookServer` is listening on. Needed by the ExitPlanMode
+   * approval-forwarder hook (see `mergeExitPlanAutoApproveIntoSettings.ts`)
+   * so the injected settings entry knows where to POST the picker payload.
+   */
+  readonly hookServerPort: number;
   /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
   readonly jsRuntime: JsRuntime;
   /** Model to pass to Claude Code */
@@ -46,6 +52,34 @@ export class Session {
   sessionId: string | null;
   mode: "local" | "remote" = "local";
   thinking: boolean = false;
+
+  /**
+   * Live handler for the ExitPlanMode approval bridge.
+   *
+   * Written by the active launcher (`claudeRemoteLauncherCore`) once the
+   * per-run `permissionHandler` is available; read by the process-wide
+   * `hookServer.onExitPlanApproval` callback in `runClaude.ts`. The
+   * indirection is what lets the singleton `hookServer` — created before
+   * any launcher iteration — reach the current iteration's
+   * `permissionHandler`.
+   *
+   * Null when no launcher is active (session torn down, or before
+   * first spawn). The `hookServer` treats null as "no handler" and
+   * returns `undefined`, which the forwarder maps to "silent exit →
+   * TUI in-terminal picker" — the correct fallback.
+   *
+   * Returned type mirrors `permissionHandler.registerExitPlanApproval`.
+   * Kept as a bare function type (rather than importing the interface)
+   * to avoid a session → permissionHandler compile-time dependency.
+   */
+  exitPlanApprovalHandler:
+    | ((toolInput: unknown) => Promise<{
+        approved: boolean;
+        mode?: string;
+        reason?: string;
+        updatedInput?: unknown;
+      }>)
+    | null = null;
 
   /** Callbacks to be notified when session ID is found/changed */
   private sessionFoundCallbacks: ((sessionId: string) => void)[] = [];
@@ -69,6 +103,9 @@ export class Session {
     sandboxConfig?: SandboxConfig;
     /** Path to temporary settings file with SessionStart hook (required for session tracking) */
     hookSettingsPath: string;
+    /** Port the local hookServer is listening on (used by the ExitPlanMode
+     * approval-forwarder hook to reach us). */
+    hookServerPort: number;
     /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
     jsRuntime?: JsRuntime;
     /** Model to pass to Claude Code */
@@ -88,6 +125,7 @@ export class Session {
     this._onModeChange = opts.onModeChange;
     this._onAbort = opts.onAbort;
     this.hookSettingsPath = opts.hookSettingsPath;
+    this.hookServerPort = opts.hookServerPort;
     this.jsRuntime = opts.jsRuntime ?? "node";
     this.model = opts.model;
 

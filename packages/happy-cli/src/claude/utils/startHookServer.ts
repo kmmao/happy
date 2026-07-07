@@ -187,6 +187,42 @@ export interface PostToolBatchHookData {
     [key: string]: unknown;
 }
 
+// ─── ExitPlanApproval bridge (Happy-specific, plan-mode 429 mitigation) ────
+// Not a native Claude Code hook — synthesized by
+// `scripts/exit_plan_approval_forwarder.cjs`, which overrides the
+// `hook_event_name` field on the PreToolUse payload so the hookServer
+// dispatch table routes it here. The forwarder BLOCKS on the HTTP
+// response, so this handler is the sole authority on what the TUI does
+// with the ExitPlanMode tool call — the response body IS the
+// `hookSpecificOutput` Claude reads.
+
+/** Payload the ExitPlanApproval bridge forwards from the PreToolUse hook. */
+export interface ExitPlanApprovalHookData {
+    hook_event_name: 'ExitPlanApproval';
+    session_id?: string;
+    tool_name?: string;
+    tool_input?: unknown;
+    [key: string]: unknown;
+}
+
+/**
+ * Response the ExitPlanApproval handler returns. Shape mirrors the
+ * PreToolUse hook's expected output verbatim: the forwarder writes this
+ * body to stdout unchanged, and the TUI reads it. Setting
+ * `permissionDecision: "allow"` MUST be paired with `updatedInput` for
+ * `requiresUserInteraction` tools like ExitPlanMode; the handler is
+ * responsible for including it.
+ */
+export interface ExitPlanApprovalResponse {
+    hookSpecificOutput?: {
+        hookEventName?: 'PreToolUse';
+        permissionDecision?: 'allow' | 'deny';
+        permissionDecisionReason?: string;
+        updatedInput?: unknown;
+        [key: string]: unknown;
+    };
+}
+
 /**
  * Optional response body the SessionStart hook may return to Claude Code.
  * Mirrors `hookSpecificOutput` semantics introduced in Claude Code 2.1.152:
@@ -236,6 +272,18 @@ export interface HookServerOptions {
     onPermissionDenied?: (data: PermissionDeniedHookData) => void;
     /** Called once after a batch of tool calls resolves (Claude Code 2.1.157+, optional). */
     onPostToolBatch?: (data: PostToolBatchHookData) => void;
+    /**
+     * Called when `exit_plan_approval_forwarder.cjs` bridges an
+     * ExitPlanMode PreToolUse to us. The handler is expected to BLOCK
+     * on user input (via the App picker) and RETURN the
+     * `hookSpecificOutput` body — the forwarder writes it to stdout
+     * verbatim, which is how the TUI learns whether the tool call is
+     * allowed. Returning `undefined` falls back to the TUI's built-in
+     * in-terminal picker (same as if the hook produced no output).
+     */
+    onExitPlanApproval?: (
+        data: ExitPlanApprovalHookData,
+    ) => ExitPlanApprovalResponse | undefined | Promise<ExitPlanApprovalResponse | undefined>;
 }
 
 export interface HookServer {
@@ -262,6 +310,7 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         onInstructionsLoaded,
         onPermissionDenied,
         onPostToolBatch,
+        onExitPlanApproval,
     } = options;
 
     async function parseBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
@@ -319,15 +368,49 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         onStopFailure?.(data);
     }
 
+    async function handleExitPlanApproval(
+        data: ExitPlanApprovalHookData,
+    ): Promise<ExitPlanApprovalResponse | undefined> {
+        if (!onExitPlanApproval) {
+            // No handler configured — let the TUI fall back to its own
+            // picker by returning nothing (the forwarder treats a
+            // non-JSON response as "silent exit").
+            return undefined;
+        }
+        logger.debug(
+            `[hookServer] ExitPlanApproval hook received (tool=${data.tool_name ?? '?'})`,
+        );
+        try {
+            const maybe = onExitPlanApproval(data);
+            return (await maybe) ?? undefined;
+        } catch (err) {
+            logger.debug(`[hookServer] ExitPlanApproval handler threw: ${err}`);
+            return undefined;
+        }
+    }
+
     // Typed dispatch keyed on `hook_event_name`. Unlisted events fall through
     // to `handleSessionStart` for backwards compatibility — the old behaviour
     // was "anything other than StopFailure is SessionStart" and some
     // session-lifecycle hooks Claude might add later are best served by that
     // generic path until they get a dedicated handler. SessionStart is the
     // only entry that may produce a response body (see SessionStartHookResponse).
+    // Handler return values are unioned across the two response-producing
+    // events (SessionStart → SessionStartHookResponse, ExitPlanApproval →
+    // ExitPlanApprovalResponse) plus void for the fire-and-forget rest.
+    // The request loop below just tests `typeof result === 'object'` to
+    // decide whether to echo JSON, so the exact union is not load-bearing.
     const dispatch: Record<
         string,
-        (data: Record<string, unknown>) => void | Promise<SessionStartHookResponse | undefined>
+        (
+            data: Record<string, unknown>,
+        ) =>
+            | void
+            | Promise<
+                  | SessionStartHookResponse
+                  | ExitPlanApprovalResponse
+                  | undefined
+              >
     > = {
         SessionStart: (data) => handleSessionStart(data as SessionHookData),
         StopFailure: (data) => handleStopFailure(data as StopFailureHookData),
@@ -338,38 +421,70 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         InstructionsLoaded: (data) => onInstructionsLoaded?.(data as InstructionsLoadedHookData),
         PermissionDenied: (data) => onPermissionDenied?.(data as PermissionDeniedHookData),
         PostToolBatch: (data) => onPostToolBatch?.(data as PostToolBatchHookData),
+        ExitPlanApproval: (data) =>
+            handleExitPlanApproval(data as ExitPlanApprovalHookData),
     };
 
     return new Promise((resolve, reject) => {
         const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-            // Handle POST /hook (generic) and POST /hook/session-start (backwards compat)
-            if (req.method === 'POST' && (req.url === '/hook' || req.url === '/hook/session-start')) {
-                const data = await parseBody(req);
-                if (data === null) {
-                    res.writeHead(408).end('timeout');
+            // Wrap the whole request body in a try/catch so a thrown handler
+            // (e.g. JSON.stringify on a circular response, or a downstream
+            // callback that rejects) always yields a definite HTTP response
+            // rather than a dangling socket. The forwarder scripts read the
+            // response body as their hook decision; leaking a socket wedge
+            // there means the TUI hook never resolves and the whole session
+            // hangs. Cheaper defensive layering than per-branch try/catches.
+            try {
+                // Handle POST /hook (generic) and POST /hook/session-start (backwards compat)
+                if (req.method === 'POST' && (req.url === '/hook' || req.url === '/hook/session-start')) {
+                    const data = await parseBody(req);
+                    if (data === null) {
+                        res.writeHead(408).end('timeout');
+                        return;
+                    }
+
+                    const eventName = (data as SessionHookData).hook_event_name;
+                    const handler = (eventName && dispatch[eventName]) || dispatch.SessionStart;
+                    const maybeResponse = await handler(data);
+
+                    // SessionStart may return a JSON body that Claude reads as
+                    // hookSpecificOutput (Claude Code 2.1.152+ — sessionTitle,
+                    // reloadSkills, etc.). Other events keep the legacy plain-text
+                    // 'ok' response.
+                    if (maybeResponse && typeof maybeResponse === 'object') {
+                        res.writeHead(200, { 'Content-Type': 'application/json' })
+                           .end(JSON.stringify(maybeResponse));
+                    } else {
+                        res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
+                    }
                     return;
                 }
 
-                const eventName = (data as SessionHookData).hook_event_name;
-                const handler = (eventName && dispatch[eventName]) || dispatch.SessionStart;
-                const maybeResponse = await handler(data);
-
-                // SessionStart may return a JSON body that Claude reads as
-                // hookSpecificOutput (Claude Code 2.1.152+ — sessionTitle,
-                // reloadSkills, etc.). Other events keep the legacy plain-text
-                // 'ok' response.
-                if (maybeResponse && typeof maybeResponse === 'object') {
-                    res.writeHead(200, { 'Content-Type': 'application/json' })
-                       .end(JSON.stringify(maybeResponse));
-                } else {
-                    res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
-                }
-                return;
+                // 404 for anything else
+                res.writeHead(404).end('not found');
+            } catch (err) {
+                logger.debug(`[hookServer] Request handler threw: ${err}`);
+                // Best-effort 500 — headers may already be written if the
+                // throw happened during response streaming, in which case
+                // writeHead throws again and we swallow it silently.
+                try {
+                    if (!res.headersSent) {
+                        res.writeHead(500, { 'Content-Type': 'text/plain' }).end('internal error');
+                    } else {
+                        res.end();
+                    }
+                } catch { /* nothing else we can do */ }
             }
-
-            // 404 for anything else
-            res.writeHead(404).end('not found');
         });
+
+        // Disable Node's per-request timeout — Node 18+ defaults to
+        // 300 000 ms (5 min), but the ExitPlanApproval bridge can legitimately
+        // block for HAPPY_EXIT_PLAN_APPROVAL_TIMEOUT_MS (default 10 min, max
+        // 1 h) waiting on the App user's picker click. Every handler enforces
+        // its own timeout at the app layer, so the transport shouldn't cut
+        // requests off. Fast handlers (SessionStart / StopFailure) return
+        // within milliseconds regardless, so removing the ceiling is safe.
+        server.requestTimeout = 0;
 
         // Listen on random available port
         server.listen(0, '127.0.0.1', () => {

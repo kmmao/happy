@@ -83,6 +83,9 @@ interface LoopOptions {
   onSessionEvent?: (sessionId: string, eventType: string, summary: string, detail?: Record<string, unknown>) => void;
   /** Path to temporary settings file with SessionStart hook (required for session tracking) */
   hookSettingsPath: string;
+  /** Port the local hookServer is listening on. Passed through to Session
+   * so the ExitPlanMode approval-forwarder hook can POST back to us. */
+  hookServerPort: number;
   /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
   jsRuntime?: JsRuntime;
 }
@@ -105,6 +108,7 @@ export async function loop(opts: LoopOptions): Promise<number> {
     onModeChange: opts.onModeChange,
     onAbort: opts.onAbort,
     hookSettingsPath: opts.hookSettingsPath,
+    hookServerPort: opts.hookServerPort,
     jsRuntime: opts.jsRuntime,
     model: opts.model,
   });

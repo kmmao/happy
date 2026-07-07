@@ -40,6 +40,7 @@ function makeSession(sessionId: string | null): Session {
     messageQueue: {} as unknown as MessageQueue2<EnhancedMode>,
     onModeChange: () => undefined,
     hookSettingsPath: "/tmp/session-test/hook.json",
+    hookServerPort: 0, // no real hookServer in this unit test
   });
 }
 

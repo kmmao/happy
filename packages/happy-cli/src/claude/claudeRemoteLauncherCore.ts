@@ -17,6 +17,10 @@ import {
 } from "./strandPolicy";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
+import {
+  readExitPlanApprovalTimeoutMs,
+  shouldAutoApproveExitPlanInBypass,
+} from "./utils/exitPlanApproval";
 import { Future } from "@/utils/future";
 import { ClaudeJsonlAssistantMessage, ClaudeJsonlMessage, ClaudeJsonlUserMessage } from "./jsonl";
 import { forkSession } from "@/claude/rpc/sessionStoreRpc";
@@ -1073,6 +1077,18 @@ export async function claudeRemoteLauncher(
     messageQueue.releaseToolCall(toolCallId);
   });
 
+  // Wire the ExitPlanMode picker bridge. The process-wide `hookServer`
+  // (created in `runClaude`) reads this handler off the `Session`
+  // instance whenever the forwarder POSTs it a bridged PreToolUse hook.
+  // Cleared in the finally block below so a subsequent iteration
+  // (post-cold-restart) picks up the fresh permissionHandler instead of
+  // the torn-down one.
+  session.exitPlanApprovalHandler = (toolInput) =>
+    permissionHandler.registerExitPlanApproval(
+      toolInput,
+      readExitPlanApprovalTimeoutMs(),
+    );
+
   // Create SDK to Log converter (pass responses from permissions)
   const jsonlToLogConverter = new ClaudeJsonlToLogConverter(
     {
@@ -1741,40 +1757,61 @@ export async function claudeRemoteLauncher(
               // divergent coldModeHash in `nextMessage` as the secondary safety
               // net.
               if (permissionHandler.isInBypassMode() && planModeLockdownActive) {
-                planModeLockdownActive = false;
-
-                // Continuation after plan approval (the part that was missing).
+                // Two very different post-observe paths for Yolo depending on
+                // WHICH hook is installed — see utils/exitPlanApproval.ts and
+                // utils/mergeExitPlanAutoApproveIntoSettings.ts.
                 //
-                // In PTY mode ExitPlanMode is approved by the PreToolUse
-                // allow-hook at the TUI level, so the SDK canCallTool path
-                // (permissionHandler.autoApproveExitPlan) NEVER runs — and that
-                // is the only place that normally queues PLAN_FAKE_RESTART to
-                // continue the session. Meanwhile permissionHandler.isAborted()
-                // unconditionally returns true for ExitPlanMode, so the moment
-                // its tool_result arrives claudeRemote tears the PTY down with
-                // SIGTERM. The outer loop relaunches with the deny list lifted
-                // (planModeLockdown=false, set just above), but with no queued
-                // message it blocks in nextMessage and the run idles right
-                // after the plan renders — confirmed PID 47534: "Tool aborted,
-                // tearing down PTY" with zero PLAN_FAKE_RESTART in the log.
+                // AUTO-APPROVE PATH (`HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1`):
+                //   The `exit_plan_auto_approve.cjs` hook has already emitted
+                //   `permissionDecision:"allow"` at the TUI level, so the
+                //   ExitPlanMode tool call succeeds and Claude keeps going in
+                //   the plan-mode context until permissionHandler.isAborted()
+                //   flips true (which it does unconditionally for ExitPlanMode)
+                //   and claudeRemote tears the PTY down. We need to queue the
+                //   PLAN_FAKE_RESTART here so the relaunched lockdown-free
+                //   process finds a message waiting — this detection point is
+                //   the only one that fires under PTY mode (the SDK canCallTool
+                //   path is dead). Flip the lockdown flag first so coldModeHash
+                //   diverges and the restart is stashed for the natural turn
+                //   boundary via onTurnComplete (a synchronous restart here
+                //   tears down the still-completing turn — see PIDs 67654 /
+                //   50704 for the wedge that produced).
                 //
-                // Queue the same PLAN_FAKE_RESTART continuation here, the one
-                // detection point that DOES fire in PTY mode, so the relaunched
-                // (lockdown-free) process resumes and implements the approved
-                // plan. `unshift` (urgent) makes it the first message the
-                // relaunch dispatches.
-                session.queue.unshift(
-                  PLAN_FAKE_RESTART,
-                  { permissionMode: permissionHandler.getPermissionMode() },
-                  {
-                    priority: "urgent",
-                    kind: "notification",
-                    source: "exit-plan-continue",
-                  },
-                );
-                logger.debug(
-                  "[remote]: ExitPlanMode observed → disabling plan-mode lockdown + queued PLAN_FAKE_RESTART continuation (PTY hook approval; SDK autoApprove path skipped)",
-                );
+                // APP-PICKER PATH (new default):
+                //   The `exit_plan_approval_forwarder.cjs` hook is BLOCKING on
+                //   a response from `runClaude`'s onExitPlanApproval callback.
+                //   That callback owns the whole lifecycle: it registers the
+                //   approval via permissionHandler.registerExitPlanApproval,
+                //   waits for the App user's click, and on approval **it**
+                //   unshifts PLAN_FAKE_RESTART with the user-picked mode. If
+                //   we ALSO queued one here, the plan would fire before the
+                //   App picker is even shown, and a second unlike-mode one
+                //   would arrive after — both silently colliding. So under
+                //   this path we do NOTHING here: the callback drives.
+                //
+                // How do we tell which hook is live? The env var opt-in is
+                // the single source of truth for both the hook injection and
+                // this branch. Reading it fresh (rather than caching)
+                // matches the env-var semantics of the other read sites.
+                if (shouldAutoApproveExitPlanInBypass()) {
+                  planModeLockdownActive = false;
+                  session.queue.unshift(
+                    PLAN_FAKE_RESTART,
+                    { permissionMode: permissionHandler.getPermissionMode() },
+                    {
+                      priority: "urgent",
+                      kind: "notification",
+                      source: "exit-plan-continue",
+                    },
+                  );
+                  logger.debug(
+                    "[remote]: ExitPlanMode observed (auto-approve hook) → disabling lockdown + queued PLAN_FAKE_RESTART",
+                  );
+                } else {
+                  logger.debug(
+                    "[remote]: ExitPlanMode observed (app-picker hook) → deferring lockdown teardown + PLAN_FAKE_RESTART to onExitPlanApproval callback",
+                  );
+                }
               }
             }
             // When SDK enters plan mode via EnterPlanMode tool, sync permissionHandler
@@ -2773,6 +2810,7 @@ export async function claudeRemoteLauncher(
           // effect without restarting the session.
           mcpServers: liveMcpServers,
           hookSettingsPath: session.hookSettingsPath,
+          hookServerPort: session.hookServerPort,
           jsRuntime: session.jsRuntime,
           happySessionId: session.client.sessionId,
           canCallTool: permissionHandler.handleToolCall,
@@ -2831,6 +2869,21 @@ export async function claudeRemoteLauncher(
             }
 
             if (msg) {
+              // ExitPlanMode approval bridge queued PLAN_FAKE_RESTART from
+              // outside the launcher (via `runClaude`'s onExitPlanApproval
+              // callback). The launcher owns `planModeLockdownActive`, so it
+              // couldn't be flipped by the callback — release it here as
+              // the message flows through, right BEFORE the coldModeHash
+              // read below picks up the new value. Idempotent: if the flag
+              // is already false (opt-in path already flipped it), this is
+              // a no-op.
+              if (msg.source === "exit-plan-continue" && planModeLockdownActive) {
+                planModeLockdownActive = false;
+                logger.debug(
+                  "[remote]: consumed exit-plan-continue message → releasing plan-mode lockdown",
+                );
+              }
+
               // Check if mode has changed
               if (msg.isolate) {
                 logger.debug("[remote]: isolate requested, pending message");
@@ -3598,6 +3651,12 @@ export async function claudeRemoteLauncher(
 
     // Clean up permission handler
     permissionHandler.reset();
+
+    // Detach the ExitPlanMode picker bridge so the process-wide
+    // `hookServer.onExitPlanApproval` handler falls back to the "no
+    // handler" branch (silent-exit → TUI in-terminal picker) instead of
+    // reaching into a torn-down permissionHandler on the next hook fire.
+    session.exitPlanApprovalHandler = null;
 
     // Reset Terminal
     process.stdin.off("data", abort);

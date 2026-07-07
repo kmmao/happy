@@ -58,6 +58,7 @@ import {
   resolveInitialClaudePermissionMode,
   resolveRemoteClaudePermissionMode,
 } from "./utils/permissionMode";
+import { PLAN_FAKE_RESTART } from "./jsonl/prompts";
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
 
@@ -558,6 +559,79 @@ export async function runClaude(
           logger.debug(`[START] notifyDaemonSessionFault threw: ${err}`);
         });
       }
+    },
+    /**
+     * ExitPlanMode picker bridge: the `exit_plan_approval_forwarder.cjs`
+     * PreToolUse hook (injected under Yolo when
+     * `HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE` is off) POSTs here and BLOCKS
+     * on the response. We hand it off to the active session's
+     * `exitPlanApprovalHandler` (wired to `permissionHandler.
+     * registerExitPlanApproval`), which surfaces the plan as an App
+     * picker entry and waits for the user's decision.
+     *
+     * No handler → return undefined → forwarder does silent exit →
+     * TUI falls back to its in-terminal picker. Same as if the hook
+     * were never installed, which is the correct behaviour when the
+     * session is torn down mid-approval.
+     */
+    onExitPlanApproval: async (data) => {
+      const session = currentSession;
+      const handler = session?.exitPlanApprovalHandler;
+      if (!session || !handler) {
+        logger.debug(
+          "[START] ExitPlanApproval hook received but no session handler active — falling back to TUI picker",
+        );
+        return undefined;
+      }
+      const result = await handler(data.tool_input);
+      if (result.approved) {
+        // Queue the continuation continuation prompt so the launcher's
+        // nextMessage picks it up, releases the plan-mode lockdown (via
+        // the `exit-plan-continue` source guard added in
+        // claudeRemoteLauncherCore.ts), and cold-restarts into the
+        // user-picked permission mode. Mirrors what the auto-approve
+        // path does inline at launcher observe time — only difference
+        // is we're firing here because the launcher explicitly deferred
+        // to us.
+        session.queue.unshift(
+          PLAN_FAKE_RESTART,
+          {
+            permissionMode:
+              (result.mode as PermissionMode | undefined) ?? "default",
+          },
+          {
+            priority: "urgent",
+            kind: "notification",
+            source: "exit-plan-continue",
+          },
+        );
+        logger.debug(
+          `[START] ExitPlanApproval approved (mode=${result.mode ?? "default"}) → queued PLAN_FAKE_RESTART`,
+        );
+        return {
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "allow",
+            permissionDecisionReason:
+              "Approved by user via Happy App picker",
+            // ExitPlanMode is a `requiresUserInteraction()` tool — the
+            // TUI hook pipeline only skips the picker when the allow
+            // decision carries `updatedInput`. Echo the original
+            // tool_input verbatim.
+            updatedInput: result.updatedInput ?? data.tool_input,
+          },
+        };
+      }
+      logger.debug(
+        `[START] ExitPlanApproval rejected: ${result.reason ?? "no reason"}`,
+      );
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: result.reason ?? "User rejected plan",
+        },
+      };
     },
     // ── Session-state hooks (Claude Code 2.1.121+ / 2.1.157+) ──────────────
     // Surface Claude's live cwd / worktree / file-change activity through
@@ -1283,6 +1357,7 @@ export async function runClaude(
     claudeArgs: options.claudeArgs,
     sandboxConfig,
     hookSettingsPath,
+    hookServerPort: hookServer.port,
     jsRuntime: options.jsRuntime,
     onSessionEvent: (sessionId, eventType, summary, detail) => {
       session.sessionEvent(sessionId, eventType, summary, detail);
