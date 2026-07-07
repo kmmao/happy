@@ -2202,7 +2202,28 @@ export async function claudeRemoteLauncher(
     // turn) mirrors strand recovery's `rearmRedeliverBudget` semantics:
     // once real output is on the wire, we MUST NOT re-fire; the user
     // has already seen it.
-    if (message.type === "assistant" && currentTurnIsPlanContinue) {
+    //
+    // Cold-restart replay guard — critical. sessionScanner replays the
+    // full pre-existing JSONL history on every cold restart (Claude TUI
+    // rewrites the session file with a fresh sessionId on --resume, so
+    // every historical record looks "new" to the scanner). Without this
+    // gate, the 13 pre-restart assistant records the plan-mode session
+    // has already emitted (EnterPlanMode / plan file writes / etc.) all
+    // replay through this branch, each with real content, and the rearm
+    // fires immediately — planContinueTurnProducedRealOutput flips true
+    // BEFORE the genuine 429 assistant arrives, and the auto-retry is
+    // dead-on-arrival. `outputEffect.countAsTurnOutput` was already
+    // computed at the top of `onMessage` from the same
+    // `classifyOutputTick` policy strand recovery uses, and is exactly
+    // the "this is a real post-cold-restart tick, not a replay" signal
+    // we want. Gate the ENTIRE branch on it (both rate_limit detection
+    // and rearm) so a replayed rate_limit record cannot spuriously
+    // trigger a retry either.
+    if (
+      message.type === "assistant" &&
+      currentTurnIsPlanContinue &&
+      outputEffect.countAsTurnOutput
+    ) {
       const aMsg = message as ClaudeJsonlAssistantMessage;
       if (aMsg.error === "rate_limit") {
         const decision = decidePlanContinueRetry({

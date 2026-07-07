@@ -183,6 +183,19 @@ Scope guards baked into the policy:
   prompts). Gated on `currentTurnIsPlanContinue` — set when the
   launcher consumes a msg with `source ∈ {"exit-plan-continue",
   "exit-plan-retry"}`.
+- **Cold-restart replay is ignored.** The whole branch is additionally
+  gated on `outputEffect.countAsTurnOutput` (the same
+  `classifyOutputTick` signal strand recovery uses). Without this
+  gate the sessionScanner's post-cold-restart replay of pre-existing
+  assistant history would immediately fire the rearm branch — every
+  historical real-content record marks the turn as "already produced
+  output" *before* the genuine 429 assistant arrives, killing the
+  auto-retry dead-on-arrival. Fixed after a live reproduction in
+  pid-27438 (2026-07-08): the launcher observed
+  `consumed exit-plan-continue message → releasing plan-mode lockdown`
+  and the JSONL later carried `assistant.error === "rate_limit"`, yet
+  no `[plan-retry]` log fired because 13 replayed assistant records
+  had already flipped the disarm flag.
 - **A turn that produces non-rate-limit output disarms the auto-
   retry.** If the model emitted any real text / tool_use / thinking
   before the rate_limit error arrived, the user has already seen a
