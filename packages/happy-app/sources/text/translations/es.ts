@@ -628,6 +628,9 @@ export const es: TranslationStructure = {
     experimentalFeatures: "Características experimentales",
     experimentalFeaturesEnabled: "Características experimentales habilitadas",
     experimentalFeaturesDisabled: "Usando solo características estables",
+    autoApprovePlanInYolo: "Aprobar planes automáticamente en Yolo",
+    autoApprovePlanInYoloDescription:
+      "En modo Yolo/bypass, aprueba los planes automáticamente y continúa con todo el contexto, sin tocar el selector. Solo funciona con la app abierta en esta sesión; desactívalo para revisar cada plan manualmente (y acceder a \"Limpiar contexto y ejecutar\").",
     webFeatures: "Características web",
     webFeaturesDescription:
       "Características disponibles solo en la versión web de la aplicación.",

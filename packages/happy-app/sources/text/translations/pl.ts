@@ -638,6 +638,9 @@ export const pl: TranslationStructure = {
     experimentalFeatures: "Funkcje eksperymentalne",
     experimentalFeaturesEnabled: "Funkcje eksperymentalne włączone",
     experimentalFeaturesDisabled: "Używane tylko stabilne funkcje",
+    autoApprovePlanInYolo: "Automatyczne zatwierdzanie planów w Yolo",
+    autoApprovePlanInYoloDescription:
+      "W trybie Yolo/bypass zatwierdza plany automatycznie i kontynuuje z pełnym kontekstem, bez dotykania selektora. Działa tylko, gdy aplikacja jest otwarta w tej sesji; wyłącz, aby ręcznie przeglądać każdy plan (i uzyskać dostęp do \"Wyczyść kontekst i wykonaj\").",
     webFeatures: "Funkcje webowe",
     webFeaturesDescription:
       "Funkcje dostępne tylko w wersji webowej aplikacji.",

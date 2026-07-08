@@ -611,6 +611,9 @@ export const zhHant: TranslationStructure = {
     experimentalFeatures: "實驗功能",
     experimentalFeaturesEnabled: "實驗功能已啟用",
     experimentalFeaturesDisabled: "僅使用穩定功能",
+    autoApprovePlanInYolo: "Yolo 模式自動核准計畫",
+    autoApprovePlanInYoloDescription:
+      "在 Yolo/bypass 模式下，自動核准計畫並保留完整上下文繼續執行，無需手動點選。僅在本工作階段且 App 開啟時生效；關閉後可手動逐一審閱計畫（並使用「清除上下文並執行」）。",
     webFeatures: "Web 功能",
     webFeaturesDescription: "僅在應用程式的 Web 版本中可用的功能。",
     enterToSend: "Enter 鍵傳送",

@@ -17,6 +17,9 @@ import { useUnistyles } from "react-native-unistyles";
 function FeaturesSettingsScreen() {
   const { theme } = useUnistyles();
   const [experiments, setExperiments] = useSettingMutable("experiments");
+  const [autoApprovePlanInYolo, setAutoApprovePlanInYolo] = useSettingMutable(
+    "autoApprovePlanInYolo",
+  );
   const [agentInputEnterToSend, setAgentInputEnterToSend] = useSettingMutable(
     "agentInputEnterToSend",
   );
@@ -72,6 +75,18 @@ function FeaturesSettingsScreen() {
           icon={<Ionicons name="flask-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch value={experiments} onValueChange={setExperiments} />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.autoApprovePlanInYolo")}
+          subtitle={t("settingsFeatures.autoApprovePlanInYoloDescription")}
+          icon={<Ionicons name="flash-outline" size={29} color={theme.colors.accentOrange} />}
+          rightElement={
+            <Switch
+              value={autoApprovePlanInYolo}
+              onValueChange={setAutoApprovePlanInYolo}
+            />
           }
           showChevron={false}
         />

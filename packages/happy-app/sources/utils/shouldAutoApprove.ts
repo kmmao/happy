@@ -36,24 +36,28 @@ const EXIT_PLAN_TOOLS = new Set([
 export function shouldAutoApprove(
     permissionModeKey: string | null | undefined,
     toolName: string,
+    autoApprovePlanInYolo: boolean,
 ): boolean {
     // AskUserQuestion always requires manual interaction (it's the Q&A channel)
     if (ALWAYS_MANUAL_TOOLS.has(toolName)) {
         return false;
     }
 
-    // ExitPlanMode ALWAYS requires manual approval — including bypassPermissions/yolo.
+    // ExitPlanMode in yolo/bypass is gated by the `autoApprovePlanInYolo`
+    // setting (default on). When on, ToolView's auto-approve effect taps the
+    // App picker via sessionAllow — equivalent to a manual approve, and it
+    // fires the CLI's onExitPlanApproval, continuing with full context.
     //
-    // Auto-approving it here would 47ms-秒批 the App picker (via ToolView's
-    // auto-approve effect calling sessionAllow) before the user can choose
-    // "Clear context & execute" (Layer 0, docs/investigations/plan-mode-429.md).
-    // Since Yolo is exactly the long-context 429 hot path, auto-approving would
-    // make the new button unreachable where it matters most. True unattended
-    // flows set the CLI's HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1, which allow-s at
-    // the hook layer and never registers an App picker request at all — so this
-    // change does not affect them.
+    // When off, the picker renders so the user can still reach "Clear context
+    // & execute" (Layer 0, docs/investigations/plan-mode-429.md). In any
+    // non-yolo mode (including plan mode) ExitPlanMode always needs manual
+    // approval. Fully unattended flows (App closed) still use the CLI's
+    // HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1, which never reaches this function.
     if (EXIT_PLAN_TOOLS.has(toolName)) {
-        return false;
+        const isYolo =
+            permissionModeKey === "yolo" ||
+            permissionModeKey === "bypassPermissions";
+        return isYolo && autoApprovePlanInYolo === true;
     }
 
     switch (permissionModeKey) {

@@ -757,6 +757,9 @@ export const ja: TranslationStructure = {
     experimentalFeatures: "実験的機能",
     experimentalFeaturesEnabled: "実験的機能が有効です",
     experimentalFeaturesDisabled: "安定版機能のみを使用",
+    autoApprovePlanInYolo: "Yoloでプランを自動承認",
+    autoApprovePlanInYoloDescription:
+      "Yolo/バイパスモードでは、ピッカーを操作せずにプランを自動承認し、フルコンテキストで続行します。このセッションでアプリを開いている間のみ有効です。オフにすると各プランを手動で確認できます（「コンテキストをクリアして実行」も選択可能）。",
     webFeatures: "Web機能",
     webFeaturesDescription: "Webバージョンでのみ利用可能な機能。",
     enterToSend: "Enterで送信",

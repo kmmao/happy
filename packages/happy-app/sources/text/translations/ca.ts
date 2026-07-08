@@ -628,6 +628,9 @@ export const ca: TranslationStructure = {
     experimentalFeatures: "Funcions experimentals",
     experimentalFeaturesEnabled: "Funcions experimentals activades",
     experimentalFeaturesDisabled: "Utilitzant només funcions estables",
+    autoApprovePlanInYolo: "Aprova plans automàticament a Yolo",
+    autoApprovePlanInYoloDescription:
+      "En mode Yolo/bypass, aprova els plans automàticament i continua amb tot el context, sense tocar el selector. Només funciona amb l'aplicació oberta en aquesta sessió; desactiva-ho per revisar cada pla manualment (i accedir a \"Neteja el context i executa\").",
     webFeatures: "Funcions web",
     webFeaturesDescription:
       "Funcions disponibles només a la versió web de l'app.",

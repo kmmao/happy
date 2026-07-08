@@ -74,6 +74,9 @@ export const SettingsSchema = z.object({
     .boolean()
     .describe("Whether to opt out of anonymous analytics"),
   experiments: z.boolean().describe("Whether to enable experimental features"),
+  autoApprovePlanInYolo: z
+    .boolean()
+    .describe("Auto-approve ExitPlanMode in yolo/bypass mode"),
   showAgentActivity: z
     .boolean()
     .describe(
@@ -423,6 +426,7 @@ export const settingsDefaults: Settings = {
   expandDiffsByDefault: true,
   analyticsOptOut: false,
   experiments: false,
+  autoApprovePlanInYolo: true,
   showAgentActivity: true,
   showAgentsDashboard: false,
   knowledgeBase: false,

@@ -592,6 +592,9 @@ export const ru: TranslationStructure = {
     experimentalFeatures: "Экспериментальные функции",
     experimentalFeaturesEnabled: "Экспериментальные функции включены",
     experimentalFeaturesDisabled: "Используются только стабильные функции",
+    autoApprovePlanInYolo: "Авто-одобрение планов в Yolo",
+    autoApprovePlanInYoloDescription:
+      "В режиме Yolo/bypass планы одобряются автоматически и продолжаются с полным контекстом, без нажатия в пикере. Работает только при открытом приложении в этой сессии; отключите, чтобы просматривать каждый план вручную (и открыть «Очистить контекст и выполнить»).",
     webFeatures: "Веб-функции",
     webFeaturesDescription:
       "Функции, доступные только в веб-версии приложения.",

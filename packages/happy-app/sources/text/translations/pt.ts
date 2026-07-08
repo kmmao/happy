@@ -627,6 +627,9 @@ export const pt: TranslationStructure = {
     experimentalFeatures: "Recursos experimentais",
     experimentalFeaturesEnabled: "Recursos experimentais ativados",
     experimentalFeaturesDisabled: "Usando apenas recursos estáveis",
+    autoApprovePlanInYolo: "Aprovar planos automaticamente no Yolo",
+    autoApprovePlanInYoloDescription:
+      "No modo Yolo/bypass, aprova os planos automaticamente e continua com o contexto completo, sem tocar no seletor. Só funciona com o app aberto nesta sessão; desative para revisar cada plano manualmente (e acessar \"Limpar contexto e executar\").",
     webFeatures: "Recursos web",
     webFeaturesDescription:
       "Recursos disponíveis apenas na versão web do aplicativo.",

@@ -613,6 +613,9 @@ export const zhHans: TranslationStructure = {
     experimentalFeatures: "实验功能",
     experimentalFeaturesEnabled: "实验功能已启用",
     experimentalFeaturesDisabled: "仅使用稳定功能",
+    autoApprovePlanInYolo: "Yolo 模式自动批准计划",
+    autoApprovePlanInYoloDescription:
+      "在 Yolo/bypass 模式下，自动批准计划并保留完整上下文继续执行，无需手动点选。仅在本会话且 App 打开时生效；关闭后可手动逐个审阅计划（并使用「清空上下文并执行」）。",
     webFeatures: "Web 功能",
     webFeaturesDescription: "仅在应用的 Web 版本中可用的功能。",
     enterToSend: "回车发送",

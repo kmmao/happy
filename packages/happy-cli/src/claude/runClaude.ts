@@ -60,7 +60,7 @@ import {
 } from "./utils/permissionMode";
 import { PLAN_FAKE_RESTART, buildPlanExecutionPrompt } from "./jsonl/prompts";
 import {
-  parseKeepContextEnv,
+  parseDefaultClearEnv,
   shouldClearOnPlanExit,
 } from "./utils/planExitClearPolicy";
 /** JavaScript runtime to use for spawning Claude Code */
@@ -607,23 +607,24 @@ export async function runClaude(
         const mode = (result.mode as PermissionMode | undefined) ?? "default";
         // Layer 0 — "clear context & execute". Run `/clear` (context → 0, no
         // model call) then inject the plan as the first instruction of a fresh
-        // session, so the continuation request never carries the `--resume`
-        // full-history replay that bursts self-hosted mirrors into 429 (see
+        // session, so the continuation request carries only the plan text
+        // instead of the `--resume` full-history replay (see
         // docs/investigations/plan-mode-429.md).
         //
-        // This is the DEFAULT for bypass (`--dangerously-skip-permissions`)
-        // sessions — the 429 hot path, where keeping the burst AND avoiding the
-        // 429 is impossible under PTY (the lockdown teardown forces the burst-y
-        // cold restart and cannot be dropped). Non-bypass sessions keep the
-        // classic full-context continuation. Opt out with
-        // HAPPY_PLAN_KEEP_CONTEXT=1; an explicit App "Clear context & execute"
-        // click always clears regardless. Decision is a pure function so the
-        // precedence is unit-tested (planExitClearPolicy.test.ts).
+        // This is NOT the default: a plain "Approve plan" — bypass included —
+        // keeps the classic full-context continuation so plans leaning on
+        // unstated history continue correctly (the 0.102.26 "bypass clears by
+        // default" experiment is reverted; its 429 was a profile misconfig, not
+        // payload size). The clear path stays reachable as opt-in: an explicit
+        // App "Clear context & execute" click always clears, and bypass
+        // sessions can restore the old default with HAPPY_PLAN_DEFAULT_CLEAR=1.
+        // Decision is a pure function so the precedence is unit-tested
+        // (planExitClearPolicy.test.ts).
         const wantClear = shouldClearOnPlanExit({
           explicitClear: result.clearContext === true,
           bypass: dangerouslySkipPermissions,
-          keepContextEnv: parseKeepContextEnv(
-            process.env.HAPPY_PLAN_KEEP_CONTEXT,
+          defaultClearEnv: parseDefaultClearEnv(
+            process.env.HAPPY_PLAN_DEFAULT_CLEAR,
           ),
         });
         // Fall back to the classic continue path when no plan body is present
@@ -656,7 +657,7 @@ export async function runClaude(
           );
           logger.debug(
             `[START] ExitPlanApproval approved → clear path (mode=${mode}, ` +
-              `${result.clearContext === true ? "explicit picker" : "bypass default"}` +
+              `${result.clearContext === true ? "explicit picker" : "bypass opt-in"}` +
               `) → queued /clear + plan execution`,
           );
         } else {

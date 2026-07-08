@@ -66,6 +66,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   const router = useRouter();
   const { theme } = useUnistyles();
   const showAgentActivity = useSetting("showAgentActivity");
+  const autoApprovePlanInYolo = useSetting("autoApprovePlanInYolo");
   const SpecificToolView = getToolViewComponent(tool.name);
   const patchEntryCount = React.useMemo(
     () =>
@@ -144,7 +145,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   // In default mode: never auto-approve — show PermissionFooter for manual review.
   // In other modes: auto-approve per shouldAutoApprove() with fallback on failure.
   const [autoApproveFailed, setAutoApproveFailed] = React.useState(false);
-  const willAutoApprove = shouldAutoApprove(props.permissionModeKey, tool.name);
+  const willAutoApprove = shouldAutoApprove(
+    props.permissionModeKey,
+    tool.name,
+    autoApprovePlanInYolo,
+  );
   const hideToolCall = shouldHideToolCall(tool);
 
   React.useEffect(() => {
