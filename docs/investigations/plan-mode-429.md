@@ -26,14 +26,19 @@ mirrors don't emit that shape.
 One root-cause bypass plus three reactive layers of defence, each
 independently useful:
 
-0. **Clear context & execute** (Layer 0, user-picked per plan) — the
-   App approval picker offers a second button that tells the CLI to run
-   `/clear` (context → 0, no model call) and inject the approved plan
-   body as the first instruction of a fresh session. The request body
-   drops well under Anthropic's 200K long-context billing line, so it
-   **never** enters long-context territory and never 429s — including
-   the `Usage credits are required for long context requests` variant
-   that the reactive layers below cannot fix (see Layer 0 section).
+0. **Clear context & execute** (Layer 0 — **the default for bypass
+   sessions**, and a per-plan App button everywhere) — run `/clear`
+   (context → 0, no model call) and inject the approved plan body as the
+   first instruction of a fresh session. The continuation request never
+   carries the `--resume` full-history replay, so it never bursts — this
+   is what kills the 429 regardless of context size (even a ~50K session
+   429s on the burst; it is the single fat request that trips the
+   mirror's per-request / per-minute cap, not the total token count).
+   Also sidesteps the `Usage credits are required for long context
+   requests` variant that the reactive layers below cannot fix. Default
+   because bypass is the 429 hot path and its only verified alternatives
+   are this or a full SDK rewrite (see "Why default on for bypass"
+   below). Opt out with `HAPPY_PLAN_KEEP_CONTEXT=1`.
 1. **App picker cooldown** (default, no config) — Yolo's ExitPlanMode
    is routed through an App-side approval picker rather than the
    auto-approve hook, so the mirror's rate window has a chance to
@@ -106,8 +111,55 @@ waiting 30/60/120 s and re-sending the identical over-line request
 fails every time (Layer 3 spins the full 3.5 min ladder and still
 loses).
 
-Layer 0 removes the burst instead of spacing it out. When the user
-picks the second picker button ("Clear context & execute"):
+**Default for bypass sessions (2026-07-09).** Originally Layer 0 was a
+second picker button the user had to remember to click; plain "Approve
+plan" still ran the burst-y PLAN_FAKE_RESTART path and 429'd. It is now
+the **default** for bypass (`--dangerously-skip-permissions`) sessions:
+`onExitPlanApproval` routes plain approvals through the clear path too.
+The routing decision is the pure function
+`shouldClearOnPlanExit` (`utils/planExitClearPolicy.ts`), precedence:
+
+1. explicit App "Clear context & execute" click → clear (always),
+2. bypass session and `HAPPY_PLAN_KEEP_CONTEXT` not set → clear (the
+   new default),
+3. otherwise (non-bypass, or bypass opted out) → classic
+   PLAN_FAKE_RESTART continuation.
+
+`HAPPY_PLAN_KEEP_CONTEXT=1` restores the classic full-context path for
+plans that lean on unstated conversation history — sensible only on the
+official API or a mirror without a tight burst cap, since it re-arms the
+429.
+
+**Why default on for bypass — the alternatives are exhausted
+(verified 2026-07-09).** Under PTY you cannot keep the full history AND
+avoid the burst on plan exit:
+
+- The exit *must* cold-restart: exiting the plan-mode lockdown restores
+  the full toolset by rewriting `disallowedTools`, and Claude TUI only
+  reads settings at startup (`applyFlagSettings` is noop+warn). Any
+  cold restart `--resume`-replays the whole history = the burst.
+- The lockdown *cannot* be dropped: bypass
+  (`--dangerously-skip-permissions`) short-circuits every permission
+  check, so plan-mode read-only is purely **advisory**. Opus was
+  observed `Write`-ing the plan straight to `~/.claude/plans/*.md` and
+  going idle, hanging the App picker on `honking…` forever. The
+  lockdown's hard `disallowedTools` deny is the only thing that forces
+  `ExitPlanMode`. Because the read-only is advisory (probabilistic),
+  no amount of testing can prove removal safe — one compliant run does
+  not bind the next.
+- A per-turn handoff to the SDK does **not** help: the SDK would
+  `--resume`-reload the same history into a fresh runtime = the same
+  burst. The SDK escapes the 429 only when it drives the session
+  continuously from turn 1 (mode switch is an in-memory
+  `setPermissionMode`, no reload) — i.e. a full architecture revert of
+  `cc2bd12e4` (SDK → node-pty), losing the raw-PTY WebTerminal. That is
+  out of scope here.
+
+So for bypass the real choice is Layer 0 (drop the history) or the SDK
+rewrite (never reload it). Layer 0 is the pragmatic default.
+
+When the user picks the second picker button ("Clear context & execute")
+— or, now, simply approves a plan in a bypass session:
 
 1. The App sends the `permission` RPC with `clearContext: true` and
    **no** `mode` (the CLI keeps the session's current permission mode,
@@ -384,6 +436,7 @@ ExitPlanMode observed
 | `maybeDelayPlanRestartWrite.test.ts` | Layer 2 env parse, upper clamp, AbortSignal, batched-siblings match |
 | `sleepWithAbort.test.ts` | Cancellable sleep across pre-aborted / mid-abort / no-signal shapes |
 | `planContinueRetryPolicy.test.ts` | Layer 3 decision cases (non-continuation → no-op, produced-output → no-op, ladder 30/60/120, budget exhausted, defensive clamps) |
+| `planExitClearPolicy.test.ts` | Layer 0 default routing: explicit click always clears, bypass defaults to clear, `HAPPY_PLAN_KEEP_CONTEXT` opt-out, non-bypass stays classic |
 | `exitPlanApproval.test.ts` | Layer 1 env-var gate for auto-approve vs App picker; Layer 0 clearContext routing to `/clear` + plan-exec |
 | `permissionHandlerExitPlan.test.ts` | Layer 1 unshift semantics and PLAN_FAKE_RESTART routing; Layer 0 clearContext branch vs continue-path regression |
 | `MessageQueue2.test.ts` | Layer 0 `pushIsolateAndClear("/clear") + push(exec)` → `collectBatch` returns `/clear` (isolate) alone, then exec |

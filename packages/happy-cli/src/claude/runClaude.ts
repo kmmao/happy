@@ -59,6 +59,10 @@ import {
   resolveRemoteClaudePermissionMode,
 } from "./utils/permissionMode";
 import { PLAN_FAKE_RESTART, buildPlanExecutionPrompt } from "./jsonl/prompts";
+import {
+  parseKeepContextEnv,
+  shouldClearOnPlanExit,
+} from "./utils/planExitClearPolicy";
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
 
@@ -601,17 +605,33 @@ export async function runClaude(
       const result = await handler(data.tool_input);
       if (result.approved) {
         const mode = (result.mode as PermissionMode | undefined) ?? "default";
-        // "Clear context & execute" (Layer 0). Extract the approved plan body
-        // and, when present, run `/clear` (context → 0, no model call) then
-        // inject the plan as the first instruction of the fresh session. The
-        // request body drops well under Anthropic's 200K long-context billing
-        // line, so it never 429s — unlike the PLAN_FAKE_RESTART replay path.
-        // Falls back to the classic continue path when no plan body is present
+        // Layer 0 — "clear context & execute". Run `/clear` (context → 0, no
+        // model call) then inject the plan as the first instruction of a fresh
+        // session, so the continuation request never carries the `--resume`
+        // full-history replay that bursts self-hosted mirrors into 429 (see
+        // docs/investigations/plan-mode-429.md).
+        //
+        // This is the DEFAULT for bypass (`--dangerously-skip-permissions`)
+        // sessions — the 429 hot path, where keeping the burst AND avoiding the
+        // 429 is impossible under PTY (the lockdown teardown forces the burst-y
+        // cold restart and cannot be dropped). Non-bypass sessions keep the
+        // classic full-context continuation. Opt out with
+        // HAPPY_PLAN_KEEP_CONTEXT=1; an explicit App "Clear context & execute"
+        // click always clears regardless. Decision is a pure function so the
+        // precedence is unit-tested (planExitClearPolicy.test.ts).
+        const wantClear = shouldClearOnPlanExit({
+          explicitClear: result.clearContext === true,
+          bypass: dangerouslySkipPermissions,
+          keepContextEnv: parseKeepContextEnv(
+            process.env.HAPPY_PLAN_KEEP_CONTEXT,
+          ),
+        });
+        // Fall back to the classic continue path when no plan body is present
         // (defensive: never regress an approval into a hang).
-        const planText = result.clearContext
+        const planText = wantClear
           ? extractPlanBody(data.tool_input)
           : undefined;
-        if (result.clearContext && planText) {
+        if (wantClear && planText) {
           // 1) Clear first. pushIsolateAndClear wipes the whole queue and marks
           //    the `/clear` as isolate, so collectBatch returns it alone before
           //    the exec message (verified: MessageQueue2 isolate single-return).
@@ -635,7 +655,9 @@ export async function runClaude(
             },
           );
           logger.debug(
-            `[START] ExitPlanApproval approved with clearContext (mode=${mode}) → queued /clear + plan execution`,
+            `[START] ExitPlanApproval approved → clear path (mode=${mode}, ` +
+              `${result.clearContext === true ? "explicit picker" : "bypass default"}` +
+              `) → queued /clear + plan execution`,
           );
         } else {
           // Queue the continuation continuation prompt so the launcher's
