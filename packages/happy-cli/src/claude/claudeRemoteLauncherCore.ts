@@ -74,6 +74,13 @@ import { createElicitationRegistry } from "./elicitationRegistry";
 import { extractCompactSummary } from "./compactSummaryParser";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
+import {
+  DEFAULT_STALE_THRESHOLD_MS,
+  DEFAULT_SWEEP_TICK_MS,
+  buildReapEnvelopePayload,
+  selectStaleTasks,
+  type InFlightTask,
+} from "./utils/inFlightTaskRegistry";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -124,6 +131,13 @@ function buildProtocolMessage(type: string, payload: Record<string, unknown>): R
     type,
     ...payload,
   };
+}
+
+/** Parse a positive-integer millisecond env override, falling back when it is
+ * unset, non-numeric, or non-positive. */
+function envMs(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export async function claudeRemoteLauncher(
@@ -1119,6 +1133,68 @@ export async function claudeRemoteLauncher(
   let latestPlanFilePath: string | null = null;
   let latestPlanContent: string | null = null;
   let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
+  // Sub-agent tasks seen start (task_started) but not finish (task_notification).
+  // Drained by the stale-task sweep + session-exit reap so a lost completion
+  // signal can't strand a "running" chip forever. See utils/inFlightTaskRegistry.
+  const inFlightTasks = new Map<string, InFlightTask>();
+  const staleTaskThresholdMs = envMs(
+    process.env.HAPPY_TASK_REAP_STALE_MS,
+    DEFAULT_STALE_THRESHOLD_MS,
+  );
+  const staleTaskSweepTickMs = envMs(
+    process.env.HAPPY_TASK_REAP_SWEEP_MS,
+    DEFAULT_SWEEP_TICK_MS,
+  );
+  let staleTaskSweep: ReturnType<typeof setInterval> | null = null;
+
+  // Reap one stranded sub-agent: emit the synthetic task-end the App needs to
+  // flip its "running" chip, then drop it from the registry. Mirrors the
+  // doStopTask task-end emit — same buildProtocolMessage/sendSessionProtocolMessage
+  // path the manual-stop RPC uses.
+  const reapInFlightTask = (task: InFlightTask, reason: string): void => {
+    const envelope = buildProtocolMessage(
+      "agent",
+      buildReapEnvelopePayload(task, "stopped"),
+    );
+    session.client.sendSessionProtocolMessage(envelope as any);
+    inFlightTasks.delete(task.taskId);
+    logger.debug(
+      `[remote][task-reap] ${reason} taskId=${task.taskId} toolUseId=${task.toolUseId ?? "?"} idleMs=${Date.now() - task.lastActivityAt} desc="${task.description.slice(0, 60)}"`,
+    );
+  };
+
+  // Session-scoped sweep: periodically reap tasks that stopped heartbeating.
+  // Live background agents keep emitting task_progress, refreshing
+  // lastActivityAt, so only genuinely-silent ones cross the threshold.
+  const startStaleTaskSweep = (): void => {
+    if (staleTaskSweep) return;
+    staleTaskSweep = setInterval(() => {
+      if (inFlightTasks.size === 0) return;
+      const stale = selectStaleTasks(
+        inFlightTasks.values(),
+        Date.now(),
+        staleTaskThresholdMs,
+      );
+      for (const task of stale) reapInFlightTask(task, "stale-sweep");
+    }, staleTaskSweepTickMs);
+    if (typeof staleTaskSweep.unref === "function") staleTaskSweep.unref();
+  };
+
+  const stopStaleTaskSweep = (): void => {
+    if (staleTaskSweep) {
+      clearInterval(staleTaskSweep);
+      staleTaskSweep = null;
+    }
+  };
+
+  // Reap every remaining task — the Claude process is going away, so any
+  // sub-agent that never reported completion is definitively dead. Snapshot
+  // the values first since reapInFlightTask mutates the map.
+  const reapAllInFlightTasks = (reason: string): void => {
+    for (const task of [...inFlightTasks.values()]) {
+      reapInFlightTask(task, reason);
+    }
+  };
   let lastResultData: {
     totalCostUsd: number;
     numTurns: number;
@@ -2066,6 +2142,17 @@ export async function claudeRemoteLauncher(
         workflowName: (m as any).workflow_name,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+      // Track this sub-agent so a lost task_notification can be reaped. The
+      // heartbeat starts now; task_progress/updated refresh it.
+      const startedNow = Date.now();
+      inFlightTasks.set(m.task_id, {
+        taskId: m.task_id,
+        toolUseId: m.tool_use_id,
+        description: m.description ?? "",
+        startedAt: startedNow,
+        lastActivityAt: startedNow,
+        backgrounded: false,
+      });
     }
 
     // Forward Task progress to session protocol
@@ -2089,6 +2176,11 @@ export async function claudeRemoteLauncher(
         summary: m.summary,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+      // Heartbeat: a live sub-agent keeps the staleness clock from advancing.
+      const existing = inFlightTasks.get(m.task_id);
+      if (existing) {
+        inFlightTasks.set(m.task_id, { ...existing, lastActivityAt: Date.now() });
+      }
     }
 
     // Forward memory recall to App as a session event (SDK 0.2.105+).
@@ -2135,6 +2227,10 @@ export async function claudeRemoteLauncher(
           : undefined,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+      // Terminal: the real completion arrived — stop tracking so neither the
+      // sweep nor the exit reap re-emits a duplicate task-end. Single source of
+      // truth for registry removal.
+      inFlightTasks.delete(m.task_id);
     }
 
     // Forward Task updated (patch) to session protocol (SDK 0.3.142+)
@@ -2155,6 +2251,15 @@ export async function claudeRemoteLauncher(
         },
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+      // Heartbeat + record backgrounded (diagnostic only — never a reap gate).
+      const existing = inFlightTasks.get(m.task_id);
+      if (existing) {
+        inFlightTasks.set(m.task_id, {
+          ...existing,
+          lastActivityAt: Date.now(),
+          backgrounded: m.patch.is_backgrounded ?? existing.backgrounded,
+        });
+      }
     }
 
     // Forward rate limit events to App (SDK 0.3.142+)
@@ -2627,6 +2732,9 @@ export async function claudeRemoteLauncher(
     // actually changes (e.g., new session started or /clear command used).
     // See: https://github.com/anthropics/happy-cli/issues/143
     let previousSessionId: string | null = null;
+    // Session-scoped: survives cold restarts (--resume) so a background agent's
+    // silence is measured across the whole session, not reset each iteration.
+    startStaleTaskSweep();
     while (!exitReason) {
       logger.debug("[remote]: launch");
       messageBuffer.addMessage("═".repeat(40), "status");
@@ -3817,6 +3925,12 @@ export async function claudeRemoteLauncher(
       }
     }
   } finally {
+    // Session truly ending (loop exited): stop the sweep and reap any sub-agent
+    // that never reported completion — the Claude process is gone, so a still-
+    // "running" chip would otherwise strand forever.
+    stopStaleTaskSweep();
+    reapAllInFlightTasks("session-exit");
+
     // Drain any pending elicitations to prevent Promise/listener leaks
     elicitations.drainAll(new Error("Session ended"));
 
