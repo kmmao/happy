@@ -10,6 +10,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
+import { formatDurationBetween } from "@/utils/formatUsage";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
     fetchRunComparison,
@@ -41,18 +42,6 @@ function formatDate(timestamp: number): string {
         hour: "2-digit",
         minute: "2-digit",
     });
-}
-
-function formatDuration(startMs: number, endMs: number | null): string {
-    if (!endMs) return "--";
-    const seconds = Math.round((endMs - startMs) / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
 }
 
 function formatCost(costUsd: number | null): string {
@@ -238,7 +227,7 @@ function SupervisorRunDetailScreen() {
                 />
                 <MetadataRow
                     label={t("supervisor.runDuration")}
-                    value={formatDuration(
+                    value={formatDurationBetween(
                         currentRun.createdAt,
                         currentRun.completedAt,
                     )}

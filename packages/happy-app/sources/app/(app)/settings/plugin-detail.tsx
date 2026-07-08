@@ -12,14 +12,8 @@ import type { PluginDetail } from "@/sync/ops";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { Modal } from "@/modal";
-import { storage } from "@/sync/storage";
-
-/** Find the first online machine ID. */
-function findOnlineMachineId(): string | null {
-    const machines = storage.getState().machines;
-    const online = Object.values(machines).find((m) => m.active);
-    return online?.id ?? null;
-}
+import { extractMachineError } from "@/utils/machineUtils";
+import { findOnlineMachineId } from "@/utils/onlineMachine";
 
 /**
  * Plugin detail page.
@@ -120,9 +114,7 @@ function PluginDetailScreen() {
                     Modal.toast(
                         t("settingsPlugins.actionFailed", {
                             error:
-                                result.stderr?.slice(0, 100) ||
-                                result.error ||
-                                "Unknown error",
+                                extractMachineError(result, { maxLength: 100 }),
                         }),
                     );
                 }
@@ -176,9 +168,7 @@ function PluginDetailScreen() {
                 Modal.toast(
                     t("settingsPlugins.actionFailed", {
                         error:
-                            result.stderr?.slice(0, 100) ||
-                            result.error ||
-                            "Unknown error",
+                            extractMachineError(result, { maxLength: 100 }),
                     }),
                 );
             }
@@ -216,9 +206,7 @@ function PluginDetailScreen() {
                 Modal.toast(
                     t("settingsPlugins.actionFailed", {
                         error:
-                            result.stderr?.slice(0, 100) ||
-                            result.error ||
-                            "Unknown error",
+                            extractMachineError(result, { maxLength: 100 }),
                     }),
                 );
             }

@@ -9,6 +9,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
+import { formatDurationBetween } from "@/utils/formatUsage";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
     fetchLoopDetail,
@@ -34,18 +35,6 @@ function formatDate(timestamp: number): string {
         hour: "2-digit",
         minute: "2-digit",
     });
-}
-
-function formatDuration(startMs: number, endMs: number | null): string {
-    if (!endMs) return "--";
-    const seconds = Math.round((endMs - startMs) / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
 }
 
 // Mirror of supervisorLoopBrief.composeSummary on the server so the brief
@@ -175,7 +164,7 @@ function IterationTimeline({ runs }: { runs: LoopDetailRun[] }) {
                                     {run.loopIteration != null ? `#${run.loopIteration} ` : ""}{phaseLabel}
                                 </Text>
                                 <Text style={timelineStyles.durationText}>
-                                    {formatDuration(run.createdAt, run.completedAt)}
+                                    {formatDurationBetween(run.createdAt, run.completedAt)}
                                 </Text>
                             </View>
                             <View style={timelineStyles.metaRow}>
@@ -512,7 +501,7 @@ function SupervisorLoopDetailScreen() {
                         label={loop.maxIterations > 0
                             ? t("supervisor.loopIteration", { current: loop.currentIteration, max: loop.maxIterations })
                             : t("supervisor.loopIterationUnlimited", { current: loop.currentIteration })}
-                        value={formatDuration(loop.createdAt, loop.completedAt)}
+                        value={formatDurationBetween(loop.createdAt, loop.completedAt)}
                     />
                     <MetadataRow
                         label={t("supervisor.loopFound")}

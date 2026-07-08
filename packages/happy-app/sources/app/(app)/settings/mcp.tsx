@@ -17,14 +17,8 @@ import type { McpServerInfo, AvailableMcpServer } from "@/sync/ops";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { storage } from "@/sync/storage";
-
-/** Find the first online machine ID from storage. */
-function findOnlineMachineId(): string | null {
-    const machines = storage.getState().machines;
-    const online = Object.values(machines).find((m) => m.active);
-    return online?.id ?? null;
-}
+import { extractMachineError } from "@/utils/machineUtils";
+import { findOnlineMachineId } from "@/utils/onlineMachine";
 
 /** Category labels */
 function getCategoryLabel(category: string): string {
@@ -149,9 +143,7 @@ function McpSettingsScreen() {
                     Modal.toast(
                         t("settingsMcp.actionFailed", {
                             error:
-                                result.stderr?.slice(0, 100) ||
-                                result.error ||
-                                "Unknown error",
+                                extractMachineError(result, { maxLength: 100 }),
                         }),
                     );
                 }
@@ -204,9 +196,7 @@ function McpSettingsScreen() {
                 Modal.toast(
                     t("settingsMcp.actionFailed", {
                         error:
-                            result.stderr?.slice(0, 100) ||
-                            result.error ||
-                            "Unknown error",
+                            extractMachineError(result, { maxLength: 100 }),
                     }),
                 );
             }
@@ -253,9 +243,7 @@ function McpSettingsScreen() {
                     Modal.toast(
                         t("settingsMcp.actionFailed", {
                             error:
-                                result.stderr?.slice(0, 100) ||
-                                result.error ||
-                                "Unknown error",
+                                extractMachineError(result, { maxLength: 100 }),
                         }),
                     );
                 }

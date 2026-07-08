@@ -16,7 +16,8 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { machineBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { MMKV } from "react-native-mmkv";
-import { isMachineOnline } from "@/utils/machineUtils";
+import { isMachineOnline, extractMachineError } from "@/utils/machineUtils";
+import { findOnlineMachineId } from "@/utils/onlineMachine";
 import {
     provisionCreate,
     provisionList,
@@ -26,12 +27,6 @@ import {
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
 import { SharedEmptyState } from "@/components/SharedEmptyState";
-
-function findOnlineMachineId(): string | null {
-    const machines = storage.getState().machines;
-    const online = Object.values(machines).find((m) => m.active);
-    return online?.id ?? null;
-}
 
 function sanitizeContainerName(name: string): string {
     return name.replace(/[^a-zA-Z0-9_.-]/g, "-").replace(/-+/g, "-");
@@ -277,7 +272,7 @@ function ProvisionSettingsScreen() {
         if (bashResult.success && bashResult.exitCode === 0) {
             Modal.toast(t("provision.containerCreated"));
         } else {
-            const errorMsg = bashResult.stderr || bashResult.error || "Unknown error";
+            const errorMsg = extractMachineError(bashResult);
             Modal.alert(
                 t("provision.containerFailed"),
                 t("provision.containerFailedDescription", { error: errorMsg }),
@@ -393,7 +388,7 @@ function ProvisionSettingsScreen() {
             } else {
                 // Clean up Caddy site file since container failed to start
                 await machineBash(machineId, `docker exec happy-caddy-1 rm -f /etc/caddy/sites/t-${shellEscape(safeName)}.caddy && docker exec happy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true`, "/");
-                const errorMsg = bashResult.stderr || bashResult.error || "Unknown error";
+                const errorMsg = extractMachineError(bashResult);
                 Modal.alert(
                     t("provision.containerFailed"),
                     t("provision.restoreContainerFailed", { error: errorMsg }),
@@ -425,7 +420,7 @@ function ProvisionSettingsScreen() {
             if (result.success && result.exitCode === 0) {
                 Modal.toast(t("provision.restarted"));
             } else {
-                Modal.alert(t("provision.containerFailed"), result.stderr || result.error || "Unknown error");
+                Modal.alert(t("provision.containerFailed"), extractMachineError(result));
             }
             await refreshContainerStatuses();
         },

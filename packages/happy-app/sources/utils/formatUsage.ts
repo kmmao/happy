@@ -57,6 +57,25 @@ export function formatDurationMs(ms: number): string {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+/**
+ * Round-based elapsed duration between two epoch-ms timestamps. Always shows the
+ * finer unit (e.g. "3m 0s") and renders "--" when there is no end time yet.
+ * Deliberately distinct from `formatDurationMs` (floor-based, omits zero units) —
+ * folded here from byte-identical local copies in the supervisor run/loop detail
+ * screens (ADR-0061).
+ */
+export function formatDurationBetween(startMs: number, endMs: number | null): string {
+    if (!endMs) return "--";
+    const seconds = Math.round((endMs - startMs) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+}
+
 // ---------------------------------------------------------------------------
 // Value formatting owner (ADR-0061)
 //
@@ -67,7 +86,9 @@ export function formatDurationMs(ms: number): string {
 //     `formatTokenCountShort` ("1.2K") / `formatTokensCompact` ("1.2k" — the
 //     message/turn-timeline style, lowercase unit, no suffix).
 //   - duration: `formatDurationMs` (floor-based h/m/s clock) /
-//     `formatDurationCompact` ("Xm Ys" or "1.4s" decimal seconds).
+//     `formatDurationCompact` ("Xm Ys" or "1.4s" decimal seconds) /
+//     `formatDurationBetween` (round-based elapsed between two timestamps,
+//     always shows finer unit, "--" when unfinished).
 //   - cost: `formatCostUsd` (adaptive: 4 decimals under a cent, else 2). The
 //     always-4-decimals "precise" style in the usage/supervisor detail views is
 //     a deliberately different presentation and stays local to those screens.

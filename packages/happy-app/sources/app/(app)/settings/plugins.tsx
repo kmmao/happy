@@ -17,14 +17,8 @@ import type { InstalledPlugin, MarketplaceInfo, AvailablePlugin } from "@/sync/o
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { storage } from "@/sync/storage";
-
-/** Find the first online machine ID from storage. */
-function findOnlineMachineId(): string | null {
-    const machines = storage.getState().machines;
-    const online = Object.values(machines).find((m) => m.active);
-    return online?.id ?? null;
-}
+import { extractMachineError } from "@/utils/machineUtils";
+import { findOnlineMachineId } from "@/utils/onlineMachine";
 
 /** Recommended marketplace sources. */
 const RECOMMENDED_MARKETPLACES = [
@@ -196,9 +190,7 @@ function PluginsSettingsScreen() {
                     Modal.toast(
                         t("settingsPlugins.actionFailed", {
                             error:
-                                result.stderr?.slice(0, 100) ||
-                                result.error ||
-                                "Unknown error",
+                                extractMachineError(result, { maxLength: 100 }),
                         }),
                     );
                 }
