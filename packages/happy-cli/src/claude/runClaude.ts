@@ -58,7 +58,7 @@ import {
   resolveInitialClaudePermissionMode,
   resolveRemoteClaudePermissionMode,
 } from "./utils/permissionMode";
-import { PLAN_FAKE_RESTART } from "./jsonl/prompts";
+import { PLAN_FAKE_RESTART, buildPlanExecutionPrompt } from "./jsonl/prompts";
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
 
@@ -74,6 +74,21 @@ export type JsRuntime = "node" | "bun";
 // the App's Agent Defaults screen.
 const DEFAULT_CLAUDE_PERMISSION_MODE: PermissionMode = "default";
 const DEFAULT_CLAUDE_MODEL = "opus";
+
+/**
+ * Pull the markdown plan body out of an ExitPlanMode tool input. The SDK shapes
+ * it as `{ plan: string }`; we defensively read only that field and require a
+ * non-empty trimmed string. Returns undefined when the plan is missing/blank so
+ * the "Clear context & execute" path can fall back to the classic continue path
+ * rather than injecting an empty instruction into the fresh session.
+ */
+export function extractPlanBody(toolInput: unknown): string | undefined {
+  if (!toolInput || typeof toolInput !== "object") return undefined;
+  const plan = (toolInput as { plan?: unknown }).plan;
+  if (typeof plan !== "string") return undefined;
+  const trimmed = plan.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
 const DEFAULT_CLAUDE_EFFORT: "low" | "medium" | "high" | "xhigh" | "max" =
   "medium";
 
@@ -585,29 +600,67 @@ export async function runClaude(
       }
       const result = await handler(data.tool_input);
       if (result.approved) {
-        // Queue the continuation continuation prompt so the launcher's
-        // nextMessage picks it up, releases the plan-mode lockdown (via
-        // the `exit-plan-continue` source guard added in
-        // claudeRemoteLauncherCore.ts), and cold-restarts into the
-        // user-picked permission mode. Mirrors what the auto-approve
-        // path does inline at launcher observe time — only difference
-        // is we're firing here because the launcher explicitly deferred
-        // to us.
-        session.queue.unshift(
-          PLAN_FAKE_RESTART,
-          {
-            permissionMode:
-              (result.mode as PermissionMode | undefined) ?? "default",
-          },
-          {
-            priority: "urgent",
-            kind: "notification",
-            source: "exit-plan-continue",
-          },
-        );
-        logger.debug(
-          `[START] ExitPlanApproval approved (mode=${result.mode ?? "default"}) → queued PLAN_FAKE_RESTART`,
-        );
+        const mode = (result.mode as PermissionMode | undefined) ?? "default";
+        // "Clear context & execute" (Layer 0). Extract the approved plan body
+        // and, when present, run `/clear` (context → 0, no model call) then
+        // inject the plan as the first instruction of the fresh session. The
+        // request body drops well under Anthropic's 200K long-context billing
+        // line, so it never 429s — unlike the PLAN_FAKE_RESTART replay path.
+        // Falls back to the classic continue path when no plan body is present
+        // (defensive: never regress an approval into a hang).
+        const planText = result.clearContext
+          ? extractPlanBody(data.tool_input)
+          : undefined;
+        if (result.clearContext && planText) {
+          // 1) Clear first. pushIsolateAndClear wipes the whole queue and marks
+          //    the `/clear` as isolate, so collectBatch returns it alone before
+          //    the exec message (verified: MessageQueue2 isolate single-return).
+          session.queue.pushIsolateAndClear(
+            "/clear",
+            { permissionMode: mode },
+            { priority: "urgent", kind: "isolated", source: "exit-plan-clear" },
+          );
+          // 2) Then queue the plan execution prompt to run in the post-/clear
+          //    fresh session. The launcher releases the plan-mode lockdown for
+          //    both `exit-plan-clear*` sources (see claudeRemoteLauncherCore.ts)
+          //    so the executing session can write/edit.
+          session.queue.push(
+            buildPlanExecutionPrompt(planText),
+            { permissionMode: mode },
+            undefined,
+            {
+              priority: "urgent",
+              kind: "prompt",
+              source: "exit-plan-clear-exec",
+            },
+          );
+          logger.debug(
+            `[START] ExitPlanApproval approved with clearContext (mode=${mode}) → queued /clear + plan execution`,
+          );
+        } else {
+          // Queue the continuation continuation prompt so the launcher's
+          // nextMessage picks it up, releases the plan-mode lockdown (via
+          // the `exit-plan-continue` source guard added in
+          // claudeRemoteLauncherCore.ts), and cold-restarts into the
+          // user-picked permission mode. Mirrors what the auto-approve
+          // path does inline at launcher observe time — only difference
+          // is we're firing here because the launcher explicitly deferred
+          // to us.
+          session.queue.unshift(
+            PLAN_FAKE_RESTART,
+            {
+              permissionMode: mode,
+            },
+            {
+              priority: "urgent",
+              kind: "notification",
+              source: "exit-plan-continue",
+            },
+          );
+          logger.debug(
+            `[START] ExitPlanApproval approved (mode=${mode}) → queued PLAN_FAKE_RESTART`,
+          );
+        }
         return {
           hookSpecificOutput: {
             hookEventName: "PreToolUse",

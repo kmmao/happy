@@ -25,6 +25,7 @@ interface Captured {
     reason?: string;
     allowTools?: string[];
     answers?: Record<string, string>;
+    clearContext?: boolean;
   }) => Promise<void>) | null;
 }
 
@@ -133,6 +134,7 @@ describe("PermissionHandler.registerExitPlanApproval", () => {
       approved: true,
       mode: "bypassPermissions",
       updatedInput: { plan: "hi" },
+      clearContext: false,
     });
     // Request migrated from `requests` → `completedRequests`.
     expect(captured.requests.size).toBe(0);
@@ -191,6 +193,30 @@ describe("PermissionHandler.registerExitPlanApproval", () => {
     const [id] = [...captured.requests.keys()];
     await captured.rpcHandler!({ id, approved: true, mode });
     await expect(promise).resolves.toMatchObject({ approved: true, mode });
+  });
+
+  it("forwards clearContext:true into the result (Layer 0 fresh-context opt-in)", async () => {
+    const promise = ph.registerExitPlanApproval({ plan: "hi" }, 60_000);
+    await Promise.resolve();
+    const [id] = [...captured.requests.keys()];
+    await captured.rpcHandler!({ id, approved: true, clearContext: true });
+
+    await expect(promise).resolves.toMatchObject({
+      approved: true,
+      clearContext: true,
+    });
+  });
+
+  it("defaults clearContext to false when the App omits it (classic continue path)", async () => {
+    const promise = ph.registerExitPlanApproval({ plan: "hi" }, 60_000);
+    await Promise.resolve();
+    const [id] = [...captured.requests.keys()];
+    await captured.rpcHandler!({ id, approved: true }); // no clearContext
+
+    await expect(promise).resolves.toMatchObject({
+      approved: true,
+      clearContext: false,
+    });
   });
 
   it("resolves as denied with reason when the App RPC returns approved=false", async () => {

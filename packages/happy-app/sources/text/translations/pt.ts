@@ -2942,6 +2942,7 @@ export const pt: TranslationStructure = {
   plan: {
     approve: "Aprovar plano",
     approveAutoEdits: "Aprovar e auto-aprovar edições",
+    approveFreshContext: "Limpar contexto e executar",
     rejectWithFeedback: "Rejeitar com feedback",
     rejectTitle: "Por que rejeitar este plano?",
     rejectMessage: "Seu feedback ajuda o Claude a melhorar o plano",

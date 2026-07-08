@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { sessionAllow, sessionDeny } from "@/sync/ops";
+import { sessionAllow, sessionAllowPlanFreshContext, sessionDeny } from "@/sync/ops";
 import { useUnistyles } from "react-native-unistyles";
 import { storage } from "@/sync/storage";
 import { t } from "@/text";
@@ -50,6 +50,8 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
   >(null);
   const [loadingAllEdits, setLoadingAllEdits] = useState(false);
   const [loadingForSession, setLoadingForSession] = useState(false);
+  // "Clear context & execute" opt-in for ExitPlanMode (Layer 0, plan-mode-429).
+  const [loadingFreshContext, setLoadingFreshContext] = useState(false);
 
   // Check if this is a Codex session - check both metadata.flavor and tool name prefix
   const isCodex = metadata?.flavor === "codex" || toolName.startsWith("Codex");
@@ -522,6 +524,32 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
       }
     };
 
+    // "Clear context & execute" — approve the plan but tell the CLI to run
+    // `/clear` and inject the plan into a fresh session, sidestepping the 200K
+    // long-context 429. Mode is left unset (CLI keeps the current session mode,
+    // matching plain "Approve plan").
+    const handleApproveFreshContext = async () => {
+      if (
+        permission.status !== "pending" ||
+        loadingButton !== null ||
+        loadingAllEdits ||
+        loadingFreshContext
+      )
+        return;
+
+      setLoadingFreshContext(true);
+      try {
+        await sessionAllowPlanFreshContext(sessionId, permission.id);
+        // Match handleApprove: leave plan mode so subsequent messages don't
+        // carry permissionMode: "plan".
+        storage.getState().updateSessionPermissionMode(sessionId, "default");
+      } catch (error) {
+        log.error("Failed to approve plan with fresh context:", error);
+      } finally {
+        setLoadingFreshContext(false);
+      }
+    };
+
     const handleSubmitFeedback = async (feedbackText: string) => {
       if (
         permission.status !== "pending" ||
@@ -559,8 +587,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
         isApprovedViaAllEdits={isApprovedViaAllEdits}
         loadingButton={loadingButton}
         loadingAllEdits={loadingAllEdits}
+        loadingFreshContext={loadingFreshContext}
         handleApprove={handleApprove}
         handlePlanApproveAll={handlePlanApproveAll}
+        handleApproveFreshContext={handleApproveFreshContext}
         handleSubmitFeedback={handleSubmitFeedback}
         styles={styles}
       />
@@ -785,8 +815,10 @@ const ExitPlanButtons: React.FC<{
   isApprovedViaAllEdits: boolean;
   loadingButton: "allow" | "deny" | "abort" | null;
   loadingAllEdits: boolean;
+  loadingFreshContext: boolean;
   handleApprove: () => void;
   handlePlanApproveAll: () => void;
+  handleApproveFreshContext: () => void;
   handleSubmitFeedback: (text: string) => void;
   styles: any;
 }> = ({
@@ -799,8 +831,10 @@ const ExitPlanButtons: React.FC<{
   isApprovedViaAllEdits,
   loadingButton,
   loadingAllEdits,
+  loadingFreshContext,
   handleApprove,
   handlePlanApproveAll,
+  handleApproveFreshContext,
   handleSubmitFeedback,
   styles,
 }) => {
@@ -922,6 +956,51 @@ const ExitPlanButtons: React.FC<{
                 ellipsizeMode="tail"
               >
                 {t("plan.approveAutoEdits")}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Clear context & execute (fresh session, avoids 200K long-context 429) */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            isPending && styles.buttonAllow,
+            (isDenied || isApprovedViaAllow || isApprovedViaAllEdits) &&
+              styles.buttonInactive,
+          ]}
+          onPress={handleApproveFreshContext}
+          disabled={
+            !isPending ||
+            loadingButton !== null ||
+            loadingAllEdits ||
+            loadingFreshContext
+          }
+          activeOpacity={isPending ? 0.7 : 1}
+        >
+          {loadingFreshContext && isPending ? (
+            <View
+              style={[
+                styles.buttonContent,
+                { width: 40, height: 20, justifyContent: "center" },
+              ]}
+            >
+              <ActivityIndicator
+                size={Platform.OS === "ios" ? "small" : (14 as any)}
+                color={(styles as any).loadingIndicatorAllow?.color}
+              />
+            </View>
+          ) : (
+            <View style={styles.buttonContent}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  isPending && styles.buttonTextAllow,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("plan.approveFreshContext")}
               </Text>
             </View>
           )}

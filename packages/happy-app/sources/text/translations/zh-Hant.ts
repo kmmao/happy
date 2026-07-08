@@ -2879,6 +2879,7 @@ export const zhHant: TranslationStructure = {
   plan: {
     approve: "批准計劃",
     approveAutoEdits: "批准並自動通過後續編輯",
+    approveFreshContext: "清空上下文後執行",
     rejectWithFeedback: "拒絕並提供反饋",
     rejectTitle: "為什麼拒絕這個計劃？",
     rejectMessage: "你的反饋有助於 Claude 改進計劃",

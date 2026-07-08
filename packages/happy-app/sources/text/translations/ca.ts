@@ -2946,6 +2946,7 @@ export const ca: TranslationStructure = {
   plan: {
     approve: "Aprova el pla",
     approveAutoEdits: "Aprova i auto-aprova edicions",
+    approveFreshContext: "Neteja el context i executa",
     rejectWithFeedback: "Rebutja amb comentaris",
     rejectTitle: "Per què rebutges aquest pla?",
     rejectMessage: "Els teus comentaris ajuden Claude a millorar el pla",

@@ -2984,6 +2984,7 @@ export const en = {
   plan: {
     approve: "Approve plan",
     approveAutoEdits: "Approve & auto-approve edits",
+    approveFreshContext: "Clear context & execute",
     rejectWithFeedback: "Reject with feedback",
     rejectTitle: "Why reject this plan?",
     rejectMessage: "Your feedback helps Claude improve the plan",

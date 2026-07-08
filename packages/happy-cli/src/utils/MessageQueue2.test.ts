@@ -47,6 +47,44 @@ describe("MessageQueue2", () => {
     expect(queue.size()).toBe(0);
   });
 
+  it("Layer 0: pushIsolateAndClear('/clear') + push(exec) returns /clear alone, then exec", async () => {
+    // Regression for the "Clear context & execute" plan-mode-429 bypass:
+    // the `/clear` must come back as a standalone isolate batch (so it runs
+    // as its own turn) before the plan-execution prompt.
+    const queue = new MessageQueue2<string>((mode) => mode);
+
+    // A stale pending message that pushIsolateAndClear must wipe.
+    queue.push("stale pending prompt", "local");
+
+    queue.pushIsolateAndClear("/clear", "local", {
+      priority: "urgent",
+      kind: "isolated",
+      source: "exit-plan-clear",
+    });
+    queue.push("execute the approved plan", "local", undefined, {
+      priority: "urgent",
+      kind: "prompt",
+      source: "exit-plan-clear-exec",
+    });
+
+    // First batch: /clear alone, flagged isolate.
+    const first = await queue.waitForMessagesAndGetAsString();
+    expect(first).not.toBeNull();
+    expect(first?.message).toBe("/clear");
+    expect(first?.isolate).toBe(true);
+    expect(first?.source).toBe("exit-plan-clear");
+    // Stale message was cleared, so only the exec prompt remains.
+    expect(queue.size()).toBe(1);
+
+    // Second batch: the plan-execution prompt, not isolate.
+    const second = await queue.waitForMessagesAndGetAsString();
+    expect(second).not.toBeNull();
+    expect(second?.message).toBe("execute the approved plan");
+    expect(second?.isolate).toBe(false);
+    expect(second?.source).toBe("exit-plan-clear-exec");
+    expect(queue.size()).toBe(0);
+  });
+
   it("should handle complex mode objects", async () => {
     interface Mode {
       type: string;

@@ -3060,6 +3060,7 @@ export const ja: TranslationStructure = {
   plan: {
     approve: "プランを承認",
     approveAutoEdits: "承認して編集も自動承認",
+    approveFreshContext: "コンテキストをクリアして実行",
     rejectWithFeedback: "フィードバック付きで拒否",
     rejectTitle: "なぜこのプランを拒否しますか？",
     rejectMessage: "フィードバックはClaudeのプラン改善に役立ちます",

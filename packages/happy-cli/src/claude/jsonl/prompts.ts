@@ -2,6 +2,17 @@ export const PLAN_FAKE_REJECT = `User approved plan, but you need to be restarte
 export const PLAN_FAKE_RESTART = `PlEaZe Continue with plan.`
 
 /**
+ * "Clear context & execute" path (Layer 0, see docs/investigations/plan-mode-429.md).
+ * After the launcher runs `/clear` (context → 0, no model call), this wraps the
+ * approved plan body into the first instruction of the fresh session. Because
+ * the request body no longer carries the ~400K --resume replay, it stays under
+ * Anthropic's 200K long-context billing line and never 429s.
+ */
+export function buildPlanExecutionPrompt(planText: string): string {
+  return `以下是已批准的计划，请完整执行：\n\n${planText}`
+}
+
+/**
  * Happy-flavored replacement for the SDK 0.2.119+ plan-mode workflow body.
  * The SDK still wraps this with its read-only enforcement preamble and the
  * ExitPlanMode protocol footer, so we only restate the workflow itself —

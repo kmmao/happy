@@ -1,7 +1,8 @@
 # Plan-mode 429 — investigation & mitigation
 
-> **Status**: mitigation shipped in three layers (App picker → opt-in
-> pre-sleep → reactive auto-retry). This document is referenced from
+> **Status**: mitigation shipped in three reactive layers (App picker →
+> opt-in pre-sleep → reactive auto-retry) **plus a Layer 0 root-cause
+> bypass** ("Clear context & execute"). This document is referenced from
 > several source-code comments; keep it in sync when the layers evolve.
 >
 > **Applies to**: happy-cli, Yolo / bypass-permissions sessions running
@@ -22,8 +23,17 @@ never see this because the API responds with a structured
 `rate_limit_info` payload (`resetsAt`) that Claude TUI defers against;
 mirrors don't emit that shape.
 
-Three layers of defence, each independently useful:
+One root-cause bypass plus three reactive layers of defence, each
+independently useful:
 
+0. **Clear context & execute** (Layer 0, user-picked per plan) — the
+   App approval picker offers a second button that tells the CLI to run
+   `/clear` (context → 0, no model call) and inject the approved plan
+   body as the first instruction of a fresh session. The request body
+   drops well under Anthropic's 200K long-context billing line, so it
+   **never** enters long-context territory and never 429s — including
+   the `Usage credits are required for long context requests` variant
+   that the reactive layers below cannot fix (see Layer 0 section).
 1. **App picker cooldown** (default, no config) — Yolo's ExitPlanMode
    is routed through an App-side approval picker rather than the
    auto-approve hook, so the mirror's rate window has a chance to
@@ -82,6 +92,69 @@ turn: a fresh HTTP connection past the mirror's now-drained cooldown
 window, from the mirror's perspective effectively a new client.
 
 ## Mitigation layers
+
+### Layer 0 — Clear context & execute (root-cause bypass)
+
+Layers 1–3 are all **reactive**: they re-send the *same* ~400K-token
+burst, just spaced out or retried. That works for a transient
+per-minute TPM window, but it does **nothing** for the long-context
+case. Once the accumulated session crosses Anthropic's **200K
+long-context line**, an upstream account without usage credits gets a
+hard `429 rate_limit_error` — `Usage credits are required for long
+context requests`. This is a **billing gate, not a time window**;
+waiting 30/60/120 s and re-sending the identical over-line request
+fails every time (Layer 3 spins the full 3.5 min ladder and still
+loses).
+
+Layer 0 removes the burst instead of spacing it out. When the user
+picks the second picker button ("Clear context & execute"):
+
+1. The App sends the `permission` RPC with `clearContext: true` and
+   **no** `mode` (the CLI keeps the session's current permission mode,
+   matching plain "Approve plan").
+2. `permissionHandler` forwards `clearContext` into
+   `ExitPlanApprovalResult`.
+3. `runClaude.ts:onExitPlanApproval` extracts the plan markdown from the
+   ExitPlanMode `tool_input` (`{ plan: string }`) and:
+   - `queue.pushIsolateAndClear("/clear", …, source: "exit-plan-clear")`
+     — wipes the pending queue and marks `/clear` as an isolate so
+     `collectBatch` returns it alone (context → 0, no model call);
+   - `queue.push(buildPlanExecutionPrompt(planText), …, source:
+     "exit-plan-clear-exec")` — the plan body runs as the first turn of
+     the post-`/clear` fresh session.
+   - If the plan body is missing/blank, it falls back to the classic
+     PLAN_FAKE_RESTART continue path so an approval never regresses into
+     a hang.
+4. The launcher releases `planModeLockdownActive` for both
+   `exit-plan-clear` and `exit-plan-clear-exec` sources (the flag is
+   launcher-local; `/clear` only resets `permissionHandler`, never this
+   flag), so the executing session can Write/Edit and actually land the
+   plan.
+
+Because the fresh session carries no `--resume` replay, its first
+request is a normal small prompt — it never crosses the 200K line and
+therefore **never 429s**, regardless of mirror or upstream credits.
+
+**Deliberately NOT armed for Layer 3.** The clear path sets
+`currentTurnIsPlanContinue = false`: re-sending `/clear` on a 429 would
+be nonsensical, and the whole point is to avoid the long-context burst
+in the first place.
+
+**Trade-off (by design)**: the executing session starts with zero
+conversational context — it only sees the approved plan text. For a
+concrete, self-contained plan (the intended output of plan mode) this
+is exactly what you want. When the plan leans on unstated conversation
+history, keep using plain "Approve plan" (Layers 1–3). The user makes
+this call per plan; there is no global switch or auto-trigger.
+
+**Code pointers**:
+
+- `packages/happy-app/sources/sync/ops.ts` — `sessionAllowPlanFreshContext` + `SessionPermissionRequest.clearContext`.
+- `packages/happy-app/sources/components/tools/PermissionFooter.tsx` — `ExitPlanButtons` third button + `handleApproveFreshContext`.
+- `packages/happy-cli/src/claude/utils/permissionHandler.ts` — `PermissionResponse.clearContext` / `ExitPlanApprovalResult.clearContext` forwarding.
+- `packages/happy-cli/src/claude/runClaude.ts` — `onExitPlanApproval` clearContext branch + `extractPlanBody`.
+- `packages/happy-cli/src/claude/jsonl/prompts.ts` — `buildPlanExecutionPrompt`.
+- `packages/happy-cli/src/claude/claudeRemoteLauncherCore.ts` — `exit-plan-clear*` lockdown release.
 
 ### Layer 1 — App picker cooldown (default)
 
@@ -280,9 +353,19 @@ ExitPlanMode observed
 - **We do not scrape the TUI screen.** All three layers rely on JSONL
   structured signals (`error`, `terminal_reason`, `rate_limit_info`).
   Screen text is theatre, not source of truth.
-- **We do not shrink the payload.** The `--resume` request stays huge
-  by design. The right fix for that is `/compact` before ExitPlanMode
-  — surfaced to the user in Layer 3's give-up ping.
+- **We do not shrink the payload in Layers 1–3.** The `--resume`
+  request stays huge by design there. The right fixes for that are
+  `/compact` before ExitPlanMode (surfaced in Layer 3's give-up ping)
+  or the Layer 0 "Clear context & execute" bypass.
+- **Long-context billing 429 ≠ time-window 429.** When the accumulated
+  session crosses Anthropic's 200K long-context line and the upstream
+  account has no usage credits, the API returns a hard
+  `429 rate_limit_error` — `Usage credits are required for long context
+  requests` (mirrors wrap it as `Upstream rate limit exceeded`). This
+  is a **billing gate, not a rolling window**: it is deterministic per
+  request, so Layers 1–3's wait-and-resend ladder can never clear it —
+  the identical over-line request fails every attempt. Layer 0 is the
+  only defence here, because it drops the request back under 200K.
 - **We do not retry across turns that already produced output.** If
   the model streamed anything real before the mirror gave up, the
   auto-retry is disarmed. The user sees the partial response and
@@ -301,8 +384,9 @@ ExitPlanMode observed
 | `maybeDelayPlanRestartWrite.test.ts` | Layer 2 env parse, upper clamp, AbortSignal, batched-siblings match |
 | `sleepWithAbort.test.ts` | Cancellable sleep across pre-aborted / mid-abort / no-signal shapes |
 | `planContinueRetryPolicy.test.ts` | Layer 3 decision cases (non-continuation → no-op, produced-output → no-op, ladder 30/60/120, budget exhausted, defensive clamps) |
-| `exitPlanApproval.test.ts` | Layer 1 env-var gate for auto-approve vs App picker |
-| `permissionHandlerExitPlan.test.ts` | Layer 1 unshift semantics and PLAN_FAKE_RESTART routing |
+| `exitPlanApproval.test.ts` | Layer 1 env-var gate for auto-approve vs App picker; Layer 0 clearContext routing to `/clear` + plan-exec |
+| `permissionHandlerExitPlan.test.ts` | Layer 1 unshift semantics and PLAN_FAKE_RESTART routing; Layer 0 clearContext branch vs continue-path regression |
+| `MessageQueue2.test.ts` | Layer 0 `pushIsolateAndClear("/clear") + push(exec)` → `collectBatch` returns `/clear` (isolate) alone, then exec |
 
 ## Future work
 

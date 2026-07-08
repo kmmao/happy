@@ -52,6 +52,14 @@ interface SessionPermissionRequest {
   decision?: "approved" | "approved_for_session" | "denied" | "abort";
   /** User answers for AskUserQuestion — keyed by question text */
   answers?: Record<string, string>;
+  /**
+   * ExitPlanMode "Clear context & execute" opt-in. When true, the CLI runs
+   * `/clear` (context → 0, no model call) then injects the approved plan body
+   * as the first instruction of a fresh session, sidestepping Anthropic's
+   * 200K long-context billing line that otherwise 429s on the full --resume
+   * replay. See docs/investigations/plan-mode-429.md (Layer 0).
+   */
+  clearContext?: boolean;
 }
 
 // Mode change operation types
@@ -2053,6 +2061,41 @@ export async function sessionAllow(
     // decide whether to add user-facing retry/toast.
     console.error(
       `[sessionAllow] RPC failed (sessionId=${sessionId}, permissionId=${id}):`,
+      error,
+    );
+    throw error;
+  }
+}
+
+/**
+ * Approve an ExitPlanMode plan with "Clear context & execute" (fresh context).
+ *
+ * Thin wrapper over the `permission` RPC: sends `clearContext: true` and leaves
+ * `mode` unset so the CLI keeps the session's current permission mode (matching
+ * plain "Approve plan" — see permissionHandler.ts `requestedMode ?? this.permissionMode`).
+ * The CLI's `onExitPlanApproval` branches on `clearContext` to run `/clear` then
+ * inject the plan body into a new session, instead of the full --resume replay.
+ */
+export async function sessionAllowPlanFreshContext(
+  sessionId: string,
+  id: string,
+): Promise<void> {
+  // Clear needsAttention when user handles a permission request (mirrors sessionAllow)
+  const session = storage.getState().sessions[sessionId];
+  if (session?.needsAttention) {
+    storage.getState().applySessions([{ ...session, needsAttention: false }]);
+  }
+
+  const request: SessionPermissionRequest = {
+    id,
+    approved: true,
+    clearContext: true,
+  };
+  try {
+    await apiSocket.sessionRPC(sessionId, "permission", request);
+  } catch (error) {
+    console.error(
+      `[sessionAllowPlanFreshContext] RPC failed (sessionId=${sessionId}, permissionId=${id}):`,
       error,
     );
     throw error;

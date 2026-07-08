@@ -3025,7 +3025,19 @@ export async function claudeRemoteLauncher(
               const isPlanContinueSource =
                 msg.source === "exit-plan-continue" ||
                 msg.source === "exit-plan-retry";
-              if (isPlanContinueSource && planModeLockdownActive) {
+              // "Clear context & execute" (Layer 0): the `/clear` isolate and
+              // the follow-up plan-execution prompt both need the plan-mode
+              // lockdown released, otherwise the executing session spawns with
+              // Write/Edit disabled and can't land the plan. planModeLockdownActive
+              // is a launcher-local flag; `/clear` only resets permissionHandler,
+              // never this flag, so we must clear it here for both sources.
+              const isPlanClearSource =
+                msg.source === "exit-plan-clear" ||
+                msg.source === "exit-plan-clear-exec";
+              if (
+                (isPlanContinueSource || isPlanClearSource) &&
+                planModeLockdownActive
+              ) {
                 planModeLockdownActive = false;
                 logger.debug(
                   `[remote]: consumed ${msg.source} message → releasing plan-mode lockdown`,
@@ -3035,6 +3047,9 @@ export async function claudeRemoteLauncher(
               // reactive 429 auto-retry policy applies. Cleared on any
               // non-continuation msg below — we do NOT want a normal
               // user prompt inheriting the flag from a previous turn.
+              // NOTE: the clear path is deliberately NOT armed for L3 429
+              // retry — its whole point is to avoid the long-context burst,
+              // and re-sending `/clear` on a 429 would be nonsensical.
               currentTurnIsPlanContinue = isPlanContinueSource;
               if (isPlanContinueSource) {
                 planContinueTurnProducedRealOutput = false;

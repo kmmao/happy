@@ -2880,6 +2880,7 @@ export const zhHans: TranslationStructure = {
   plan: {
     approve: "批准计划",
     approveAutoEdits: "批准并自动通过后续编辑",
+    approveFreshContext: "清空上下文后执行",
     rejectWithFeedback: "拒绝并提供反馈",
     rejectTitle: "为什么拒绝这个计划？",
     rejectMessage: "你的反馈有助于 Claude 改进计划",

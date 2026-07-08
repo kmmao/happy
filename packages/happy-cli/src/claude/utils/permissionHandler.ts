@@ -27,6 +27,13 @@ interface PermissionResponse {
   receivedAt?: number;
   /** User answers for AskUserQuestion — keyed by question text */
   answers?: Record<string, string>;
+  /**
+   * ExitPlanMode "Clear context & execute" opt-in from the App picker. When
+   * true, the launcher runs `/clear` then injects the approved plan body into
+   * a fresh session instead of the full --resume replay — sidestepping the
+   * 200K long-context 429. See docs/investigations/plan-mode-429.md (Layer 0).
+   */
+  clearContext?: boolean;
 }
 
 interface PendingRequest {
@@ -54,6 +61,12 @@ export interface ExitPlanApprovalResult {
   mode?: PermissionMode;
   reason?: string;
   updatedInput?: unknown;
+  /**
+   * True when the App picker chose "Clear context & execute". The launcher
+   * (`onExitPlanApproval`) branches on this to run `/clear` + inject the plan
+   * body into a new session, instead of the classic PLAN_FAKE_RESTART replay.
+   */
+  clearContext?: boolean;
 }
 
 interface ExitPlanPending {
@@ -743,6 +756,9 @@ export class PermissionHandler {
               // pick one — critical for Yolo users hitting plain "Approve".
               mode: requestedMode ?? this.permissionMode,
               updatedInput: pendingExitPlan.toolInput,
+              // Forward the "Clear context & execute" opt-in so the launcher
+              // can route to the /clear + plan-inject path (Layer 0).
+              clearContext: message.clearContext === true,
             }
           : {
               approved: false,

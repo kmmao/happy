@@ -2891,6 +2891,7 @@ export const ru: TranslationStructure = {
   plan: {
     approve: "Одобрить план",
     approveAutoEdits: "Одобрить и авто-одобрять правки",
+    approveFreshContext: "Очистить контекст и выполнить",
     rejectWithFeedback: "Отклонить с отзывом",
     rejectTitle: "Почему вы отклоняете этот план?",
     rejectMessage: "Ваш отзыв поможет Claude улучшить план",

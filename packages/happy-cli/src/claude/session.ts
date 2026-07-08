@@ -78,6 +78,10 @@ export class Session {
         mode?: string;
         reason?: string;
         updatedInput?: unknown;
+        // Layer 0 "Clear context & execute" opt-in — forwarded from the App
+        // picker so onExitPlanApproval can route to the /clear + plan-inject
+        // path. See docs/investigations/plan-mode-429.md.
+        clearContext?: boolean;
       }>)
     | null = null;
 
