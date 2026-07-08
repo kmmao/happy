@@ -38,6 +38,15 @@ gs.sangreal.code.xycloud.info {
 	import cloudflare_tls
 }
 
+agent.sangreal.code.xycloud.info {
+	# Agents Anywhere server (SQLite Docker container) exposes host port 5174 -> container 8000
+	reverse_proxy host.docker.internal:5174 {
+		# Flush immediately for WebSocket (Connector RPC / live logs)
+		flush_interval -1
+	}
+	import cloudflare_tls
+}
+
 # Pre-sign wildcard cert so new subdomains are instant
 *.code.xycloud.info {
 	tls {
