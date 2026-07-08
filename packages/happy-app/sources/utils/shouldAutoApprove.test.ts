@@ -49,23 +49,23 @@ describe("shouldAutoApprove", () => {
         });
     });
 
-    // ExitPlanMode: auto-approve in bypassPermissions and yolo
+    // ExitPlanMode: NEVER auto-approve in any mode — including bypass/yolo.
+    // The picker must render so the user can pick "Clear context & execute"
+    // (Layer 0, plan-mode-429). Unattended flows use the CLI's
+    // HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1, which never reaches this function.
     describe("ExitPlanMode", () => {
-        it.each(["bypassPermissions", "yolo"] as const)(
-            "returns true in %s mode",
-            (mode) => {
-                expect(shouldAutoApprove(mode, "ExitPlanMode")).toBe(true);
-                expect(shouldAutoApprove(mode, "exit_plan_mode")).toBe(true);
-            },
-        );
-
-        it.each(["default", "plan", "acceptEdits", null, undefined] as const)(
-            "returns false in %s mode",
-            (mode) => {
-                expect(shouldAutoApprove(mode, "ExitPlanMode")).toBe(false);
-                expect(shouldAutoApprove(mode, "exit_plan_mode")).toBe(false);
-            },
-        );
+        it.each([
+            "default",
+            "bypassPermissions",
+            "yolo",
+            "plan",
+            "acceptEdits",
+            null,
+            undefined,
+        ] as const)("returns false in %s mode (picker must render)", (mode) => {
+            expect(shouldAutoApprove(mode, "ExitPlanMode")).toBe(false);
+            expect(shouldAutoApprove(mode, "exit_plan_mode")).toBe(false);
+        });
     });
 
     // bypassPermissions: auto-approve everything except AskUserQuestion

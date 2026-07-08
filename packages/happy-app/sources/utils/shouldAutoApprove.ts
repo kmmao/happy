@@ -42,9 +42,18 @@ export function shouldAutoApprove(
         return false;
     }
 
-    // ExitPlanMode always requires manual approval (except in bypassPermissions/yolo)
+    // ExitPlanMode ALWAYS requires manual approval — including bypassPermissions/yolo.
+    //
+    // Auto-approving it here would 47ms-秒批 the App picker (via ToolView's
+    // auto-approve effect calling sessionAllow) before the user can choose
+    // "Clear context & execute" (Layer 0, docs/investigations/plan-mode-429.md).
+    // Since Yolo is exactly the long-context 429 hot path, auto-approving would
+    // make the new button unreachable where it matters most. True unattended
+    // flows set the CLI's HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1, which allow-s at
+    // the hook layer and never registers an App picker request at all — so this
+    // change does not affect them.
     if (EXIT_PLAN_TOOLS.has(toolName)) {
-        return permissionModeKey === "bypassPermissions" || permissionModeKey === "yolo";
+        return false;
     }
 
     switch (permissionModeKey) {
