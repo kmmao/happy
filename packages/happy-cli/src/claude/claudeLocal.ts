@@ -11,6 +11,7 @@ import { projectPath } from "@/projectPath";
 import { systemPrompt } from "./utils/systemPrompt";
 import type { SandboxConfig } from "@/persistence";
 import { initializeSandbox, wrapCommand } from "@/sandbox/manager";
+import { SERVER_ONLY_ENV_VARS } from "@/daemon/serverOnlyEnvironment";
 
 /**
  * Error thrown when the Claude process exits with a non-zero exit code.
@@ -274,21 +275,8 @@ export async function claudeLocal(opts: {
       // Security: Strip server-internal secrets so that Claude tool calls
       // (e.g. Bash `printenv`) cannot leak operator infrastructure credentials.
       // API keys needed by Claude (ANTHROPIC_AUTH_TOKEN etc.) are passed through
-      // claudeEnvVars which are already validated upstream.
-      const SERVER_ONLY_ENV_VARS = new Set([
-        "DATABASE_URL",
-        "REDIS_URL",
-        "JWT_SECRET",
-        "ENCRYPTION_KEY",
-        "GITHUB_CLIENT_SECRET",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SESSION_TOKEN",
-        "STRIPE_SECRET_KEY",
-        "SENDGRID_API_KEY",
-        "S3_ACCESS_KEY",
-        "S3_SECRET_KEY",
-      ]);
+      // claudeEnvVars which are already validated upstream. The secrets list is
+      // owned by serverOnlyEnvironment.ts so it cannot drift between spawn paths.
       const filteredProcessEnv = Object.fromEntries(
         Object.entries(process.env).filter(
           ([key]) => !SERVER_ONLY_ENV_VARS.has(key),

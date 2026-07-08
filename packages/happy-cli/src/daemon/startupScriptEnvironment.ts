@@ -5,24 +5,10 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { OPERATOR_ONLY_ENV_VARS } from "./operatorOnlyEnvironment";
+import { SERVER_ONLY_ENV_VARS } from "./serverOnlyEnvironment";
 
 const execFileAsync = promisify(execFile);
 const bashExecutable = process.env.BASH || "/bin/bash";
-
-export const SERVER_ONLY_ENV_VARS = new Set([
-  "DATABASE_URL",
-  "REDIS_URL",
-  "JWT_SECRET",
-  "ENCRYPTION_KEY",
-  "GITHUB_CLIENT_SECRET",
-  "AWS_SECRET_ACCESS_KEY",
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SESSION_TOKEN",
-  "STRIPE_SECRET_KEY",
-  "SENDGRID_API_KEY",
-  "S3_ACCESS_KEY",
-  "S3_SECRET_KEY",
-]);
 
 const STARTUP_SCRIPT_IGNORED_ENV_VARS = new Set([
   "OLDPWD",

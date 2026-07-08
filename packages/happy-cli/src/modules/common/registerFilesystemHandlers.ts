@@ -7,10 +7,8 @@ import { dirname, join, resolve } from "path";
 import { tmpdir } from "os";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
 import { validatePath } from "./pathSecurity";
-import {
-  findSensitiveEnvVarReferences,
-  summarizeShellCommandForLog,
-} from "@/utils/securityRedaction";
+import { summarizeShellCommandForLog } from "@/utils/securityRedaction";
+import { checkBlockedBashCommand } from "@/utils/bashCommandPolicy";
 
 const execAsync = promisify(exec);
 
@@ -99,42 +97,9 @@ interface GetUploadDirResponse {
   error?: string;
 }
 
-// ── Security: Block commands that can leak secrets via bash RPC ──────────
-// These patterns prevent remote (mobile/web) users from extracting
-// operator-configured API keys, tokens, or other sensitive environment data.
-// Claude Code's own Bash tool is NOT affected — it runs via SDK, not RPC.
-const BLOCKED_BASH_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
-  // Direct env var reading
-  { pattern: /\bprintenv\b/i, reason: "printenv is blocked for security" },
-  { pattern: /\benv\b(?:\s|$|;|\|)/i, reason: "env command is blocked for security" },
-  { pattern: /\bset\b\s*(?:$|;|\|)/i, reason: "set (list env) is blocked for security" },
-  { pattern: /\bexport\s+-p\b/i, reason: "export -p is blocked for security" },
-  { pattern: /\bcompgen\s+-e\b/i, reason: "compgen -e is blocked for security" },
-  { pattern: /\bdeclare\s+-x\b/i, reason: "declare -x is blocked for security" },
-  // Reading process environment from procfs or equivalent
-  { pattern: /\/proc\/[^/]*\/environ/i, reason: "reading /proc/environ is blocked for security" },
-  // Reading common credential files
-  { pattern: /\.(env|env\.local|env\.prod|env\.production|env\.dev)\b/i, reason: "reading .env files is blocked for security" },
-  { pattern: /\.aws\/credentials/i, reason: "reading AWS credentials is blocked for security" },
-  { pattern: /\.netrc/i, reason: "reading .netrc is blocked for security" },
-];
-
-/**
- * Check if a bash command matches any blocked pattern.
- * Returns the reason string if blocked, or null if allowed.
- */
-function checkBlockedBashCommand(command: string): string | null {
-  for (const { pattern, reason } of BLOCKED_BASH_PATTERNS) {
-    if (pattern.test(command)) {
-      return reason;
-    }
-  }
-  const sensitiveEnvVars = findSensitiveEnvVarReferences(command);
-  if (sensitiveEnvVars.length > 0) {
-    return `accessing sensitive environment variables is blocked (${sensitiveEnvVars.join(", ")})`;
-  }
-  return null;
-}
+// Security: bash RPC commands that could leak secrets are blocked by the
+// `checkBlockedBashCommand` policy (see utils/bashCommandPolicy.ts). Claude
+// Code's own Bash tool is NOT affected — it runs via SDK, not RPC.
 
 /**
  * Register filesystem + shell RPC handlers: bash, readFile, writeFile,
