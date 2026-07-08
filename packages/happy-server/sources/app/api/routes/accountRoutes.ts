@@ -1,5 +1,6 @@
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { db } from "@/storage/db";
+import { versionedUpdate } from "@/modules/versionedUpdate";
 import { Prisma } from "@prisma/client";
 import { Fastify } from "../types";
 import { getPublicUrl } from "@/storage/files";
@@ -98,46 +99,47 @@ export function accountRoutes(app: Fastify) {
         const { settings, expectedVersion } = request.body;
 
         try {
-            const currentUser = await db.account.findUnique({
-                where: { id: userId },
-                select: { settings: true, settingsVersion: true },
+            // Account.settings is a versioned blob under optimistic concurrency;
+            // the compare-and-swap dance (read → guarded updateMany → count===0
+            // re-read) is owned by the shared seam so this route cannot drift
+            // from the Session/Machine versioned-field writers (ADR-0075).
+            const result = await versionedUpdate<string | null>({
+                expectedVersion,
+                read: async () => {
+                    const currentUser = await db.account.findUnique({
+                        where: { id: userId },
+                        select: { settings: true, settingsVersion: true },
+                    });
+                    if (!currentUser) {
+                        return null;
+                    }
+                    return { version: currentUser.settingsVersion, value: currentUser.settings };
+                },
+                write: async (expected) => {
+                    const { count } = await db.account.updateMany({
+                        where: { id: userId, settingsVersion: expected },
+                        data: {
+                            settings,
+                            settingsVersion: expected + 1,
+                            updatedAt: new Date(),
+                        },
+                    });
+                    return count;
+                },
             });
 
-            if (!currentUser) {
+            if (!result.applied) {
+                if (result.reason === 'version-mismatch') {
+                    return reply.code(409).send({
+                        success: false,
+                        error: 'version-mismatch',
+                        currentVersion: result.currentVersion,
+                        currentSettings: result.currentValue,
+                    });
+                }
                 return reply.code(500).send({
                     success: false,
                     error: 'Failed to update account settings',
-                });
-            }
-
-            if (currentUser.settingsVersion !== expectedVersion) {
-                return reply.code(409).send({
-                    success: false,
-                    error: 'version-mismatch',
-                    currentVersion: currentUser.settingsVersion,
-                    currentSettings: currentUser.settings,
-                });
-            }
-
-            const { count } = await db.account.updateMany({
-                where: {
-                    id: userId,
-                    settingsVersion: expectedVersion,
-                },
-                data: {
-                    settings,
-                    settingsVersion: expectedVersion + 1,
-                    updatedAt: new Date(),
-                },
-            });
-
-            if (count === 0) {
-                const account = await db.account.findUnique({ where: { id: userId } });
-                return reply.code(409).send({
-                    success: false,
-                    error: 'version-mismatch',
-                    currentVersion: account?.settingsVersion || 0,
-                    currentSettings: account?.settings || null,
                 });
             }
 
@@ -145,7 +147,7 @@ export function accountRoutes(app: Fastify) {
             // payload (ADR-0023); we only express the domain delta.
             const settingsUpdate = {
                 value: settings,
-                version: expectedVersion + 1,
+                version: result.newVersion,
             };
             await emitSyncUpdate(userId, {
                 t: "update-account",
@@ -154,7 +156,7 @@ export function accountRoutes(app: Fastify) {
 
             return reply.send({
                 success: true,
-                version: expectedVersion + 1,
+                version: result.newVersion,
             });
         } catch (error) {
             log({ module: 'api', level: 'error' }, `Failed to update account settings: ${error}`);

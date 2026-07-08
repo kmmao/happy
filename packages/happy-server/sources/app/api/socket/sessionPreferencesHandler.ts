@@ -1,8 +1,7 @@
 import { ClientConnection } from "@/app/events/eventRouter";
-import { emitSyncUpdate } from "@/app/events/syncUpdate";
-import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { Socket } from "socket.io";
+import { sessionVersionedFieldUpdate } from "./sessionVersionedFieldUpdate";
 
 export function sessionPreferencesHandler(userId: string, socket: Socket, _connection: ClientConnection) {
     socket.on('update-preferences', async (data: any, callback: (response: any) => void) => {
@@ -17,46 +16,17 @@ export function sessionPreferencesHandler(userId: string, socket: Socket, _conne
                 return;
             }
 
-            // Resolve session
-            const session = await db.session.findUnique({
-                where: { id: sid, accountId: userId }
+            // The compare-and-swap + version-mismatch/success/error acknowledgement
+            // and the update-session broadcast all live in the shared seam so
+            // preferences cannot drift from metadata/agentState (ADR-0075).
+            await sessionVersionedFieldUpdate({
+                userId,
+                sid,
+                field: 'preferences',
+                value: preferences,
+                expectedVersion,
+                callback,
             });
-            if (!session) {
-                if (callback) {
-                    callback({ result: 'error' });
-                }
-                return;
-            }
-
-            // Check version
-            if (session.preferencesVersion !== expectedVersion) {
-                callback({ result: 'version-mismatch', version: session.preferencesVersion, preferences: session.preferences });
-                return;
-            }
-
-            // Update preferences
-            const { count } = await db.session.updateMany({
-                where: { id: sid, preferencesVersion: expectedVersion },
-                data: {
-                    preferences: preferences,
-                    preferencesVersion: expectedVersion + 1
-                }
-            });
-            if (count === 0) {
-                callback({ result: 'version-mismatch', version: session.preferencesVersion, preferences: session.preferences });
-                return;
-            }
-
-            // Broadcast update-session (preferences slot). Seam owns seq + id
-            // + recipient (ADR-0023).
-            await emitSyncUpdate(userId, {
-                t: "update-session",
-                sessionId: sid,
-                preferences: { value: preferences, version: expectedVersion + 1 },
-            });
-
-            // Send success response with new version via callback
-            callback({ result: 'success', version: expectedVersion + 1, preferences: preferences });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in update-preferences: ${error}`);
             if (callback) {

@@ -3,12 +3,12 @@ import { versionedUpdate } from "@/modules/versionedUpdate";
 import { db } from "@/storage/db";
 
 /**
- * The two optimistically-versioned Session fields a client writes over the
- * socket. The discriminant drives both the guarded DB columns and the echo key
- * used in the socket acknowledgement, so the metadata/agentState handlers
- * cannot disagree on either.
+ * The optimistically-versioned Session fields a client writes over the socket.
+ * The discriminant drives the guarded DB columns, the `update-session` body slot,
+ * and the echo key used in the socket acknowledgement, so the
+ * metadata/agentState/preferences handlers cannot disagree on any of them.
  */
-export type SessionVersionedField = "metadata" | "agentState";
+export type SessionVersionedField = "metadata" | "agentState" | "preferences";
 
 /**
  * Apply a compare-and-swap to one versioned Session field and acknowledge the
@@ -24,7 +24,10 @@ export type SessionVersionedField = "metadata" | "agentState";
  * `success` allocates a user seq and broadcasts the session update before
  * acking, and a missing row (or any non-applied, non-mismatch outcome) acks
  * `error`. Per-field validation and the surrounding try/catch stay at the call
- * site; only the shared dance lives here.
+ * site; only the shared dance lives here. `preferences` was folded in from a
+ * hand-rolled inline copy in `sessionPreferencesHandler` that reported the stale
+ * read version on a lost race instead of re-reading the winner — the seam's
+ * re-read fixes that.
  */
 export async function sessionVersionedFieldUpdate(input: {
     userId: string;
@@ -45,19 +48,25 @@ export async function sessionVersionedFieldUpdate(input: {
             if (!session) {
                 return null;
             }
-            return field === "metadata"
-                ? { version: session.metadataVersion, value: session.metadata }
-                : { version: session.agentStateVersion, value: session.agentState };
+            switch (field) {
+                case "metadata":
+                    return { version: session.metadataVersion, value: session.metadata };
+                case "agentState":
+                    return { version: session.agentStateVersion, value: session.agentState };
+                case "preferences":
+                    return { version: session.preferencesVersion, value: session.preferences };
+            }
         },
         write: async (expected) => {
-            const { count } = await db.session.updateMany({
-                where: field === "metadata"
-                    ? { id: sid, metadataVersion: expected }
-                    : { id: sid, agentStateVersion: expected },
-                data: field === "metadata"
-                    ? { metadata: value as string, metadataVersion: expected + 1 }
-                    : { agentState: value, agentStateVersion: expected + 1 }
-            });
+            const where =
+                field === "metadata" ? { id: sid, metadataVersion: expected } :
+                field === "agentState" ? { id: sid, agentStateVersion: expected } :
+                { id: sid, preferencesVersion: expected };
+            const data =
+                field === "metadata" ? { metadata: value as string, metadataVersion: expected + 1 } :
+                field === "agentState" ? { agentState: value, agentStateVersion: expected + 1 } :
+                { preferences: value as string, preferencesVersion: expected + 1 };
+            const { count } = await db.session.updateMany({ where, data });
             return count;
         }
     });
@@ -76,11 +85,12 @@ export async function sessionVersionedFieldUpdate(input: {
     // through unchanged) without widening the builder signature here.
     const fieldUpdate = { value, version: result.newVersion } as { value: string; version: number };
     // update-session SyncUpdate (seam owns seq + id + recipient, ADR-0023).
-    // The metadata-vs-agentState branch lives at the body level: each
-    // emitSyncUpdate carries exactly one of the two versioned-field slots.
-    await emitSyncUpdate(userId, field === "metadata"
-        ? { t: "update-session", sessionId: sid, metadata: fieldUpdate }
-        : { t: "update-session", sessionId: sid, agentState: fieldUpdate }
+    // The field branch lives at the body level: each emitSyncUpdate carries
+    // exactly one of the versioned-field slots.
+    await emitSyncUpdate(userId,
+        field === "metadata" ? { t: "update-session", sessionId: sid, metadata: fieldUpdate } :
+        field === "agentState" ? { t: "update-session", sessionId: sid, agentState: fieldUpdate } :
+        { t: "update-session", sessionId: sid, preferences: fieldUpdate }
     );
 
     callback?.({ result: "success", version: result.newVersion, [field]: value });
