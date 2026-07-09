@@ -29,6 +29,7 @@ import {
     resumeGenericAgentLoop,
     stopGenericAgentLoop,
     handleAgentLoopIterationCallback,
+    runGenericAgentLoopNow,
     serializeAgentLoop,
 } from "@/modules/agentLoopEngine";
 import {
@@ -312,6 +313,42 @@ export function agentLoopRoutes(app: Fastify) {
             },
         );
     }
+
+    // ───────────────────────────────────────────────────────────────
+    // POST /v1/projects/:projectId/agent-loops/:loopId/run
+    // On-demand single iteration ("run now"). Generic loops only —
+    // supervisor loops are phase-driven and run elsewhere.
+    // ───────────────────────────────────────────────────────────────
+    app.post(
+        "/v1/projects/:projectId/agent-loops/:loopId/run",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    projectId: z.string(),
+                    loopId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { projectId, loopId } = request.params;
+            const loop = await ownedAgentLoop(userId, loopId);
+            if (loop.projectId !== projectId) {
+                return reply.code(404).send({ error: "Loop not found" });
+            }
+            if (loop.role === "supervisor") {
+                return reply
+                    .code(400)
+                    .send({ error: "Run-now is only available for generic loops" });
+            }
+            const result = await runGenericAgentLoopNow({ userId, loopId });
+            if (!result.ok) {
+                return reply.code(result.code).send({ error: result.error });
+            }
+            return reply.send({ loop: serializeAgentLoop(result.value.loop) });
+        },
+    );
 
     // ───────────────────────────────────────────────────────────────
     // POST /v1/projects/:projectId/agent-loops/:loopId/iterations

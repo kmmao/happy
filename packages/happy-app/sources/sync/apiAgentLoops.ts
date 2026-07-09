@@ -143,6 +143,29 @@ export async function deleteAgentLoop(
 }
 
 /**
+ * On-demand "run now" — fire a single iteration immediately without
+ * disturbing the loop's schedule. Backs the workflow list's 立即执行.
+ */
+export async function runAgentLoopNow(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<SerializedAgentLoop> {
+    const data = await apiRequest<AgentLoopResponse>(
+        credentials,
+        `/v1/projects/${encodeURIComponent(projectId)}/agent-loops/${encodeURIComponent(loopId)}/run`,
+        {
+            method: "POST",
+            errorMessage: "Failed to run agent loop",
+        },
+    );
+    if (!data.loop) {
+        throw new Error("Server accepted the run but returned no loop");
+    }
+    return data.loop;
+}
+
+/**
  * ADR-0022 Phase 4 — unified pause / resume / stop. The server dispatches
  * to the right engine internally (supervisor vs generic) based on the
  * loop's role, so the App passes the same shape regardless of which

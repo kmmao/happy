@@ -52,6 +52,10 @@ export interface AgentLoopEngineError {
 export type AgentLoopEngineOutcome<T> = AgentLoopEngineResult<T> | AgentLoopEngineError;
 
 type AgentLoopRow = NonNullable<Awaited<ReturnType<typeof db.agentLoop.findUnique>>>;
+// AgentLoopRow plus the project.path we need to resolve a trigger's working
+// directory. Both the scheduler tick and the run-now path load the loop with
+// this relation, so the shared emit helper takes this shape.
+type AgentLoopRowWithProjectPath = AgentLoopRow & { project: { path: string } };
 
 // ── Constants ──
 
@@ -481,6 +485,55 @@ export async function deleteGenericAgentLoop(opts: {
     return { ok: true, value: { projectId: existing.projectId } };
 }
 
+// ── Trigger emission ──
+
+/**
+ * Emit a single `agent-loop-trigger` ephemeral for one generic loop.
+ * Shared by the scheduler tick and the on-demand run-now path so both
+ * build the callback token + runtimeProfile identically. The caller is
+ * responsible for having already claimed/bumped the iteration.
+ */
+async function emitAgentLoopTrigger(opts: {
+    loop: AgentLoopRowWithProjectPath;
+    machineId: string;
+    iteration: number;
+    userId: string;
+}): Promise<void> {
+    const { loop, machineId, iteration, userId } = opts;
+    const callbackToken = buildCallbackToken(loop.id, iteration);
+
+    // Best-effort runtimeProfile normalization (mirrors supervisor side).
+    let runtimeProfile: ResolvedRuntimeProfile | undefined;
+    if (loop.runtimeProfile) {
+        runtimeProfile = normalizeResolvedRuntimeProfile(loop.runtimeProfile, {
+            allowLegacyEnvironmentVariables: true,
+            profileId: loop.profileId,
+            profileName: loop.profileId ?? undefined,
+            source: "account-profile",
+            trust: "trusted",
+        }) ?? undefined;
+    }
+
+    await emitSyncEphemeral(userId, {
+        t: "agent-loop-trigger",
+        loopId: loop.id,
+        projectId: loop.projectId,
+        machineId,
+        iteration,
+        prompt: loop.prompt ?? "",
+        directory: loop.directory ?? loop.project.path,
+        agent: (loop.agent ?? DEFAULT_AGENT) as "claude" | "codex" | "gemini",
+        continuityKey: loop.continuityKey ?? undefined,
+        profileId: loop.profileId ?? undefined,
+        runtimeProfile,
+        modelMode: loop.modelMode ?? undefined,
+        effort: loop.effort ?? undefined,
+        genericConfig: (loop.genericConfig as Record<string, unknown> | null) ?? undefined,
+        callbackToken,
+        maxDurationMinutes: loop.maxDurationMinutes,
+    });
+}
+
 // ── Scheduler tick ──
 
 /**
@@ -550,37 +603,11 @@ export async function tickDueGenericAgentLoops(
                 continue;
             }
 
-            const callbackToken = buildCallbackToken(loop.id, newIteration);
-
-            // Best-effort runtimeProfile normalization (mirrors supervisor side).
-            let runtimeProfile: ResolvedRuntimeProfile | undefined;
-            if (loop.runtimeProfile) {
-                runtimeProfile = normalizeResolvedRuntimeProfile(loop.runtimeProfile, {
-                    allowLegacyEnvironmentVariables: true,
-                    profileId: loop.profileId,
-                    profileName: loop.profileId ?? undefined,
-                    source: "account-profile",
-                    trust: "trusted",
-                }) ?? undefined;
-            }
-
-            await emitSyncEphemeral(userId, {
-                t: "agent-loop-trigger",
-                loopId: loop.id,
-                projectId: loop.projectId,
+            await emitAgentLoopTrigger({
+                loop,
                 machineId,
                 iteration: newIteration,
-                prompt: loop.prompt ?? "",
-                directory: loop.directory ?? loop.project.path,
-                agent: (loop.agent ?? DEFAULT_AGENT) as "claude" | "codex" | "gemini",
-                continuityKey: loop.continuityKey ?? undefined,
-                profileId: loop.profileId ?? undefined,
-                runtimeProfile,
-                modelMode: loop.modelMode ?? undefined,
-                effort: loop.effort ?? undefined,
-                genericConfig: (loop.genericConfig as Record<string, unknown> | null) ?? undefined,
-                callbackToken,
-                maxDurationMinutes: loop.maxDurationMinutes,
+                userId,
             });
 
             log(
@@ -594,6 +621,70 @@ export async function tickDueGenericAgentLoops(
             );
         }
     }
+}
+
+// ── Run now (on-demand) ──
+
+/**
+ * On-demand "run now" — fire a single iteration immediately, bypassing the
+ * cron/interval schedule. Used from the App's workflow list to verify a
+ * loop's configuration is workable without waiting for the next tick.
+ *
+ * Deliberately does NOT touch `nextRunAt`: the regular schedule stays
+ * intact. It only bumps `iteration` (keeps the counter monotonic so
+ * callback tokens never collide with a scheduled tick) and emits one
+ * trigger ephemeral. Works regardless of the loop's `enabled` flag — the
+ * daemon enqueues purely from the ephemeral payload — but refuses
+ * terminal-state loops and loops whose machine is offline.
+ */
+export async function runGenericAgentLoopNow(opts: {
+    userId: string;
+    loopId: string;
+}): Promise<AgentLoopEngineOutcome<{ loop: AgentLoopRow }>> {
+    const { userId, loopId } = opts;
+
+    const loop = await db.agentLoop.findFirst({
+        where: { id: loopId, accountId: userId, role: "generic" },
+        include: { project: { select: { id: true, machineId: true, path: true } } },
+    });
+    if (!loop) {
+        return { ok: false, code: 404, error: "Loop not found" };
+    }
+    if (
+        loop.status === "completed" ||
+        loop.status === "stopped" ||
+        loop.status === "failed"
+    ) {
+        return {
+            ok: false,
+            code: 400,
+            error: "Cannot run a finished loop. Enable or recreate it first.",
+        };
+    }
+    if (!loop.project.machineId) {
+        return { ok: false, code: 409, error: "Loop's machine is offline" };
+    }
+
+    const newIteration = loop.iteration + 1;
+    const updated = await db.agentLoop.update({
+        where: { id: loop.id },
+        data: { iteration: newIteration },
+        include: { project: { select: { id: true, machineId: true, path: true } } },
+    });
+
+    await emitAgentLoopTrigger({
+        loop: updated,
+        machineId: loop.project.machineId,
+        iteration: newIteration,
+        userId,
+    });
+
+    log(
+        { module: "agent-loop" },
+        `Ran generic loop ${loop.id} on demand, iteration ${newIteration} (schedule untouched)`,
+    );
+
+    return { ok: true, value: { loop: updated } };
 }
 
 // ── Iteration callback ──

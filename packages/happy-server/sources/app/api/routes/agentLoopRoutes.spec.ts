@@ -542,4 +542,51 @@ describe("agentLoopRoutes — Phase 3b/4 unified surface", () => {
         });
         expect(res.statusCode).toBe(401);
     });
+
+    it("POST /run fires an immediate iteration without moving nextRunAt", async () => {
+        // runGenericAgentLoopNow loads the loop with its project relation to
+        // read machineId; the fake findFirst returns the row as-is, so attach
+        // an online project here.
+        const gen = state.loops.find((l) => l.id === "loop-generic")!;
+        (gen as any).project = { id: "proj-1", machineId: "machine-1", path: "/tmp/proj" };
+        const nextRunAtBefore = gen.nextRunAt;
+
+        app = await createApp();
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/projects/proj-1/agent-loops/loop-generic/run",
+            headers: { "x-user-id": "user-1" },
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.json().loop.iteration).toBe(1);
+        // Schedule is left intact — only the iteration counter advances.
+        const after = state.loops.find((l) => l.id === "loop-generic")!;
+        expect(after.iteration).toBe(1);
+        expect(after.nextRunAt).toBe(nextRunAtBefore);
+        // A trigger ephemeral was emitted to the daemon.
+        expect(emitSyncEphemeralMock).toHaveBeenCalled();
+    });
+
+    it("POST /run on a supervisor loop is rejected with 400", async () => {
+        app = await createApp();
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/projects/proj-1/agent-loops/loop-supervisor/run",
+            headers: { "x-user-id": "user-1" },
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.json().error).toContain("generic loops");
+    });
+
+    it("POST /run returns 409 when the loop's machine is offline", async () => {
+        const gen = state.loops.find((l) => l.id === "loop-generic")!;
+        (gen as any).project = { id: "proj-1", machineId: null, path: "/tmp/proj" };
+        app = await createApp();
+        const res = await app.inject({
+            method: "POST",
+            url: "/v1/projects/proj-1/agent-loops/loop-generic/run",
+            headers: { "x-user-id": "user-1" },
+        });
+        expect(res.statusCode).toBe(409);
+    });
 });

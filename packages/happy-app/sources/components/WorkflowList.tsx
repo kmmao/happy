@@ -53,6 +53,7 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import {
     setAgentLoopEnabled,
     deleteAgentLoop,
+    runAgentLoopNow,
 } from "@/sync/apiAgentLoops";
 import {
     updateWebhookTrigger,
@@ -819,6 +820,26 @@ const WorkflowRow = React.memo(function WorkflowRow({
             }
         };
 
+        // "Run now" — fire a single iteration immediately so the user can
+        // verify the loop is workable without waiting for the next tick.
+        // Generic server-managed loops only (guarded at the call site).
+        const runNow = async () => {
+            try {
+                if (workflow.kind !== "loop" || !workflow.projectId) return;
+                const creds = await TokenStorage.getCredentials();
+                if (!creds) throw new Error("Not authenticated");
+                await runAgentLoopNow(creds, workflow.projectId, workflow.loop.id);
+                notifyWorkflowSourcesChanged();
+                Modal.alert(
+                    t("workflows.actionRunNowSuccessTitle"),
+                    t("workflows.actionRunNowSuccessMessage"),
+                );
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                Modal.alert(t("workflows.actionRunNowErrorTitle"), message);
+            }
+        };
+
         const confirmDelete = () => {
             Modal.alert(
                 t("workflows.actionDeleteTitle"),
@@ -873,6 +894,13 @@ const WorkflowRow = React.memo(function WorkflowRow({
                     : t("workflows.actionEnable"),
                 onPress: toggle,
             },
+            // Run-now sits between enable/disable and delete — generic,
+            // server-managed loops only (CLI-local ones already bailed above).
+            ...(workflow.kind === "loop" &&
+            workflow.role === "generic" &&
+            workflow.projectId
+                ? [{ text: t("workflows.actionRunNow"), onPress: runNow }]
+                : []),
             {
                 text: t("common.delete"),
                 style: "destructive",

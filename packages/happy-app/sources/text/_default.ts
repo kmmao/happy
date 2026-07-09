@@ -154,6 +154,10 @@ export const en = {
     // Multi-session row long-press menu (Scheduled / Event / Loop).
     actionEnable: "Enable",
     actionDisable: "Disable",
+    actionRunNow: "Run now",
+    actionRunNowSuccessTitle: "Loop triggered",
+    actionRunNowSuccessMessage: "A new iteration is starting — check the sessions below in a moment.",
+    actionRunNowErrorTitle: "Couldn't run the loop",
     actionDeleteTitle: "Delete workflow?",
     actionDeleteMessage: (name: string) => `“${name}” will be removed. Sessions it already created are kept; future runs stop.`,
     actionDeleteErrorTitle: "Couldn't delete workflow",
