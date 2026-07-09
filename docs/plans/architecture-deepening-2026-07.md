@@ -272,3 +272,24 @@ exists in that shape (re-ground against live code before ADR-ing IF re-suggested
   re-surfaced only already-rejected/already-done items → **converged.** No further
   groundable dev-work exists; future runs should STOP unless a new review surfaces
   a fresh groundable candidate.
+- 2026-07-10 iter 34: **Drift detected → targeted scan of new feature surface →
+  no groundable seam (user pre-empted it).** HEAD moved `886e2297c`→`1e15fac84`:
+  two new commits — `1e15fac84` (the user committing my iter-16 B4 seam) and
+  `6181d95c2 feat(workflow): add run-now action for generic agent loops` (real new
+  source across server `agentLoopEngine.ts`+`agentLoopRoutes.ts`, app
+  `apiAgentLoops.ts`+`WorkflowList.tsx`, i18n). Per the standing rule I escalated
+  and reviewed the new surface verbatim. Finding: **the one genuine deepening was
+  already done inline by the feature commit** — `emitAgentLoopTrigger` was extracted
+  as the shared build-callback-token + normalize-runtimeProfile + emit-ephemeral
+  helper, consumed identically by both `tickDueGenericAgentLoops` (scheduler) and
+  `runGenericAgentLoopNow` (run-now). Rejected everything else after reading:
+  (a) further unifying `runGenericAgentLoopNow` with `tickDueGenericAgentLoops` —
+  they diverge materially past the shared emit (single guarded update that leaves
+  `nextRunAt` untouched + terminal/offline guards vs. batch findMany→CAS
+  `updateMany` claim that advances `nextRunAt`); B1-class, reject; (b) app
+  `apiAgentLoops.ts` methods — thin one-per-endpoint wrappers mirroring the
+  established `apiWebhookTriggers.ts` pattern, no shared invariant; (c) the
+  route-level `ownedAgentLoop` + `loop.projectId !== projectId` guard repeated
+  across delete/pause-resume-stop/run — a 3-line idiom, duplicated-until-drift.
+  **CONVERGED again at new HEAD `1e15fac84`.** Files changed iter 34: this plan
+  doc + memory.md only (zero source — the feature author already captured the seam).
