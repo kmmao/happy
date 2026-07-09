@@ -379,6 +379,37 @@ export function parseBackgroundAgentLaunchAck(
 }
 
 /**
+ * Parse the `<task-notification>` XML that Claude Code injects as a user prompt
+ * when a `run_in_background` Agent/Task finishes. Mirrors happy-app's
+ * `parseTaskNotification` (typesRaw.ts) — the two MUST agree on tag names and
+ * the status mapping. The `<task-id>` equals the launch ack's agentId (the same
+ * value `parseBackgroundAgentLaunchAck` lifts into `backgroundTaskId`), so the
+ * `task-end` we emit from it reaps the exact background task on the App.
+ * `summary` falls back to `""` because the wire `task-end` schema requires a
+ * string; `toolUseId` is intentionally omitted — the App completes the card by
+ * `taskId` lookup, not the spawning tool_use id.
+ */
+export function parseTaskNotificationXml(
+  text: string,
+): { taskId: string; status: "completed" | "failed" | "stopped"; summary: string } | null {
+  const tag = (name: string): string | null => {
+    const m = text.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`));
+    return m ? m[1].trim() : null;
+  };
+  const taskId = tag("task-id");
+  if (!taskId) {
+    return null;
+  }
+  const rawStatus = (tag("status") ?? "completed").toLowerCase();
+  const status: "completed" | "failed" | "stopped" = /fail|error/.test(rawStatus)
+    ? "failed"
+    : /stop|kill|cancel|abort/.test(rawStatus)
+      ? "stopped"
+      : "completed";
+  return { taskId, status, summary: tag("summary") ?? "" };
+}
+
+/**
  * Emit one user `tool_result` block: auto-stop the matching subagent, build the
  * `tool-call-end` envelope, and lift background-task metadata out of a Bash
  * result. Isolated so the subagent-stop + background-task parsing invariants
@@ -475,14 +506,39 @@ function handleUserMessage(
       message.message.content.trimStart().startsWith("<task-notification>")
     ) {
       // Background-agent completion relay: Claude Code injects this XML as a
-      // user prompt to wake the main loop when a run_in_background agent
-      // finishes. It is machine metadata, not something the human typed —
-      // emitting it would render raw XML as a user bubble. The App derives
-      // the completion signal itself from the legacy message stream (see
-      // happy-app typesRaw parseTaskNotification), so the protocol path just
-      // closes the turn (the notification does start a new prompt) and drops.
+      // user prompt to wake the main loop when a run_in_background Agent/Task
+      // finishes. It is machine metadata, not something the human typed, so we
+      // never render it as a user bubble. In session-protocol-only mode there
+      // is NO legacy message stream for the App to derive completion from (it
+      // once parsed the raw user message via happy-app typesRaw
+      // parseTaskNotification, but the CLI no longer emits that), so the
+      // protocol path itself must carry the signal — otherwise the Agent/Task
+      // card stays stuck "running" forever. Parse the notification and emit a
+      // `task-end`, mirroring the structured `task_notification` system-message
+      // path in claudeRemoteLauncherCore. The `task-end` reaps the background
+      // task by its taskId (== the launch ack's agentId, already registered as
+      // backgroundTaskId), so the App flips the card to completed/failed.
+      const notification = parseTaskNotificationXml(message.message.content);
+      if (notification) {
+        const taskEndEvent: SessionEvent = {
+          t: "task-end",
+          taskId: notification.taskId,
+          status: notification.status,
+          summary: notification.summary,
+        };
+        // openTurn: false — a completion signal must never spawn an empty Turn.
+        // It stamps onto the currently-open Turn if any, else emits Turn-less.
+        applyIntent(
+          state,
+          { kind: "content", ev: taskEndEvent, openTurn: false },
+          sink.envelopes,
+        );
+      }
+      // The notification also wakes a new prompt, so close any open turn.
       closeTurn(state, "completed", sink.envelopes);
-      return "task-notification-relay";
+      // Emitting a task-end is no longer a drop; only a malformed notification
+      // (no <task-id>) falls back to the relay drop-reason for honest taxonomy.
+      return notification ? null : "task-notification-relay";
     } else {
       closeTurn(state, "completed", sink.envelopes);
       const userUuid = pickUuid(message);

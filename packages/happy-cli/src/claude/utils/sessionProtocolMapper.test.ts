@@ -572,7 +572,7 @@ describe("background task metadata in tool-call-end", () => {
 });
 
 describe("task-notification relay", () => {
-  it("drops the <task-notification> user message instead of emitting user text", () => {
+  it("emits a task-end from the <task-notification> instead of dropping it", () => {
     const result = mapClaudeLogMessageToSessionEnvelopes(
       {
         type: "user",
@@ -589,16 +589,69 @@ describe("task-notification relay", () => {
       { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
     );
 
-    expect(
-      result.envelopes.some((e) => e.role === "user"),
-    ).toBe(false);
-    expect(result.dropped).toContainEqual({
+    // Never rendered as a user bubble.
+    expect(result.envelopes.some((e) => e.role === "user")).toBe(false);
+    // The completion signal now rides the protocol as a task-end — this is
+    // what flips the App's Agent/Task card out of "running". taskId == the
+    // launch ack's agentId so it reaps the matching background task.
+    const taskEnd = result.envelopes.find((e) => e.ev.t === "task-end");
+    expect(taskEnd).toBeDefined();
+    expect((taskEnd!.ev as any).taskId).toBe("a73231cd515b1dc7c");
+    expect((taskEnd!.ev as any).status).toBe("completed");
+    expect((taskEnd!.ev as any).summary).toBe("Agent finished");
+    // Emitting a task-end is not a drop anymore.
+    expect(result.dropped).not.toContainEqual({
       type: "user",
       reason: "task-notification-relay",
     });
     // The notification still closes the open turn — it starts a new prompt.
     expect(result.envelopes.some((e) => e.ev.t === "turn-end")).toBe(true);
     expect(result.currentTurnId).toBeNull();
+  });
+
+  it("maps a failed status and does not spawn an empty turn when none is open", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-notif-2",
+        message: {
+          role: "user",
+          content:
+            "<task-notification>\n<task-id>bgfail1</task-id>\n" +
+            "<status>failed</status>\n<summary>boom</summary>\n" +
+            "</task-notification>",
+        },
+      } as any,
+      // No open turn: a completion signal must never open one (openTurn:false).
+      { ...createClaudeProtocolState(), currentTurnId: null },
+    );
+
+    const taskEnd = result.envelopes.find((e) => e.ev.t === "task-end");
+    expect(taskEnd).toBeDefined();
+    expect((taskEnd!.ev as any).status).toBe("failed");
+    expect(result.envelopes.some((e) => e.ev.t === "turn-start")).toBe(false);
+    expect(result.currentTurnId).toBeNull();
+  });
+
+  it("falls back to the relay drop-reason for a malformed notification (no task-id)", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-notif-3",
+        message: {
+          role: "user",
+          content:
+            "<task-notification>\n<status>completed</status>\n</task-notification>",
+        },
+      } as any,
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
+    );
+
+    expect(result.envelopes.some((e) => e.ev.t === "task-end")).toBe(false);
+    expect(result.dropped).toContainEqual({
+      type: "user",
+      reason: "task-notification-relay",
+    });
   });
 });
 
