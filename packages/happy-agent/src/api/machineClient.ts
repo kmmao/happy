@@ -352,77 +352,82 @@ export class MachineClient {
   async updateMachineMetadata(
     handler: (metadata: MachineMetadata | null) => MachineMetadata,
   ): Promise<void> {
-    await withBackoff(async () => {
-      const updated = handler(this.machine.metadata);
-      const answer: any = await new Promise((resolve) => {
-        this.socket.emit(
-          "machine-update-metadata" as any,
-          {
-            machineId: this.machine.id,
-            metadata: encodeBase64(
-              encrypt(this.machine.encryptionKey, this.machine.encryptionVariant, updated),
-            ),
-            expectedVersion: this.machine.metadataVersion,
-          },
-          resolve,
-        );
-      });
-
-      if (answer.result === "success") {
-        (this.machine as any).metadata = decrypt(
-          this.machine.encryptionKey,
-          this.machine.encryptionVariant,
-          decodeBase64(answer.metadata),
-        ) as MachineMetadata;
-        (this.machine as any).metadataVersion = answer.version;
-      } else if (answer.result === "version-mismatch") {
-        (this.machine as any).metadataVersion = answer.version;
-        (this.machine as any).metadata = decrypt(
-          this.machine.encryptionKey,
-          this.machine.encryptionVariant,
-          decodeBase64(answer.metadata),
-        );
-        throw new Error("Metadata version mismatch");
-      }
-    }, { maxRetries: 3, label: "updateMachineMetadata" });
+    await this.runVersionedFieldUpdate(
+      "metadata",
+      "machine-update-metadata",
+      handler,
+      "updateMachineMetadata",
+      "Metadata version mismatch",
+    );
   }
 
   async updateDaemonState(
     handler: (state: DaemonState | null) => DaemonState,
   ): Promise<void> {
+    await this.runVersionedFieldUpdate(
+      "daemonState",
+      "machine-update-state",
+      handler,
+      "updateDaemonState",
+      "Daemon state version mismatch",
+    );
+  }
+
+  /**
+   * Single owner of the machine OCC (optimistic-concurrency) update lifecycle.
+   *
+   * `updateMachineMetadata` and `updateDaemonState` used to be
+   * character-identical: wrap `withBackoff`, run the caller's handler over the
+   * current field value, emit the field's socket event with `expectedVersion`,
+   * then on `success` adopt the server's decrypted value + version, or on
+   * `version-mismatch` adopt the winner's version + value and throw to trigger a
+   * backoff retry. Only the field name, its `${field}Version` companion, the
+   * socket event name, the retry label, and the mismatch-error text varied. This
+   * concentrates that lifecycle so a change to the OCC dance (encryption, retry
+   * policy, adoption order) is edited in exactly one place; each public method is
+   * now a thin field-specific adapter.
+   */
+  private async runVersionedFieldUpdate<T>(
+    field: "metadata" | "daemonState",
+    eventName: string,
+    handler: (current: T | null) => T,
+    label: string,
+    mismatchError: string,
+  ): Promise<void> {
+    const versionField = `${field}Version` as const;
     await withBackoff(async () => {
-      const updated = handler(this.machine.daemonState);
+      const updated = handler((this.machine as any)[field]);
       const answer: any = await new Promise((resolve) => {
         this.socket.emit(
-          "machine-update-state" as any,
+          eventName as any,
           {
             machineId: this.machine.id,
-            daemonState: encodeBase64(
+            [field]: encodeBase64(
               encrypt(this.machine.encryptionKey, this.machine.encryptionVariant, updated),
             ),
-            expectedVersion: this.machine.daemonStateVersion,
+            expectedVersion: (this.machine as any)[versionField],
           },
           resolve,
         );
       });
 
       if (answer.result === "success") {
-        (this.machine as any).daemonState = decrypt(
+        (this.machine as any)[field] = decrypt(
           this.machine.encryptionKey,
           this.machine.encryptionVariant,
-          decodeBase64(answer.daemonState),
+          decodeBase64(answer[field]),
         );
-        (this.machine as any).daemonStateVersion = answer.version;
+        (this.machine as any)[versionField] = answer.version;
       } else if (answer.result === "version-mismatch") {
-        (this.machine as any).daemonStateVersion = answer.version;
-        (this.machine as any).daemonState = decrypt(
+        (this.machine as any)[versionField] = answer.version;
+        (this.machine as any)[field] = decrypt(
           this.machine.encryptionKey,
           this.machine.encryptionVariant,
-          decodeBase64(answer.daemonState),
+          decodeBase64(answer[field]),
         );
-        throw new Error("Daemon state version mismatch");
+        throw new Error(mismatchError);
       }
-    }, { maxRetries: 3, label: "updateDaemonState" });
+    }, { maxRetries: 3, label });
   }
 
   // -----------------------------------------------------------------------

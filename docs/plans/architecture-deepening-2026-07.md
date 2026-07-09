@@ -110,6 +110,30 @@ structural refactors).
   + difftastic 5 + ripgrep 5 + tmux 54 = 69 tests green; behavior preserved
   (delegation is exact — `code || 0` kept verbatim).
 
+- **B4 — Agent: machine OCC update seam** DONE (iteration 16)
+  Surfaced by the iter-16 fresh scan (triggered by real drift — 14 new user
+  commits landed since iter 5, tree clean, prior convergence invalidated).
+  `packages/happy-agent/src/api/machineClient.ts` had two character-identical OCC
+  methods — `updateMachineMetadata` and `updateDaemonState`. Both: wrap
+  `withBackoff({maxRetries:3})` → run the caller's handler over the current field
+  value → `socket.emit(event, {machineId, [field]:encrypt(...), expectedVersion})`
+  → on `result==="success"` adopt `decrypt(answer[field])` + `answer.version`;
+  on `result==="version-mismatch"` adopt version + decrypted value then `throw`
+  to trigger a backoff retry. The ONLY variation was the field name
+  (`metadata`/`daemonState`), its `${field}Version` companion, the socket event
+  name (`machine-update-metadata`/`machine-update-state`), the retry label, and
+  the mismatch-error text — all pure config, identical orchestration. This is a
+  real 2-adapter seam (opposite of the B1/server-pair rejections, whose wrappers
+  had divergent orchestration). NOTE: this is **within happy-agent only** — NOT
+  the ADR-rejected cli↔agent OCC unify (the CLI's `versionedUpdate.ts` is a
+  separate package the agent cannot import; the "no agent-side duplicate" note in
+  Tier C referred to cross-package, but two copies existed inside the agent).
+  Implemented: extracted a private generic `runVersionedFieldUpdate<T>(field,
+  eventName, handler, label, mismatchError)` owning the lifecycle; both public
+  methods are now thin field-specific adapters. Behavior preserved exactly
+  (mismatch-error strings + labels passed through verbatim). Verified: agent
+  build + `tsc --noEmit` clean; full suite 343/343 green.
+
 ## Tier C — rejected (conflicts settled ADRs / premature abstraction)
 
 Record as ADRs only if a future review keeps re-suggesting them. Each item is
@@ -153,6 +177,32 @@ exists in that shape (re-ground against live code before ADR-ing IF re-suggested
   batched-write mechanism before ADR-ing IF a future review re-surfaces it.
 - Server "ApiResponseBuilder class" — class anti-pattern here; ADR-0034 already
   sets the ops-error convention. ✅ covered in spirit (ADR-0034 sets the convention).
+- Server "unify sessionVersionedFieldUpdate + machineVersionedUpdate into one
+  generic `genericVersionedFieldUpdate<Entity>`" — **rejected iter 16**. Both
+  already delegate to the shared `versionedUpdate` seam; the remaining wrappers
+  diverge per entity in load-bearing ways: session has 3 fields + returns void +
+  acks `error` silently, machine has 2 fields + the daemonState write also flips
+  `active`/`lastActiveAt` + the method RETURNS the CAS outcome so the caller runs
+  brief detection only on apply + acks `error` with a message. Merging = a
+  param-heavy options-bag over two DB tables with different post-success
+  contracts (same class as the B1 rejection — shared spine already extracted,
+  wrappers legitimately diverge). *(groundable; no dedicated ADR yet — write only
+  if re-suggested.)*
+- CLI/App "extract `buildIssuePrompt` + its 5 helpers (formatDate/truncate/
+  extractImageUrls/buildCommentsSection/buildPrCreateStep) to a shared owner" —
+  **surfaced + rejected iter 16 (first suggestion).** The 6-function block is
+  near-duplicated across `packages/happy-cli/src/webhook/buildIssuePrompt.ts` and
+  `packages/happy-app/sources/utils/launchIssueSession.ts`, and a comment in
+  `IssueSummaryHeader.tsx` ("matching CLI buildIssuePrompt format") flags the
+  coupling. BUT the copies have already **drifted** — App's `buildPrCreateStep`
+  takes a 3rd `repoInfo` arg the CLI version lacks — i.e. genuine per-platform
+  divergence, not one invariant. And the packages intentionally cannot import
+  each other (cli ↔ app); the only shared runtime home is `happy-wire`, whose
+  narrow purpose is message wire types + Zod schemas, NOT a GitHub-issue prompt
+  builder. Matches the codebase's deliberate cross-package "duplicated-until-drift"
+  tolerance (ADR-0035 RpcHandlerManager, ADR-0063 TunnelManager, tailscale.ts).
+  *(groundable; per plan rule, ADR only if a FUTURE review re-suggests it — this
+  is the first, so logged here not ADR'd.)*
 
 ## Progress log
 - 2026-07-05 iter 1: **Tier A complete.** A1 done (10 tests), A2 done (22 tests:
@@ -193,6 +243,22 @@ exists in that shape (re-ground against live code before ADR-ing IF re-suggested
   typecheck clean; no stale references. **All actionable recommendations (Tier A +
   Tier B) are now implemented. Tier C stays rejected (implement only as ADRs if
   a future review keeps re-suggesting them).** Mission dev-work complete.
+- 2026-07-09 iter 16: **Drift detected → fresh scan → B4 built + 2 rejections.**
+  Iters 6–15 stayed converged (HEAD pinned `42c811f3b`). Iter 16's cheap git
+  staleness check found HEAD had moved to `886e2297c` — 14 new user commits since
+  iter 5 (incl. the user committing all prior iter-2–5 arch work, plus fresh arch
+  refactors: env/bash-policy seams, server versionedUpdate for prefs+account,
+  app machine-op/duration consolidation, sub-agent reaping). Prior convergence
+  invalidated → re-ran the full `/improve-codebase-architecture` fan-out (3
+  Explore agents: cli/agent, server, app). Verified every candidate verbatim.
+  Result: ONE cleared the strict bar — **B4** (agent machine OCC seam, above);
+  built + verified (343/343 green). THREE rejected after verbatim reads:
+  (a) server session/machineVersionedUpdate unify (divergent per-entity wrappers
+  over a shared seam — Tier C); (b) server 10-min staleness constant (codebase
+  keeps duration magic numbers inline-with-comment by convention — not worth a
+  precedent); (c) CLI/App buildIssuePrompt cross-package dup (already drifting;
+  wire is the wrong home; duplicated-until-drift — Tier C, logged not ADR'd per
+  first-suggestion rule). Converged again.
 - 2026-07-06 iter 5: **Fresh convergence scan + B3 built.** Re-ran the review's
   Explore step against the current (iter 1–4-changed) code to genuinely check for
   new work rather than assume convergence. Result: exactly ONE new groundable
