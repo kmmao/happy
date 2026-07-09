@@ -4,11 +4,13 @@ import type { AgentGoalStatus, Session } from "@/sync/storageTypes";
 
 type GoalSession = Pick<Session, "agentState" | "presence" | "metadata">;
 
-function activeGoal(overrides: Partial<Extract<AgentGoalStatus, { status: "active" }>> = {}) {
+function activeGoal(
+    overrides: Partial<Extract<AgentGoalStatus, { status: "active" }>> = {},
+): Extract<AgentGoalStatus, { status: "active" }> {
     return {
-        source: "claude" as const,
+        source: "claude",
         observedAt: 1000,
-        status: "active" as const,
+        status: "active",
         sourceSessionId: "claude-abc",
         text: "测试goal bar的显示效果",
         capabilities: { clear: true, stop: true, edit: true },
@@ -20,7 +22,10 @@ function session(goal: AgentGoalStatus | undefined, over: Partial<GoalSession> =
     return {
         presence: "online",
         metadata: { claudeSessionId: "claude-abc" } as GoalSession["metadata"],
-        agentState: goal ? ({ agentGoalStatus: goal } as GoalSession["agentState"]) : undefined,
+        // Session["agentState"] is `AgentState | null` — the absent case is null,
+        // not undefined. `{ agentGoalStatus }` structurally satisfies AgentState
+        // (its other fields are optional), so no cast is needed.
+        agentState: goal ? { agentGoalStatus: goal } : null,
         ...over,
     };
 }
@@ -43,7 +48,9 @@ describe("resolveVisibleAgentGoalStatus (goal bar display gate)", () => {
     });
 
     it("hides the bar when the session is offline", () => {
-        expect(resolveVisibleAgentGoalStatus(session(activeGoal(), { presence: "offline" }))).toBeNull();
+        // presence is `"online" | number`; a number is a last-seen timestamp,
+        // i.e. offline. The resolver treats anything other than "online" as offline.
+        expect(resolveVisibleAgentGoalStatus(session(activeGoal(), { presence: 0 }))).toBeNull();
     });
 
     it("hides the bar when the source session id does not match the live claude session", () => {

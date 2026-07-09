@@ -23,12 +23,28 @@ export const StreamingTextView = React.memo(({ text }: Props) => {
   const { theme } = useUnistyles();
 
   // displayedLength is how many characters have been "typed out" so far.
-  const [displayedLength, setDisplayedLength] = React.useState(0);
+  //
+  // Seed it with the mount-time text length rather than 0. The typewriter must
+  // only animate text that GROWS *after* this component instance mounts. Two
+  // failure modes are fixed by this:
+  //   1. A message delivered as a single complete envelope (non-streamed, e.g.
+  //      a high-effort turn with `textStreamed=false`) arrives already whole —
+  //      there is nothing to "type", so reveal it in full immediately.
+  //   2. In an inverted, windowed FlatList a still-"streaming" cell is
+  //      unmounted and remounted as background activity churns the list. With a
+  //      `useState(0)` seed every remount restarted the reveal from zero and the
+  //      rAF loop rarely caught up before the next remount, freezing the message
+  //      at its first few characters. Seeding from `text.length` makes a remount
+  //      show everything already received instead of truncating to a prefix.
+  // Genuine incremental streaming still animates: the cell first mounts on the
+  // opening delta (short text), then each later delta grows `text` and the
+  // effect below types out only the newly-appended span.
+  const [displayedLength, setDisplayedLength] = React.useState(() => text.length);
 
   // Refs let the rAF callback read the latest values without stale closures.
   const rafRef = React.useRef<number | null>(null);
   const textRef = React.useRef(text);
-  const displayedLengthRef = React.useRef(0);
+  const displayedLengthRef = React.useRef(text.length);
 
   // Keep refs in sync on every render.
   textRef.current = text;
