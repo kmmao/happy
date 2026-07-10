@@ -293,3 +293,35 @@ exists in that shape (re-ground against live code before ADR-ing IF re-suggested
   across delete/pause-resume-stop/run — a 3-line idiom, duplicated-until-drift.
   **CONVERGED again at new HEAD `1e15fac84`.** Files changed iter 34: this plan
   doc + memory.md only (zero source — the feature author already captured the seam).
+- 2026-07-10 iter 35: **Drift detected → targeted scan of two new bug-fix commits →
+  no groundable seam.** HEAD moved `1e15fac84`→`dc852af85` (tree now CLEAN — my
+  iter-16 B4 landed as `1e15fac84`). Three new commits; one docs
+  (`c7607e0ae` iter-34 log + evolve-and-ship skill), two source:
+  `51b9f8322 fix(cli): emit task-end for background-agent <task-notification>` and
+  `dc852af85 fix(app): stop StreamingTextView truncating fully-delivered messages`.
+  Per the standing rule I escalated and read both verbatim, plus every sibling
+  `task-end` emit site in `claudeRemoteLauncherCore.ts`. Finding: **no seam.**
+  (1) The CLI fix's new `task-end` emit lives in the pure `sessionProtocolMapper`
+  (`applyIntent → sink.envelopes`), a fundamentally different mechanism from the
+  three launcher sites' live `buildProtocolMessage → sendSessionProtocolMessage`
+  socket send — they share only the wire *shape* `{t:"task-end",...}`, a schema
+  type, not a behavioral invariant. Among the launcher sites the one genuine
+  payload invariant (reap path) is ALREADY extracted as `buildReapEnvelopePayload`;
+  the other two diverge (hardcoded stopped-string vs. `usage` mapping) and share
+  only the generic protocol-emit idiom used across dozens of message types — an
+  `emitTaskEnd` helper would be B1-class surface-similarity extraction. (2) The new
+  `parseTaskNotificationXml` mirrors App's `parseTaskNotification` cross-package —
+  the duplicated-until-drift pattern iters 16/34 rejected (no cross-pkg import; wire
+  is the wrong home for a parser; author documented the mirror as a doc-comment
+  contract). (3) The App StreamingTextView fix is a single-component `displayedLength`
+  seed change with no duplication; `agentGoalStatus.test.ts` edits are type fixes.
+  Both commits ship their own tests. **CONVERGED at new HEAD `dc852af85`.** Files
+  changed iter 35: this plan doc + memory.md only (zero source).
+- 2026-07-10 iter 36: **Cheap git check — HEAD unchanged at `dc852af85`, no
+  fresh source → correctly idled, no fan-out.** One `git log -5`/`git status`
+  call: HEAD still the iter-35 pin `dc852af85`, zero new commits since; working
+  tree = only this plan doc (iter-35 log, uncommitted). "No fresh HEAD" state →
+  the standing rule says STOP, not re-scan. Held discipline: did NOT re-run the
+  expensive `/improve-codebase-architecture` fan-out to re-confirm identical
+  convergence. **CONVERGED — nothing to build.** Files changed iter 36: this plan
+  doc + memory.md only (zero source).
