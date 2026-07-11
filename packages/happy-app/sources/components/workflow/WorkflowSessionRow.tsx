@@ -70,10 +70,7 @@ import {
     ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
-import {
-    resolveProjectSessionScopeTone,
-    resolveProjectSessionTextBadges,
-} from "@/components/project/projectSessionBadges";
+import { resolveProjectSessionTextBadges } from "@/components/project/projectSessionBadges";
 import { useWebHoverProps } from "@/utils/interactiveSurface";
 import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
@@ -274,20 +271,6 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         flexShrink: 1,
     },
-    tagBranch: {
-        backgroundColor: `${theme.colors.accentPurple}1F`,
-    },
-    tagBranchText: {
-        color: theme.colors.accentPurple,
-        ...Typography.default("semiBold"),
-    },
-    tagMain: {
-        backgroundColor: `${theme.colors.success}1F`,
-    },
-    tagMainText: {
-        color: theme.colors.success,
-        ...Typography.default("semiBold"),
-    },
     autoSendBadge: {
         backgroundColor: `${theme.colors.accentPurple}1F`,
     },
@@ -335,10 +318,6 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
 
     const avatarId = React.useMemo(() => getSessionAvatarId(session), [session]);
     const hasUnreadMessages = useHasUnreadMessages(session.id);
-    const scopeTone = React.useMemo(
-        () => resolveProjectSessionScopeTone(session),
-        [session],
-    );
     const textBadges = React.useMemo(
         () =>
             resolveProjectSessionTextBadges({
@@ -662,25 +641,9 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                         {sessionStatus.statusText}
                     </Text>
                 </View>
-                <View
-                    style={[
-                        styles.tag,
-                        scopeTone === "branch" ? styles.tagBranch : styles.tagMain,
-                    ]}
-                >
-                    <Text
-                        style={[
-                            styles.tagText,
-                            scopeTone === "branch"
-                                ? styles.tagBranchText
-                                : styles.tagMainText,
-                        ]}
-                    >
-                        {scopeTone === "branch"
-                            ? t("sessionInfo.tagBranch")
-                            : t("sessionInfo.tagMain")}
-                    </Text>
-                </View>
+                {/* Scope tag removed entirely: main is the default (no tag),
+                    and a branch/worktree is already marked by the ⎇ branch-name
+                    badge below — the "分支" label tag was redundant with it. */}
                 {/* Provider only — the specific model is intentionally dropped
                     to keep the tag short (user preference). */}
                 <SessionProviderTag session={session} />
