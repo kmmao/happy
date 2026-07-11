@@ -429,6 +429,17 @@ export function formatTerminalLiveStatus(
 export function getSessionSubtitle(
   session: Session,
   terminalTitle?: string | null,
+  options?: {
+    /**
+     * When the session is already rendered under a project-path header
+     * (see WorkflowList's Ad-hoc grouping), the row's own project path is
+     * redundant. With this flag the plain-path subtitle collapses to ""
+     * and the daemon variant drops its path prefix — but terminal titles
+     * and worktree branch arrows still show, since those carry per-session
+     * info the header does not.
+     */
+    hideProjectPath?: boolean;
+  },
 ): string {
   // A TUI-supplied window title (via the `terminal-signal` wire event) takes
   // priority over the static project path: the user's hook may be surfacing
@@ -452,12 +463,19 @@ export function getSessionSubtitle(
       return `${branchName} → ${parentBranch}`;
     }
 
-    const path = formatPathRelativeToHome(
-      session.metadata.path,
-      session.metadata.homeDir,
-    );
+    const hideProjectPath = options?.hideProjectPath ?? false;
+    const path = hideProjectPath
+      ? ""
+      : formatPathRelativeToHome(
+          session.metadata.path,
+          session.metadata.homeDir,
+        );
     if (session.metadata.startedBy === "daemon") {
-      return `${path} · ${t("session.startedByDaemon")}`;
+      // Grouped mode (path hidden): drop the daemon marker too so the whole
+      // subtitle collapses and the card loses a line — the group header
+      // already carries the project/machine identity. Ungrouped: keep the
+      // "path · 守护进程" line as before.
+      return path ? `${path} · ${t("session.startedByDaemon")}` : "";
     }
     return path;
   }

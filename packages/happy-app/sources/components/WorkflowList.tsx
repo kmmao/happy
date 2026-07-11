@@ -27,8 +27,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { Typography } from "@/constants/Typography";
 import { useWorkflows, type Workflow, type WorkflowKind, type LoopWorkflow } from "@/hooks/useWorkflows";
-import { useSetting } from "@/sync/storage";
+import { useSetting, useAllMachines } from "@/sync/storage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import { formatPathRelativeToHome } from "@/utils/sessionUtils";
 import { SharedStateView } from "./SharedStateView";
 import { UpdateBanner } from "./UpdateBanner";
 import { StatusDot } from "./StatusDot";
@@ -71,6 +72,18 @@ const FILTER_VALUES: ReadonlyArray<{ key: WorkflowKind; label: () => string }> =
     { key: "event", label: () => t("workflows.kindEvent") },
     { key: "loop", label: () => t("workflows.kindLoop") },
 ];
+
+/**
+ * A rendered row in the WorkflowList FlatList. The Ad-hoc tab groups its
+ * sessions under project headers (restoring the pre-Workflow-IA
+ * "group by project" behaviour, see 9fc7d3d41); every other tab renders a
+ * flat sequence of `workflow` rows with no headers.
+ */
+type WorkflowListRow =
+    | { type: "project-header"; key: string; displayPath: string; subtitle: string }
+    // hidePath: this row sits under a project-path header, so its own
+    // redundant path subtitle is suppressed (Ad-hoc grouping only).
+    | { type: "workflow"; workflow: Workflow; hidePath: boolean };
 
 const KIND_ICON: Record<WorkflowKind, React.ComponentProps<typeof Ionicons>["name"]> = {
     adhoc: "chatbubble-ellipses-outline",
@@ -157,6 +170,31 @@ const styles = StyleSheet.create((theme, rt) => ({
     },
     contentContainer: {
         flex: 1,
+    },
+    // Compact single-line project-group header for the Ad-hoc tab: project
+    // path (tail-priority ellipsis) + machine name inline, tight whitespace.
+    projectGroupHeader: {
+        flexDirection: "row",
+        alignItems: "baseline",
+        gap: 8,
+        backgroundColor: theme.colors.groupped.background,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 5,
+    },
+    projectGroupPath: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        lineHeight: 18,
+        color: theme.colors.groupped.sectionTitle,
+        flexShrink: 1,
+    },
+    projectGroupMachine: {
+        ...Typography.default(),
+        fontSize: 11,
+        lineHeight: 14,
+        color: theme.colors.textSecondary,
+        flexShrink: 0,
     },
     // Sticky wrapper around the kind filter chips. Sits on top of the
     // FlatList so that scrolling the workflow rows underneath never hides
@@ -530,6 +568,94 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
         );
     }, [workflows, activeFilter, hideInactiveSessions]);
 
+    // Machine lookup for project-group subtitles (machine display name /
+    // host). Built once per machine-list change so grouping stays O(n).
+    const machines = useAllMachines();
+    const machineMap = React.useMemo(() => {
+        const map = new Map<string, (typeof machines)[number]>();
+        for (const machine of machines) map.set(machine.id, machine);
+        return map;
+    }, [machines]);
+
+    // Ad-hoc rows are grouped under a project header ({machineId}:{path});
+    // every other kind stays a flat workflow list. Groups sort by most
+    // recent activity, sessions within a group likewise — mirroring the
+    // pre-Workflow-IA SessionsList grouping. Sessions with no path fall
+    // into a headerless group so they still render.
+    const listRows = React.useMemo<WorkflowListRow[]>(() => {
+        if (activeFilter !== "adhoc") {
+            return filtered.map((workflow) => ({
+                type: "workflow",
+                workflow,
+                hidePath: false,
+            }));
+        }
+
+        type Group = {
+            key: string;
+            displayPath: string;
+            subtitle: string;
+            latest: number;
+            items: Workflow[];
+        };
+        const groups = new Map<string, Group>();
+
+        for (const workflow of filtered) {
+            if (workflow.kind !== "adhoc") continue;
+            const meta = workflow.session.metadata;
+            const machineId = meta?.machineId || "unknown";
+            const path = meta?.path || "";
+            const key = `${machineId}:${path}`;
+
+            const existing = groups.get(key);
+            if (existing) {
+                existing.items.push(workflow);
+                existing.latest = Math.max(existing.latest, workflow.lastActivityAt);
+            } else {
+                const machine = machineMap.get(machineId);
+                groups.set(key, {
+                    key,
+                    displayPath: path
+                        ? formatPathRelativeToHome(path, meta?.homeDir)
+                        : "",
+                    subtitle:
+                        machine?.metadata?.displayName ||
+                        machine?.metadata?.host ||
+                        machineId,
+                    latest: workflow.lastActivityAt,
+                    items: [workflow],
+                });
+            }
+        }
+
+        const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+            if (b.latest !== a.latest) return b.latest - a.latest;
+            if (a.displayPath !== b.displayPath)
+                return a.displayPath.localeCompare(b.displayPath);
+            return a.key.localeCompare(b.key);
+        });
+
+        const rows: WorkflowListRow[] = [];
+        for (const group of sortedGroups) {
+            group.items.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+            const hasHeader = Boolean(group.displayPath);
+            if (hasHeader) {
+                rows.push({
+                    type: "project-header",
+                    key: group.key,
+                    displayPath: group.displayPath,
+                    subtitle: group.subtitle,
+                });
+            }
+            for (const workflow of group.items) {
+                // Only rows under a real header hide their path; a headerless
+                // (no-path) group has nothing to dedupe against.
+                rows.push({ type: "workflow", workflow, hidePath: hasHeader });
+            }
+        }
+        return rows;
+    }, [filtered, activeFilter, machineMap]);
+
     const handleEmptyCreate = React.useCallback(() => {
         switch (activeFilter) {
             case "adhoc":
@@ -623,18 +749,41 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
                     so it scrolls away with the content. */}
                 <FilterBar />
                 <FlatList
-                    data={filtered}
-                    keyExtractor={(w) => w.id}
-                    renderItem={({ item }) => (
-                        <WorkflowRow
-                            workflow={item}
-                            // Ad-hoc rows ignore this; multi-session rows
-                            // default expanded unless user collapsed them.
-                            expanded={!collapsedIds[item.id]}
-                            onToggleCollapse={() => toggleCollapse(item.id)}
-                            onOpenDetails={() => setDetailWorkflow(item)}
-                        />
-                    )}
+                    data={listRows}
+                    keyExtractor={(row) =>
+                        row.type === "project-header"
+                            ? `project-header:${row.key}`
+                            : row.workflow.id
+                    }
+                    renderItem={({ item }) =>
+                        item.type === "project-header" ? (
+                            <View style={styles.projectGroupHeader}>
+                                <Text
+                                    style={styles.projectGroupPath}
+                                    numberOfLines={1}
+                                    ellipsizeMode="head"
+                                >
+                                    {item.displayPath}
+                                </Text>
+                                <Text
+                                    style={styles.projectGroupMachine}
+                                    numberOfLines={1}
+                                >
+                                    {item.subtitle}
+                                </Text>
+                            </View>
+                        ) : (
+                            <WorkflowRow
+                                workflow={item.workflow}
+                                // Ad-hoc rows ignore this; multi-session rows
+                                // default expanded unless user collapsed them.
+                                expanded={!collapsedIds[item.workflow.id]}
+                                onToggleCollapse={() => toggleCollapse(item.workflow.id)}
+                                onOpenDetails={() => setDetailWorkflow(item.workflow)}
+                                hidePath={item.hidePath}
+                            />
+                        )
+                    }
                     ListHeaderComponent={ListHeader}
                     ListEmptyComponent={
                         <WorkflowKindEmptyState
@@ -687,6 +836,8 @@ interface WorkflowRowProps {
     expanded: boolean;
     onToggleCollapse: () => void;
     onOpenDetails: () => void;
+    // Ad-hoc rows under a project header suppress their inline path.
+    hidePath?: boolean;
 }
 
 const WorkflowRow = React.memo(function WorkflowRow({
@@ -694,6 +845,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
     expanded,
     onToggleCollapse,
     onOpenDetails,
+    hidePath = false,
 }: WorkflowRowProps) {
     const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
@@ -922,6 +1074,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
                 <WorkflowSessionRow
                     session={session}
                     mode="standalone"
+                    hidePath={hidePath}
                     extraMenuActions={[
                         {
                             label: t("workflows.actionAttachToWorkflowTitle"),

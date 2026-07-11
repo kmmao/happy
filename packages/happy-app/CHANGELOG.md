@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.46.0 - 2026-07-12
+
+The Sessions tab regains project grouping — Ad-hoc sessions are once again grouped under a project header so you can tell at a glance which project each one belongs to, even when many interleave. Agent loops pick up a pile of controls: a one-tap Run now, a per-iteration fresh-session toggle, an AI backend profile picker, 1M-context defaults, and full edit support. PTY sessions gain an authoritative goal bar, and a streaming-truncation bug plus a plan-mode auto-approve bug are fixed. Companion releases: `@kmmao/happy-coder@0.102.30`, `@kmmao/happy-wire@0.36.0`.
+
+### Sessions list
+- Added project grouping back to the Ad-hoc sessions tab. Sessions are grouped under a project header (project path + machine name), groups sorted by most recent activity and sessions within a group likewise. When sessions from many projects interleave, you can now tell which project each one belongs to instead of scanning per-row paths.
+- Improved grouped rows to drop their now-redundant inline project path — the path lives on the group header once, not on every row. Terminal titles, worktree branch arrows, and the daemon marker still render, since those carry per-session info the header doesn't.
+
+### Agent loops
+- Added Run now to the long-press menu of generic, server-managed loops. Fires a single iteration immediately so you can confirm a loop's config actually works without waiting for the next scheduled tick.
+- Added a fresh-session-per-iteration toggle to Create Loop. The default reuses one guardian session across iterations (context accumulates, so an edited prompt stacks on old context); the new mode spawns a clean session each iteration so an edited prompt takes effect cleanly, with long-term state carried across iterations via memory.md.
+- Added an AI backend profile picker to Create Loop. Loops can now run on non-default providers (MiniMax, GLM, etc.) by selecting a profile; the model list follows the chosen profile, and the picker preseeds/writes back across create, edit, and adopt modes.
+- Fixed new loops silently defaulting to a 200K context window. Create Loop now seeds the model from your Settings → Agents default (Claude Code's default Opus runs at 1M), and the CLI falls back to the 1M default for existing loops that never pinned a model. The model picker is now collapsible with a "follows settings default" hint.
+- Added a loop edit mode. The workflow detail panel's Edit entry reopens Create Loop to change a loop's prompt, schedule, model, effort, name, and bootstrap command in place.
+
+### Agent goal bar
+- Added an authoritative agent goal bar for PTY-mode sessions. `/goal` state is scanned straight from the Claude transcript and rendered as a goal bar above the composer, with clear and edit actions — so the App reflects the same goal the native session is tracking.
+
+### Fixes
+- Fixed a fully-delivered assistant reply freezing at its first characters in the App while the TUI showed the whole thing. Non-streamed messages (and messages whose cell was remounted as the list scrolled) now render in full immediately; only text that grows after mount is typewriter-animated. Most visible with background agents.
+- Fixed Yolo/bypass auto-approving ExitPlanMode before the plan picker could render, which made the "Clear context & execute" option unreachable exactly on the long-context 429 hot path. ExitPlanMode now always reaches the picker; genuinely unattended flows use the CLI's `HAPPY_YOLO_EXIT_PLAN_AUTO_APPROVE=1` instead.
+
+### Under the hood
+- Deepened testable seams across the CLI, Server, and App (ADR-0056 through ADR-0073) and added RPC security, sync-logic, and agent-goal-status visibility tests. No behavior changes at call sites.
+
 ## 2.45.0 - 2026-07-04
 
 Mostly an internal architecture-deepening cycle — a dozen new testable seams got extracted across the App (SessionController, turnLifecycle, toolMetadata, permission handling, tool-view visibility, and more), with a handful of user-visible fixes riding along. The inline image picker ceiling jumps from 5 to 20 per message, the supervisor loop's daily-limit exit is now labeled correctly across every language instead of being mis-bucketed as a generic "session ended," Machine metadata stops silently dropping `happyLibDir`, and 7 more locales get their catch-up i18n translations. Companion releases: `@kmmao/happy-coder@0.102.12`, `@kmmao/happy-wire@0.36.0`.

@@ -98,6 +98,13 @@ interface WorkflowSessionRowProps {
         onPress: () => void;
         style?: "default" | "destructive";
     }>;
+    /**
+     * Suppress the row's own project-path subtitle when the row is already
+     * grouped under a project-path header (WorkflowList Ad-hoc tab). Terminal
+     * titles / worktree branches still render — only the redundant plain path
+     * (and the daemon marker's path prefix) is hidden.
+     */
+    hidePath?: boolean;
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -105,7 +112,7 @@ const styles = StyleSheet.create((theme) => ({
     rowStandalone: {
         flexDirection: "column",
         paddingHorizontal: 14,
-        paddingVertical: 12,
+        paddingVertical: 10,
         backgroundColor: theme.colors.surface,
     },
     // treeChild variant — flat (parent provides background)
@@ -128,8 +135,8 @@ const styles = StyleSheet.create((theme) => ({
     },
     avatarContainer: {
         position: "relative",
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
     },
     avatarContainerSmall: {
         position: "relative",
@@ -150,9 +157,9 @@ const styles = StyleSheet.create((theme) => ({
     },
     content: {
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 10,
         minWidth: 0,
-        gap: 8,
+        gap: 6,
     },
     contentTree: {
         flex: 1,
@@ -198,32 +205,13 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         ...Typography.default(),
     },
-    requestPreview: {
-        fontSize: 11,
-        lineHeight: 14,
-        color: theme.colors.textSecondary,
-        ...Typography.default(),
-    },
-    requestPreviewAuto: {
-        color: theme.colors.accentPurple,
-        textShadowColor: `${theme.colors.accentPurple}66`,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
-    },
-    statusRow: {
+    // Status merged into the tags row: dot + label as a leading inline group.
+    statusInline: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-    },
-    statusLeft: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    statusDotContainer: {
-        alignItems: "center",
-        justifyContent: "center",
-        height: 16,
-        marginRight: 6,
+        gap: 4,
+        flexShrink: 1,
+        minWidth: 0,
     },
     statusText: {
         fontSize: 11,
@@ -320,6 +308,7 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
     session,
     mode = "standalone",
     extraMenuActions,
+    hidePath = false,
 }: WorkflowSessionRowProps) {
     const { theme } = useUnistyles();
     const sessionStatus = useSessionStatus(session);
@@ -329,7 +318,9 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
     const liveStatus = isSessionRunning(session)
         ? formatTerminalLiveStatus(terminalStatus)
         : null;
-    const sessionSubtitle = getSessionSubtitle(session, liveStatus ?? terminalTitle);
+    const sessionSubtitle = getSessionSubtitle(session, liveStatus ?? terminalTitle, {
+        hideProjectPath: hidePath,
+    });
     const pickerWaiting =
         isSessionRunning(session) && terminalStatus?.pickerPending === true;
 
@@ -344,7 +335,6 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
 
     const avatarId = React.useMemo(() => getSessionAvatarId(session), [session]);
     const hasUnreadMessages = useHasUnreadMessages(session.id);
-    const latestRequestPreview = session.latestUserRequestPreview;
     const scopeTone = React.useMemo(
         () => resolveProjectSessionScopeTone(session),
         [session],
@@ -356,6 +346,13 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                 machineLabel: machine?.metadata?.displayName ?? null,
             }),
         [machine?.metadata?.displayName, session],
+    );
+    // Under a project group header the machine is already shown once on the
+    // header, so drop the redundant per-row machine badge (version / branch
+    // badges stay — they carry per-session info the header doesn't).
+    const visibleBadges = React.useMemo(
+        () => (hidePath ? textBadges.filter((b) => b.kind !== "machine") : textBadges),
+        [textBadges, hidePath],
     );
 
     const { isHovered, hoverProps } = useWebHoverProps();
@@ -511,7 +508,7 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
 
     const isBusy = deletingSession || reactivatingSession || archivingSession;
     const isTree = mode === "treeChild";
-    const avatarSize = isTree ? 32 : 44;
+    const avatarSize = isTree ? 32 : 40;
 
     return (
         <Pressable
@@ -625,50 +622,24 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                         );
                     })()}
 
-                    {/* Subtitle (path / live status) */}
-                    <Text
-                        style={[
-                            styles.subtitle,
-                            pickerWaiting && { color: theme.colors.warning },
-                        ]}
-                        numberOfLines={1}
-                    >
-                        {sessionSubtitle}
-                    </Text>
-
-                    {/* Status + token usage */}
-                    <View style={styles.statusRow}>
-                        <View style={styles.statusLeft}>
-                            <View style={styles.statusDotContainer}>
-                                <StatusDot
-                                    color={sessionStatus.statusDotColor}
-                                    isPulsing={sessionStatus.isPulsing}
-                                />
-                            </View>
-                            <Text style={[styles.statusText, { color: sessionStatus.statusColor }]}>
-                                {sessionStatus.statusText}
-                            </Text>
-                        </View>
-                        {session.latestUsage ? (
-                            <Text style={styles.usageText}>
-                                {formatTokenCountShort(
-                                    session.latestUsage.totalInputTokens +
-                                        session.latestUsage.totalOutputTokens,
-                                )}
-                            </Text>
-                        ) : null}
-                    </View>
-                    {latestRequestPreview ? (
+                    {/* Subtitle (path / live status). Hidden when empty —
+                        happens under a project-path header (hidePath) for a
+                        plain-path session with no terminal title. */}
+                    {sessionSubtitle ? (
                         <Text
                             style={[
-                                styles.requestPreview,
-                                latestRequestPreview.isAutoOptionSend && styles.requestPreviewAuto,
+                                styles.subtitle,
+                                pickerWaiting && { color: theme.colors.warning },
                             ]}
                             numberOfLines={1}
                         >
-                            {latestRequestPreview.text}
+                            {sessionSubtitle}
                         </Text>
                     ) : null}
+
+                    {/* Status + request preview both removed from the content
+                        column to shrink the card — status now rides on the
+                        bottom tags row; the preview is dropped entirely. */}
                 </View>
             </View>
 
@@ -677,7 +648,20 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                 multi-session workflow shows the same identity badges
                 (scope, provider+model, branch, machine, user tags,
                 auto-send) the user sees on its ad-hoc cousin. */}
-            <View style={[styles.tagsRow, { marginTop: isTree ? 6 : 8 }]}>
+            <View style={[styles.tagsRow, { marginTop: isTree ? 6 : 6 }]}>
+                {/* Live status, merged into the tags line: dot + label. */}
+                <View style={styles.statusInline}>
+                    <StatusDot
+                        color={sessionStatus.statusDotColor}
+                        isPulsing={sessionStatus.isPulsing}
+                    />
+                    <Text
+                        style={[styles.statusText, { color: sessionStatus.statusColor }]}
+                        numberOfLines={1}
+                    >
+                        {sessionStatus.statusText}
+                    </Text>
+                </View>
                 <View
                     style={[
                         styles.tag,
@@ -697,8 +681,10 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                             : t("sessionInfo.tagMain")}
                     </Text>
                 </View>
-                <SessionProviderTag session={session} includeModel />
-                {textBadges.map((badge) => (
+                {/* Provider only — the specific model is intentionally dropped
+                    to keep the tag short (user preference). */}
+                <SessionProviderTag session={session} />
+                {visibleBadges.map((badge) => (
                     <View
                         key={`${session.id}-${badge.kind}-${badge.value}`}
                         style={[
@@ -753,6 +739,15 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                         </Text>
                     </View>
                 )}
+                {/* Token usage — trailing item on the merged status/tags row. */}
+                {session.latestUsage ? (
+                    <Text style={styles.usageText}>
+                        {formatTokenCountShort(
+                            session.latestUsage.totalInputTokens +
+                                session.latestUsage.totalOutputTokens,
+                        )}
+                    </Text>
+                ) : null}
             </View>
         </Pressable>
     );
