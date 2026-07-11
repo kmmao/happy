@@ -604,7 +604,14 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
             if (workflow.kind !== "adhoc") continue;
             const meta = workflow.session.metadata;
             const machineId = meta?.machineId || "unknown";
-            const path = meta?.path || "";
+            // Worktree sessions live in a separate checkout dir; group them
+            // under their parent repo so a branch sits with the main project's
+            // sessions instead of forming its own worktree-path group. The row
+            // still shows its branch identity (⎇ badge + "branch → parent").
+            const path =
+                (meta?.worktree?.isWorktree && meta.worktree.parentRepoPath) ||
+                meta?.path ||
+                "";
             const key = `${machineId}:${path}`;
 
             const existing = groups.get(key);
