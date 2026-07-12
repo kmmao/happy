@@ -5,6 +5,7 @@ import { WorkflowDefinitionSchema, type WorkflowDefinition } from "@kmmao/happy-
 import { logger } from "@/lib";
 import { runWorkflow, type WorkflowStepExecutor } from "./runWorkflow";
 import { persistWorkflow } from "./persistWorkflow";
+import { WorkflowRunReporter } from "./persistWorkflowRun";
 import { makeClaudeSubAgentExecutor } from "./spawnClaudeSubAgent";
 
 /**
@@ -67,14 +68,23 @@ async function runWorkflowCommand(rest: string[]): Promise<void> {
     ? dryRunExecutor
     : makeClaudeSubAgentExecutor({ cwd });
 
-  const result = await runWorkflow(definition, executor);
+  // Live progress: write <id>.json (all-pending), update it on every step
+  // transition. The mobile app polls this file to render real-time status.
+  const reporter = new WorkflowRunReporter(definition, workflowsDirFor(cwd));
+  await reporter.start();
+
+  const result = await runWorkflow(definition, executor, (stepId, status) =>
+    reporter.note(stepId, status),
+  );
   for (const r of result.results) {
     logger.print(`  ${r.ok ? "✓" : "✗"} ${r.role} (${r.stepId})${r.error ? ` — ${r.error}` : ""}`);
   }
 
+  const statusPath = await reporter.finish(result.ok);
   const filePath = await persistWorkflow(definition, workflowsDirFor(cwd));
   logger.print(`${result.ok ? "Workflow complete" : "Workflow finished with failures"}.`);
   logger.print(`Persisted replay: ${filePath}`);
+  logger.print(`Run state: ${statusPath}`);
   process.exit(result.ok ? 0 : 1);
 }
 

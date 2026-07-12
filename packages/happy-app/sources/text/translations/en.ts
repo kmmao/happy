@@ -2944,6 +2944,9 @@ export const en: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    statusRunning: "Running",
+    statusCompleted: "Completed",
+    statusFailed: "Failed",
     title: "Workflows",
     empty: "No workflows yet. Run `happy workflow run <spec.json>`.",
     stepCount: ({ count }: { count: number }) => `${count} steps`,

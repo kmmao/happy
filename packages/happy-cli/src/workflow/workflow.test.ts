@@ -38,6 +38,25 @@ describe("runWorkflow", () => {
     expect(events.indexOf("start:s3")).toBeGreaterThan(events.indexOf("end:s2"));
   });
 
+  it("reports running → succeeded/failed per step via onStepStatus", async () => {
+    const events: string[] = [];
+    await runWorkflow(
+      DEF,
+      async (step) => ({
+        stepId: step.id,
+        role: step.role,
+        ok: step.id !== "s2",
+        error: step.id === "s2" ? "x" : undefined,
+      }),
+      (stepId, status) => events.push(`${stepId}:${status}`),
+    );
+    expect(events).toContain("s1:running");
+    expect(events).toContain("s1:succeeded");
+    expect(events).toContain("s2:failed");
+    // Every step announces running before its terminal status.
+    expect(events.indexOf("s1:running")).toBeLessThan(events.indexOf("s1:succeeded"));
+  });
+
   it("stops subsequent waves when a wave has a failure", async () => {
     const seen: string[] = [];
     const result = await runWorkflow(DEF, async (step) => {

@@ -3066,6 +3066,9 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    statusRunning: "実行中",
+    statusCompleted: "完了",
+    statusFailed: "失敗",
     title: "ワークフロー",
     empty: "ワークフローはまだありません。`happy workflow run <spec.json>` を実行してください。",
     stepCount: ({ count }: { count: number }) => `${count} ステップ`,

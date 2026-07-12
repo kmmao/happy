@@ -2,6 +2,7 @@ import {
   groupWorkflowWaves,
   type WorkflowDefinition,
   type WorkflowStep,
+  type WorkflowStepStatus,
 } from "@kmmao/happy-wire";
 
 /**
@@ -41,9 +42,19 @@ export interface WorkflowRunResult {
  * subsequent waves — later waves typically depend on earlier ones, so running
  * them against a broken foundation would produce misleading results.
  */
+/**
+ * Optional progress hook fired on each step transition. Used by the CLI command
+ * to persist a live `<id>.json` run-state file the app polls.
+ */
+export type StepStatusListener = (
+  stepId: string,
+  status: WorkflowStepStatus,
+) => void;
+
 export async function runWorkflow(
   definition: WorkflowDefinition,
   executor: WorkflowStepExecutor,
+  onStepStatus?: StepStatusListener,
 ): Promise<WorkflowRunResult> {
   const waves = groupWorkflowWaves(definition.steps);
   const results: WorkflowStepResult[] = [];
@@ -52,9 +63,13 @@ export async function runWorkflow(
   for (const wave of waves) {
     const settled = await Promise.all(
       wave.map(async (step): Promise<WorkflowStepResult> => {
+        onStepStatus?.(step.id, "running");
         try {
-          return await executor(step);
+          const r = await executor(step);
+          onStepStatus?.(step.id, r.ok ? "succeeded" : "failed");
+          return r;
         } catch (err) {
+          onStepStatus?.(step.id, "failed");
           return {
             stepId: step.id,
             role: step.role,

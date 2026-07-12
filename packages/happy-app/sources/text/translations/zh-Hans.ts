@@ -2886,6 +2886,9 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    statusRunning: "运行中",
+    statusCompleted: "已完成",
+    statusFailed: "失败",
     title: "工作流",
     empty: "还没有工作流。运行 `happy workflow run <spec.json>`。",
     stepCount: ({ count }: { count: number }) => `${count} 个步骤`,

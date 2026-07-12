@@ -40,6 +40,33 @@ export const WorkflowDefinitionSchema = z.object({
 });
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 
+// ===== Live run state (Phase 5 progress reporting) =====
+
+/** Per-step lifecycle status, written incrementally as a workflow runs. */
+export const WorkflowStepStatusSchema = z.enum([
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+]);
+export type WorkflowStepStatus = z.infer<typeof WorkflowStepStatusSchema>;
+
+export const WorkflowRunStatusSchema = z.enum(["running", "completed", "failed"]);
+export type WorkflowRunStatus = z.infer<typeof WorkflowRunStatusSchema>;
+
+/**
+ * A workflow run's live state, persisted to `<cwd>/.happy/workflows/<id>.json`
+ * and updated after every step transition. The mobile app reads this file to
+ * render real-time progress (polling while `status === "running"`).
+ */
+export const WorkflowRunSchema = z.object({
+  definition: WorkflowDefinitionSchema,
+  status: WorkflowRunStatusSchema,
+  steps: z.record(z.string(), WorkflowStepStatusSchema),
+  updatedAt: z.number(),
+});
+export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
+
 /**
  * Group steps into ordered waves (ascending `order`). Each inner array is a set
  * of steps to run concurrently. Pure — shared by the runner and any UI preview.

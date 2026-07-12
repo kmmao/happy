@@ -1,25 +1,29 @@
 /**
- * Dynamic Workflows viewer (Phase 5).
+ * Dynamic Workflows viewer (Phase 5) with live progress.
  *
- * Browses the project-local `<cwd>/.happy/workflows/*.js` replay scripts the CLI
- * `happy workflow run` command persists, and renders each workflow's roles,
- * models, and wave order for on-device review.
+ * Browses the project-local `<cwd>/.happy/workflows/*.json` run-state files the
+ * CLI `happy workflow run` command writes incrementally, and renders each
+ * workflow's goal, waves, roles, models, and per-step status. Polls while any
+ * workflow is still running so progress updates in near-real-time.
  *
  * Route: /session/{id}/workflows
  */
 import * as React from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import { StyleSheet } from "react-native-unistyles";
-import type { WorkflowDefinition, WorkflowStep } from "@kmmao/happy-wire";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import type { WorkflowRun, WorkflowStep, WorkflowStepStatus } from "@kmmao/happy-wire";
 import { storage } from "@/sync/storage";
 import { sessionListDirectory, sessionReadFile } from "@/sync/ops";
 import { decodeBase64 } from "@/encryption/base64";
 import { decodeUTF8 } from "@/encryption/text";
-import { parseWorkflowJs } from "@/utils/parseWorkflowJs";
+import { parseWorkflowRunJson } from "@/utils/parseWorkflowRunJson";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { t } from "@/text";
 import { log } from "@/log";
+
+const POLL_MS = 2500;
 
 function groupWaves(steps: WorkflowStep[]): WorkflowStep[][] {
     const byOrder = new Map<number, WorkflowStep[]>();
@@ -31,43 +35,71 @@ function groupWaves(steps: WorkflowStep[]): WorkflowStep[][] {
     return [...byOrder.keys()].sort((a, b) => a - b).map((o) => byOrder.get(o)!);
 }
 
+function StepStatusIcon({ status }: { status: WorkflowStepStatus | undefined }) {
+    const { theme } = useUnistyles();
+    if (status === "running") return <ActivityIndicator size="small" />;
+    if (status === "succeeded")
+        return <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />;
+    if (status === "failed")
+        return (
+            <Ionicons
+                name="close-circle"
+                size={16}
+                color={theme.colors.permissionButton.deny.background}
+            />
+        );
+    return <Ionicons name="ellipse-outline" size={14} color={theme.colors.textSecondary} />;
+}
+
 export default React.memo(function WorkflowsPage() {
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
-    const [workflows, setWorkflows] = React.useState<WorkflowDefinition[] | null>(null);
+    const [runs, setRuns] = React.useState<WorkflowRun[] | null>(null);
 
     const [loading, load] = useHappyAction(async () => {
         const cwd = storage.getState().sessions[sessionId]?.metadata?.path;
         if (!cwd) {
-            setWorkflows([]);
+            setRuns([]);
             return;
         }
         const dir = `${cwd}/.happy/workflows`;
         const listed = await sessionListDirectory(sessionId, dir);
-        const jsFiles = (listed.entries ?? [])
-            .filter((e) => e.type === "file" && e.name.endsWith(".js"))
+        const jsonFiles = (listed.entries ?? [])
+            .filter((e) => e.type === "file" && e.name.endsWith(".json"))
             .map((e) => e.name);
 
-        const parsed: WorkflowDefinition[] = [];
-        for (const name of jsFiles) {
+        const parsed: WorkflowRun[] = [];
+        for (const name of jsonFiles) {
             try {
                 const res = await sessionReadFile(sessionId, `${dir}/${name}`);
                 if (!res.success || !res.content) continue;
-                const wf = parseWorkflowJs(decodeUTF8(decodeBase64(res.content)));
-                if (wf) parsed.push(wf);
+                const run = parseWorkflowRunJson(decodeUTF8(decodeBase64(res.content)));
+                if (run) parsed.push(run);
             } catch (e) {
-                log.error("Failed to read workflow file:", e);
+                log.error("Failed to read workflow run file:", e);
             }
         }
-        parsed.sort((a, b) => b.createdAt - a.createdAt);
-        setWorkflows(parsed);
+        parsed.sort((a, b) => b.updatedAt - a.updatedAt);
+        setRuns(parsed);
     });
 
+    // Initial load + poll while any workflow is still running.
     React.useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId]);
 
-    if (loading && workflows === null) {
+    const anyRunning = React.useMemo(
+        () => (runs ?? []).some((r) => r.status === "running"),
+        [runs],
+    );
+    React.useEffect(() => {
+        if (!anyRunning) return;
+        const timer = setInterval(() => load(), POLL_MS);
+        return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [anyRunning, sessionId]);
+
+    if (loading && runs === null) {
         return (
             <View style={styles.center}>
                 <ActivityIndicator />
@@ -75,7 +107,7 @@ export default React.memo(function WorkflowsPage() {
         );
     }
 
-    if (!workflows || workflows.length === 0) {
+    if (!runs || runs.length === 0) {
         return (
             <View style={styles.center}>
                 <Text style={styles.empty}>{t("dynamicWorkflows.empty")}</Text>
@@ -85,34 +117,55 @@ export default React.memo(function WorkflowsPage() {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ padding: 12, gap: 12 }}>
-            {workflows.map((wf) => (
-                <View key={wf.id} style={styles.card}>
-                    <Text style={styles.goal} numberOfLines={2}>
-                        {wf.goal}
-                    </Text>
-                    <Text style={styles.meta}>
-                        {t("dynamicWorkflows.stepCount", { count: wf.steps.length })}
-                    </Text>
-                    {groupWaves(wf.steps).map((wave, wi) => (
-                        <View key={wi} style={styles.wave}>
-                            <Text style={styles.waveLabel}>
-                                {t("dynamicWorkflows.wave", { index: wi + 1 })}
+            {runs.map((run) => {
+                const wf = run.definition;
+                const statusLabel =
+                    run.status === "running"
+                        ? t("dynamicWorkflows.statusRunning")
+                        : run.status === "completed"
+                          ? t("dynamicWorkflows.statusCompleted")
+                          : t("dynamicWorkflows.statusFailed");
+                const badgeStyle =
+                    run.status === "running"
+                        ? styles.badge_running
+                        : run.status === "completed"
+                          ? styles.badge_completed
+                          : styles.badge_failed;
+                return (
+                    <View key={wf.id} style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.goal} numberOfLines={2}>
+                                {wf.goal}
                             </Text>
-                            {wave.map((step) => (
-                                <View key={step.id} style={styles.step}>
-                                    <View style={styles.stepHeader}>
-                                        <Text style={styles.role}>{step.role}</Text>
-                                        <Text style={styles.model}>{step.model ?? "default"}</Text>
-                                    </View>
-                                    <Text style={styles.prompt} numberOfLines={3}>
-                                        {step.prompt}
-                                    </Text>
-                                </View>
-                            ))}
+                            <Text style={[styles.badge, badgeStyle]}>{statusLabel}</Text>
                         </View>
-                    ))}
-                </View>
-            ))}
+                        <Text style={styles.meta}>
+                            {t("dynamicWorkflows.stepCount", { count: wf.steps.length })}
+                        </Text>
+                        {groupWaves(wf.steps).map((wave, wi) => (
+                            <View key={wi} style={styles.wave}>
+                                <Text style={styles.waveLabel}>
+                                    {t("dynamicWorkflows.wave", { index: wi + 1 })}
+                                </Text>
+                                {wave.map((step) => (
+                                    <View key={step.id} style={styles.step}>
+                                        <View style={styles.stepHeader}>
+                                            <View style={styles.stepHeaderLeft}>
+                                                <StepStatusIcon status={run.steps[step.id]} />
+                                                <Text style={styles.role}>{step.role}</Text>
+                                            </View>
+                                            <Text style={styles.model}>{step.model ?? "default"}</Text>
+                                        </View>
+                                        <Text style={styles.prompt} numberOfLines={3}>
+                                            {step.prompt}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+            })}
         </ScrollView>
     );
 });
@@ -129,23 +182,34 @@ const styles = StyleSheet.create((theme) => ({
         padding: 12,
         gap: 8,
     },
-    goal: { color: theme.colors.text, fontSize: 15, fontWeight: "600" },
+    cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+    goal: { color: theme.colors.text, fontSize: 15, fontWeight: "600", flexShrink: 1 },
+    badge: {
+        fontSize: 11,
+        fontWeight: "700",
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        overflow: "hidden",
+    },
+    badge_running: { color: theme.colors.text, backgroundColor: theme.colors.surfacePressed },
+    badge_completed: { color: theme.colors.success, backgroundColor: `${theme.colors.success}1e` },
+    badge_failed: {
+        color: theme.colors.permissionButton.deny.background,
+        backgroundColor: `${theme.colors.permissionButton.deny.background}1e`,
+    },
     meta: { color: theme.colors.textSecondary, fontSize: 12 },
-    wave: {
-        gap: 6,
-        borderLeftWidth: 2,
-        borderLeftColor: theme.colors.divider,
-        paddingLeft: 10,
+    wave: { gap: 6, borderLeftWidth: 2, borderLeftColor: theme.colors.divider, paddingLeft: 10 },
+    waveLabel: {
+        color: theme.colors.textSecondary,
+        fontSize: 11,
+        fontWeight: "700",
+        textTransform: "uppercase",
     },
-    waveLabel: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
-    step: {
-        backgroundColor: theme.colors.surfacePressed,
-        borderRadius: 8,
-        padding: 8,
-        gap: 2,
-    },
+    step: { backgroundColor: theme.colors.surfacePressed, borderRadius: 8, padding: 8, gap: 2 },
     stepHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    stepHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
     role: { color: theme.colors.text, fontSize: 13, fontWeight: "600" },
-    model: { color: theme.colors.textSecondary, fontSize: 11, fontFamily: "Menlo" },
+    model: { color: theme.colors.textSecondary, fontSize: 11 },
     prompt: { color: theme.colors.textSecondary, fontSize: 12 },
 }));
