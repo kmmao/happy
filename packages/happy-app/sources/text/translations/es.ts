@@ -2951,6 +2951,8 @@ export const es: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Diff del PR",
+    reviewCard: "Revisar diff del PR",
     loadFailed: "No se pudo cargar el diff del PR",
     draft: "Borrador",
     filesCount: ({ count }: { count: number }) => `${count} archivos`,

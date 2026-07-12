@@ -2952,6 +2952,8 @@ export const ca: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Diff del PR",
+    reviewCard: "Revisa el diff del PR",
     loadFailed: "No s'ha pogut carregar el diff del PR",
     draft: "Esborrany",
     filesCount: ({ count }: { count: number }) => `${count} fitxers`,

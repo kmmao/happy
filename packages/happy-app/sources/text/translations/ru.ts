@@ -2897,6 +2897,8 @@ export const ru: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Diff PR",
+    reviewCard: "Просмотреть diff PR",
     loadFailed: "Не удалось загрузить diff PR",
     draft: "Черновик",
     filesCount: ({ count }: { count: number }) => `${count} файлов`,

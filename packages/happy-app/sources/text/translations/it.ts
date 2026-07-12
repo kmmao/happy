@@ -3088,6 +3088,8 @@ export const it: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Diff della PR",
+    reviewCard: "Rivedi il diff della PR",
     loadFailed: "Impossibile caricare il diff della PR",
     draft: "Bozza",
     filesCount: ({ count }: { count: number }) => `${count} file`,

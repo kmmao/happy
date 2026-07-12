@@ -36,6 +36,7 @@ import { parseCodexServicePreview } from "./tools/codexServiceCompat";
 import { CodexDiffView } from "./tools/views/CodexDiffView";
 import type { MessageMeta } from "@/sync/typesMessageMeta";
 import { StreamingTextView } from "./StreamingTextView";
+import { PrReviewCard } from "./tools/PrReviewCard";
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from "./parseLocalCommandMessage";
 import { getPermissionModeLabel } from "./modelModeOptions";
 
@@ -763,6 +764,13 @@ function AgentTextBlock(props: {
             onOptionPress={handleOptionPress}
             optionStatsResolver={optionStatsResolver}
           />
+        )}
+        {/* Review-driven loop (Phase 2B): surface a tappable diff card when the
+            message mentions a GitHub PR (e.g. after `gh pr create`). Renders
+            nothing when there is no PR URL. Skipped while streaming to avoid
+            flashing on partial URLs. */}
+        {!isStreaming && (
+          <PrReviewCard text={props.message.text} sessionId={props.sessionId} />
         )}
       </View>
     </View>

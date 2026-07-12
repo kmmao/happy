@@ -2990,6 +2990,8 @@ export const en = {
   },
 
   githubPr: {
+    title: "PR Diff",
+    reviewCard: "Review PR diff",
     loadFailed: "Failed to load PR diff",
     draft: "Draft",
     filesCount: ({ count }: { count: number }) => `${count} files`,

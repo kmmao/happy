@@ -2885,6 +2885,8 @@ export const zhHant: TranslationStructure = {
   },
 
   githubPr: {
+    title: "PR Diff",
+    reviewCard: "查看 PR Diff",
     loadFailed: "載入 PR diff 失敗",
     draft: "草稿",
     filesCount: ({ count }: { count: number }) => `${count} 個檔案`,

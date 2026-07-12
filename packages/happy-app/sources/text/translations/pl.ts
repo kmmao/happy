@@ -2961,6 +2961,8 @@ export const pl: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Różnica PR",
+    reviewCard: "Przejrzyj różnicę PR",
     loadFailed: "Nie udało się załadować różnicy PR",
     draft: "Wersja robocza",
     filesCount: ({ count }: { count: number }) => `${count} plików`,

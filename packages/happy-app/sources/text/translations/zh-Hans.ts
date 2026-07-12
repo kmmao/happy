@@ -2886,6 +2886,8 @@ export const zhHans: TranslationStructure = {
   },
 
   githubPr: {
+    title: "PR Diff",
+    reviewCard: "查看 PR Diff",
     loadFailed: "加载 PR diff 失败",
     draft: "草稿",
     filesCount: ({ count }: { count: number }) => `${count} 个文件`,

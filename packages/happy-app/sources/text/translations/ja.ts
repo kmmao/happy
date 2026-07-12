@@ -3066,6 +3066,8 @@ export const ja: TranslationStructure = {
   },
 
   githubPr: {
+    title: "PR Diff",
+    reviewCard: "PR の Diff をレビュー",
     loadFailed: "PR diff の読み込みに失敗しました",
     draft: "下書き",
     filesCount: ({ count }: { count: number }) => `${count} 件のファイル`,

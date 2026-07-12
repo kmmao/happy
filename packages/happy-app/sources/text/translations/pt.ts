@@ -2948,6 +2948,8 @@ export const pt: TranslationStructure = {
   },
 
   githubPr: {
+    title: "Diff do PR",
+    reviewCard: "Revisar diff do PR",
     loadFailed: "Falha ao carregar o diff do PR",
     draft: "Rascunho",
     filesCount: ({ count }: { count: number }) => `${count} arquivos`,
