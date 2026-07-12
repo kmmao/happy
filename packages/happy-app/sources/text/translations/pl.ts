@@ -2956,7 +2956,15 @@ export const pl: TranslationStructure = {
       yesAllowAllEdits: "Tak, zezwól na wszystkie edycje podczas tej sesji",
       yesForTool: "Tak, nie pytaj ponownie dla tego narzędzia",
       noTellClaude: "Nie, przekaż opinię",
+      dangerBadge: "Niebezpieczne",
     },
+  },
+
+  githubPr: {
+    loadFailed: "Nie udało się załadować różnicy PR",
+    draft: "Wersja robocza",
+    filesCount: ({ count }: { count: number }) => `${count} plików`,
+    truncated: "… różnica skrócona (za duża)",
   },
 
   plan: {

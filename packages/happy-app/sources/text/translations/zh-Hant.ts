@@ -2880,7 +2880,15 @@ export const zhHant: TranslationStructure = {
       yesAllowAllEdits: "是，允許本次工作階段的所有編輯",
       yesForTool: "是，不再詢問此工具",
       noTellClaude: "否，並告訴 Claude 該如何不同地操作",
+      dangerBadge: "危險操作",
     },
+  },
+
+  githubPr: {
+    loadFailed: "載入 PR diff 失敗",
+    draft: "草稿",
+    filesCount: ({ count }: { count: number }) => `${count} 個檔案`,
+    truncated: "… diff 已截斷（過大）",
   },
 
   plan: {

@@ -2881,7 +2881,15 @@ export const zhHans: TranslationStructure = {
       yesAllowAllEdits: "是，允许本次会话的所有编辑",
       yesForTool: "是，不再询问此工具",
       noTellClaude: "否，提供反馈",
+      dangerBadge: "危险操作",
     },
+  },
+
+  githubPr: {
+    loadFailed: "加载 PR diff 失败",
+    draft: "草稿",
+    filesCount: ({ count }: { count: number }) => `${count} 个文件`,
+    truncated: "… diff 已截断（过大）",
   },
 
   plan: {

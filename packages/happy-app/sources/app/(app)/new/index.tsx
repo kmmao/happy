@@ -10,6 +10,7 @@ import {
   Modal as RNModal,
 } from "react-native";
 import Constants from "expo-constants";
+import { formatVisualIntentRef } from "@kmmao/happy-wire";
 import { Typography } from "@/constants/Typography";
 import {
   useAllMachines,
@@ -160,11 +161,17 @@ async function deliverInitialSessionMessage(
         (r): r is PromiseFulfilledResult<{ path: string; fileName?: string }> =>
           r.status === "fulfilled",
       )
-      .map((r) =>
-        r.value.fileName
+      .map((r) => {
+        // HTML design drafts become a first-class Visual Intent reference
+        // ([design: …]) so the CLI harness treats them as an authoritative
+        // visual spec; everything else keeps the established image ref format.
+        if (r.value.fileName && /\.html?$/i.test(r.value.fileName)) {
+          return formatVisualIntentRef({ kind: "html", path: r.value.path });
+        }
+        return r.value.fileName
           ? `[image: ${r.value.path} | ${r.value.fileName}]`
-          : `[image: ${r.value.path}]`,
-      );
+          : `[image: ${r.value.path}]`;
+      });
     if (refs.length > 0) {
       imageRefs = refs.join("\n");
     }

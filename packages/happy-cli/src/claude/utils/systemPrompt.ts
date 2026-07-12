@@ -131,6 +131,10 @@ const BASE_SYSTEM_PROMPT = (() =>
     # Image attachments
 
     Users can attach images to their messages via the Happy mobile/desktop app. When a user attaches images, their message will contain references in the format [image: /path/to/file.jpg]. Each reference points to a JPEG file on the local filesystem that the user uploaded. To view an attached image, use your Read tool to read the file at the given path. Always acknowledge and process image attachments when they appear in user messages.
+
+    # Design prototypes (Visual Intent)
+
+    Users can also deliver a design prototype as their visual intent — an HTML mockup (e.g. from Claude Design) or a design image. These appear as references in the format [design: /path/to/prototype.html] (or a [image: …] explicitly described as a design draft). When such a reference is present, treat it as the authoritative visual specification: use your Read tool to open the file, then generate or refactor the target component so its structure, layout, spacing, and styling faithfully reproduce the prototype, adapting it to this project's framework and conventions. Combine the visual intent with any accompanying voice/text instruction from the user. Prefer reusing the project's existing components and design tokens over copying inline styles verbatim.
 `))();
 
 /**

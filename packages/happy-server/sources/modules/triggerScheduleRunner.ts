@@ -9,6 +9,7 @@ import { cronNextRunAt } from "./cronNextRunAt";
 import {
     buildTaskCreateData,
     dispatchTaskTrigger,
+    resolveSkillContents,
     resolveTaskRuntimeProfile,
     taskProfileFields,
 } from "@/app/api/task/taskCreate";
@@ -149,17 +150,22 @@ export async function checkAndTriggerSchedules(
             }
             const { profileId: resolvedProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 
-            let skillContents: Array<{ name: string; content: string }> | undefined;
+            let skillContents:
+                | Array<{ name: string; content: string; model?: string }>
+                | undefined;
             const skillIds: string[] = safeParseJsonArray(schedule.skillIds);
             if (skillIds.length > 0) {
                 const resolved = skillIds
                     .map((sid) => skillMap.get(sid))
                     .filter((s): s is NonNullable<typeof s> => s != null);
                 if (resolved.length > 0) {
-                    skillContents = resolved.map((s) => ({
-                        name: s.name,
-                        content: s.content,
-                    }));
+                    // Cron is a non-interactive trigger: strip front-matter,
+                    // route the skill model, and drop user-only skills so the
+                    // model can't autonomously run a guarded skill (Phase 3).
+                    skillContents = resolveSkillContents(
+                        resolved.map((s) => ({ name: s.name, content: s.content })),
+                        { interactive: false },
+                    );
                 }
             }
 

@@ -15,6 +15,7 @@ import {
     buildTaskCreateData,
     dispatchTaskTrigger,
     loadTaskSkillContents,
+    resolveSkillContents,
     profileUnavailableBody,
     resolveTaskRuntimeProfile,
     resolveTaskRuntimeProfileBestEffort,
@@ -158,7 +159,9 @@ export function taskRoutes(app: Fastify) {
             }
             const { profileId: taskProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 
-            const skillContents = await loadTaskSkillContents(userId, skillIds);
+            const skillContents = await loadTaskSkillContents(userId, skillIds, {
+                interactive: true,
+            });
 
             const task = await db.task.create({
                 data: buildTaskCreateData({
@@ -358,14 +361,19 @@ export function taskRoutes(app: Fastify) {
             const { profileId: retryProfileId, runtimeProfile: retryRuntimeProfile } =
                 taskProfileFields(retryResolution);
 
-            let skillContents: Array<{ name: string; content: string }> | undefined;
+            let skillContents:
+                | Array<{ name: string; content: string; model?: string }>
+                | undefined;
             const bindings = await db.taskSkillBinding.findMany({
                 where: { taskId: task.id },
                 include: { skill: true },
                 orderBy: { order: "asc" },
             });
             if (bindings.length > 0) {
-                skillContents = bindings.map((b) => ({ name: b.skill.name, content: b.skill.content }));
+                skillContents = resolveSkillContents(
+                    bindings.map((b) => ({ name: b.skill.name, content: b.skill.content })),
+                    { interactive: true },
+                );
             }
 
             const updated = await db.task.update({
@@ -816,10 +824,13 @@ export function taskRoutes(app: Fastify) {
 
                     const skillContents =
                         task.skillBindings.length > 0
-                            ? task.skillBindings.map((b) => ({
-                                  name: b.skill.name,
-                                  content: b.skill.content,
-                              }))
+                            ? resolveSkillContents(
+                                  task.skillBindings.map((b) => ({
+                                      name: b.skill.name,
+                                      content: b.skill.content,
+                                  })),
+                                  { interactive: true },
+                              )
                             : undefined;
 
                     await db.task.update({

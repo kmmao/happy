@@ -230,6 +230,9 @@ export const AgentStateSchema = z.object({
         tool: z.string(),
         arguments: z.any(),
         createdAt: z.number().nullish(),
+        // Auto Mode safety classification (Phase 1).
+        riskLevel: z.enum(["safe", "dangerous", "neutral"]).nullish(),
+        classifierReason: z.string().nullish(),
       }),
     )
     .nullish(),

@@ -2943,7 +2943,15 @@ export const pt: TranslationStructure = {
       yesAllowAllEdits: "Sim, permitir todas as edições durante esta sessão",
       yesForTool: "Sim, não perguntar novamente para esta ferramenta",
       noTellClaude: "Não, fornecer feedback",
+      dangerBadge: "Perigoso",
     },
+  },
+
+  githubPr: {
+    loadFailed: "Falha ao carregar o diff do PR",
+    draft: "Rascunho",
+    filesCount: ({ count }: { count: number }) => `${count} arquivos`,
+    truncated: "… diff truncado (muito grande)",
   },
 
   plan: {
