@@ -90,9 +90,9 @@ export class WorkflowRunReporter {
   }
 
   /** Await pending writes, then write the terminal state. */
-  async finish(ok: boolean): Promise<string> {
+  async finish(status: WorkflowRunStatus): Promise<string> {
     await this.writeChain;
-    await this.enqueueFlush(ok ? "completed" : "failed");
+    await this.enqueueFlush(status);
     return this.filePath;
   }
 }

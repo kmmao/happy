@@ -2411,6 +2411,75 @@ export async function sessionRunWorkflow(
   }
 }
 
+/** Cancel a running workflow (Phase 5). */
+export async function sessionCancelWorkflow(
+  sessionId: string,
+  workflowId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) return { success: false, error: rpcError };
+  try {
+    return await apiSocket.sessionRPC<
+      { success: boolean; error?: string },
+      { workflowId: string }
+    >(sessionId, "workflowCancel", { workflowId });
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/** Delete a persisted workflow's files (Phase 5). */
+export async function sessionDeleteWorkflow(
+  sessionId: string,
+  workflowId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) return { success: false, error: rpcError };
+  try {
+    return await apiSocket.sessionRPC<
+      { success: boolean; error?: string },
+      { workflowId: string }
+    >(sessionId, "workflowDelete", { workflowId });
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/** Merge or discard an isolation branch (Phase 5 review). */
+export async function sessionWorkflowBranchAction(
+  sessionId: string,
+  branch: string,
+  action: "merge" | "discard",
+): Promise<{ success: boolean; error?: string }> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) return { success: false, error: rpcError };
+  try {
+    return await apiSocket.sessionRPC<
+      { success: boolean; error?: string },
+      { branch: string; action: "merge" | "discard" }
+    >(sessionId, "workflowBranchAction", { branch, action });
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+/** Fetch an isolation branch's diff vs HEAD (Phase 5 review). */
+export async function sessionWorkflowBranchDiff(
+  sessionId: string,
+  branch: string,
+): Promise<{ success: boolean; diff?: string; error?: string }> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) return { success: false, error: rpcError };
+  try {
+    return await apiSocket.sessionRPC<
+      { success: boolean; diff?: string; error?: string },
+      { branch: string }
+    >(sessionId, "workflowBranchDiff", { branch });
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
 /**
  * Get directory tree from the session
  */

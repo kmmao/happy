@@ -33,7 +33,7 @@ export function workflowsDirFor(cwd: string): string {
 export async function runWorkflowInDir(
   definition: WorkflowDefinition,
   cwd: string,
-  opts?: { dryRun?: boolean; isolation?: boolean },
+  opts?: { dryRun?: boolean; isolation?: boolean; signal?: AbortSignal },
 ): Promise<RunWorkflowInDirResult> {
   const workflowsDir = workflowsDirFor(cwd);
   const reporter = new WorkflowRunReporter(definition, workflowsDir);
@@ -42,7 +42,7 @@ export async function runWorkflowInDir(
   const executor = opts?.dryRun
     ? dryRunExecutor
     : makeClaudeSubAgentExecutor(
-        { cwd, isolation: opts?.isolation, workflowId: definition.id },
+        { cwd, isolation: opts?.isolation, workflowId: definition.id, signal: opts?.signal },
         undefined,
         { onBranch: (stepId, branch) => reporter.noteBranch(stepId, branch) },
       );
@@ -53,9 +53,12 @@ export async function runWorkflowInDir(
     (r) => {
       if (r.output) reporter.noteOutput(r.stepId, r.output);
     },
+    opts?.signal,
   );
 
-  const statusPath = await reporter.finish(result.ok);
+  const statusPath = await reporter.finish(
+    result.cancelled ? "cancelled" : result.ok ? "completed" : "failed",
+  );
   const jsPath = await persistWorkflow(definition, workflowsDir);
   return { ok: result.ok, statusPath, jsPath };
 }

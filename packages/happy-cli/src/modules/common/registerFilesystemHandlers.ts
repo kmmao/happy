@@ -1,14 +1,16 @@
 import { logger } from "@/ui/logger";
 import { exec, ExecOptions } from "child_process";
 import { promisify } from "util";
-import { readFile, writeFile, readdir, stat, mkdir } from "fs/promises";
+import { readFile, writeFile, readdir, stat, mkdir, unlink } from "fs/promises";
 import { createHash } from "crypto";
 import { dirname, join, resolve } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { WorkflowDefinitionSchema } from "@kmmao/happy-wire";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
-import { runWorkflowInDir } from "@/workflow/runWorkflowInDir";
+import { runWorkflowInDir, workflowsDirFor } from "@/workflow/runWorkflowInDir";
+import { execFileLocal } from "@/webhook/execFileLocal";
+import { removeWorktreeForced } from "@/webhook/createWorktreeLocal";
 import { validatePath } from "./pathSecurity";
 import { summarizeShellCommandForLog } from "@/utils/securityRedaction";
 import { checkBlockedBashCommand } from "@/utils/bashCommandPolicy";
@@ -41,6 +43,30 @@ interface WorkflowRunRequest {
 interface WorkflowRunResponse {
   success: boolean;
   workflowId?: string;
+  error?: string;
+}
+
+interface WorkflowIdRequest {
+  workflowId: string;
+}
+
+interface WorkflowBranchActionRequest {
+  branch: string;
+  action: "merge" | "discard";
+}
+
+interface WorkflowBranchDiffRequest {
+  branch: string;
+}
+
+interface SimpleSuccessResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface WorkflowBranchDiffResponse {
+  success: boolean;
+  diff?: string;
   error?: string;
 }
 
@@ -139,6 +165,10 @@ export function registerFilesystemHandlers(
   workingDirectory: string,
   safeSessionId: string,
 ) {
+  // In-flight Dynamic Workflow runs, keyed by workflow id, so `workflowCancel`
+  // can abort a run and kill its sub-agent processes (Phase 5).
+  const runningWorkflows = new Map<string, AbortController>();
+
   // Shell command handler - executes commands in the default shell
   rpcHandlerManager.registerHandler<BashRequest, BashResponse>(
     "bash",
@@ -455,17 +485,93 @@ export function registerFilesystemHandlers(
         return { success: false, error: `Invalid workflow spec: ${parsed.error.message}` };
       }
       const definition = parsed.data;
-      // Kick off the run without blocking the RPC response.
+      // Track the run so `workflowCancel` can abort it; clean up on completion.
+      const controller = new AbortController();
+      runningWorkflows.set(definition.id, controller);
       void runWorkflowInDir(definition, workingDirectory, {
         dryRun: data.dryRun === true,
         isolation: data.isolation === true,
-      }).catch((error) => {
-        logger.debug("Workflow run failed:", error);
-      });
+        signal: controller.signal,
+      })
+        .catch((error) => {
+          logger.debug("Workflow run failed:", error);
+        })
+        .finally(() => {
+          runningWorkflows.delete(definition.id);
+        });
       logger.debug(`Workflow run started: ${definition.id}`);
       return { success: true, workflowId: definition.id };
     },
   );
+
+  // Cancel a running workflow — aborts remaining waves and kills in-flight
+  // sub-agent processes via the shared AbortController.
+  rpcHandlerManager.registerHandler<WorkflowIdRequest, SimpleSuccessResponse>(
+    "workflowCancel",
+    async (data) => {
+      const controller = runningWorkflows.get(data.workflowId);
+      if (!controller) return { success: false, error: "not_running" };
+      controller.abort();
+      runningWorkflows.delete(data.workflowId);
+      return { success: true };
+    },
+  );
+
+  // Delete a persisted workflow's run-state + replay files.
+  rpcHandlerManager.registerHandler<WorkflowIdRequest, SimpleSuccessResponse>(
+    "workflowDelete",
+    async (data) => {
+      const dir = workflowsDirFor(workingDirectory);
+      for (const ext of [".json", ".js"]) {
+        await unlink(join(dir, `${data.workflowId}${ext}`)).catch(() => {});
+      }
+      return { success: true };
+    },
+  );
+
+  // Merge or discard an isolation branch (post-run review).
+  rpcHandlerManager.registerHandler<
+    WorkflowBranchActionRequest,
+    SimpleSuccessResponse
+  >("workflowBranchAction", async (data) => {
+    if (!/^[\w./-]+$/.test(data.branch)) {
+      return { success: false, error: "invalid_branch" };
+    }
+    if (data.action === "merge") {
+      const res = await execFileLocal(
+        "git",
+        ["merge", "--no-ff", data.branch],
+        workingDirectory,
+      );
+      if (res.exitCode !== 0) {
+        return { success: false, error: res.stderr || "merge_failed" };
+      }
+      await removeWorktreeForced(workingDirectory, data.branch);
+      return { success: true };
+    }
+    // discard
+    await removeWorktreeForced(workingDirectory, data.branch);
+    return { success: true };
+  });
+
+  // Return the diff of an isolation branch vs the current HEAD (review).
+  rpcHandlerManager.registerHandler<
+    WorkflowBranchDiffRequest,
+    WorkflowBranchDiffResponse
+  >("workflowBranchDiff", async (data) => {
+    if (!/^[\w./-]+$/.test(data.branch)) {
+      return { success: false, error: "invalid_branch" };
+    }
+    const res = await execFileLocal(
+      "git",
+      ["diff", `HEAD...${data.branch}`],
+      workingDirectory,
+    );
+    if (res.exitCode !== 0) {
+      return { success: false, error: res.stderr || "diff_failed" };
+    }
+    return { success: true, diff: res.stdout };
+  });
 
   // Get directory tree handler - recursive with depth control
   rpcHandlerManager.registerHandler<

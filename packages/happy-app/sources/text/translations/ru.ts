@@ -2899,6 +2899,12 @@ export const ru: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "Остановить",
+    rerun: "Перезапустить",
+    merge: "Слить",
+    discard: "Отбросить",
+    noDiff: "(нет изменений)",
+    statusCancelled: "Отменено",
     output: "Вывод",
     noSession: "Запустите сессию в этом проекте, чтобы просматривать или запускать процессы.",
     isolation: "Изоляция (git worktree на агента)",

@@ -3090,6 +3090,12 @@ export const it: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "Ferma",
+    rerun: "Riesegui",
+    merge: "Unisci",
+    discard: "Scarta",
+    noDiff: "(nessuna differenza)",
+    statusCancelled: "Annullato",
     output: "Output",
     noSession: "Avvia una sessione in questo progetto per vedere o eseguire flussi.",
     isolation: "Isolamento (worktree git per agente)",

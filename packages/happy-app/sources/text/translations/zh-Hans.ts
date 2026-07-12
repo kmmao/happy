@@ -2888,6 +2888,12 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "停止",
+    rerun: "重跑",
+    merge: "合并",
+    discard: "丢弃",
+    noDiff: "（无差异）",
+    statusCancelled: "已取消",
     output: "输出",
     noSession: "在该项目里起一个会话，才能查看或运行工作流。",
     isolation: "隔离（每个代理独立 git worktree）",

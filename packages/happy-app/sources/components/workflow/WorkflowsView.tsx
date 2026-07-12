@@ -14,11 +14,20 @@ import { useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import type { WorkflowRun, WorkflowStep, WorkflowStepStatus } from "@kmmao/happy-wire";
 import { storage } from "@/sync/storage";
-import { sessionListDirectory, sessionReadFile } from "@/sync/ops";
+import {
+    sessionListDirectory,
+    sessionReadFile,
+    sessionCancelWorkflow,
+    sessionDeleteWorkflow,
+    sessionRunWorkflow,
+    sessionWorkflowBranchAction,
+    sessionWorkflowBranchDiff,
+} from "@/sync/ops";
 import { decodeBase64 } from "@/encryption/base64";
 import { decodeUTF8 } from "@/encryption/text";
 import { parseWorkflowRunJson } from "@/utils/parseWorkflowRunJson";
 import { useHappyAction } from "@/hooks/useHappyAction";
+import { Modal } from "@/modal";
 import { t } from "@/text";
 import { log } from "@/log";
 
@@ -57,6 +66,77 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
     const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
     const toggleOutput = (key: string) =>
         setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+    const [branchDiffs, setBranchDiffs] = React.useState<Record<string, string>>({});
+
+    const notifyError = (res: { success: boolean; error?: string }) => {
+        if (!res.success) Modal.alert(t("common.error"), res.error ?? "Failed");
+    };
+
+    // Card-level actions: stop (running), re-run, delete.
+    const openWorkflowMenu = (run: WorkflowRun) => {
+        const buttons: Array<{ text: string; style?: "cancel" | "destructive"; onPress?: () => void }> = [];
+        if (run.status === "running") {
+            buttons.push({
+                text: t("dynamicWorkflows.stop"),
+                onPress: async () => {
+                    notifyError(await sessionCancelWorkflow(sessionId, run.definition.id));
+                    load();
+                },
+            });
+        }
+        buttons.push({
+            text: t("dynamicWorkflows.rerun"),
+            onPress: async () => {
+                const res = await sessionRunWorkflow(
+                    sessionId,
+                    { goal: run.definition.goal, steps: run.definition.steps },
+                    { dryRun: false, isolation: !!run.branches },
+                );
+                notifyError(res);
+                load();
+            },
+        });
+        buttons.push({
+            text: t("common.delete"),
+            style: "destructive",
+            onPress: async () => {
+                notifyError(await sessionDeleteWorkflow(sessionId, run.definition.id));
+                load();
+            },
+        });
+        buttons.push({ text: t("common.cancel"), style: "cancel" });
+        Modal.alert(run.definition.goal, undefined, buttons);
+    };
+
+    // Branch-level actions: view diff, merge, discard.
+    const openBranchMenu = (key: string, branch: string) => {
+        Modal.alert(branch, undefined, [
+            {
+                text: t("githubPr.title"),
+                onPress: async () => {
+                    const res = await sessionWorkflowBranchDiff(sessionId, branch);
+                    if (!res.success) return notifyError(res);
+                    setBranchDiffs((prev) => ({ ...prev, [key]: res.diff ?? "" }));
+                },
+            },
+            {
+                text: t("dynamicWorkflows.merge"),
+                onPress: async () => {
+                    notifyError(await sessionWorkflowBranchAction(sessionId, branch, "merge"));
+                    load();
+                },
+            },
+            {
+                text: t("dynamicWorkflows.discard"),
+                style: "destructive",
+                onPress: async () => {
+                    notifyError(await sessionWorkflowBranchAction(sessionId, branch, "discard"));
+                    load();
+                },
+            },
+            { text: t("common.cancel"), style: "cancel" },
+        ]);
+    };
 
     const NewButton = (
         <Pressable
@@ -138,13 +218,17 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
                         ? t("dynamicWorkflows.statusRunning")
                         : run.status === "completed"
                           ? t("dynamicWorkflows.statusCompleted")
-                          : t("dynamicWorkflows.statusFailed");
+                          : run.status === "cancelled"
+                            ? t("dynamicWorkflows.statusCancelled")
+                            : t("dynamicWorkflows.statusFailed");
                 const badgeStyle =
                     run.status === "running"
                         ? styles.badge_running
                         : run.status === "completed"
                           ? styles.badge_completed
-                          : styles.badge_failed;
+                          : run.status === "cancelled"
+                            ? styles.badge_running
+                            : styles.badge_failed;
                 return (
                     <View key={wf.id} style={styles.card}>
                         <View style={styles.cardHeader}>
@@ -152,6 +236,17 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
                                 {wf.goal}
                             </Text>
                             <Text style={[styles.badge, badgeStyle]}>{statusLabel}</Text>
+                            <Pressable
+                                onPress={() => openWorkflowMenu(run)}
+                                hitSlop={8}
+                                style={styles.menuBtn}
+                            >
+                                <Ionicons
+                                    name="ellipsis-horizontal"
+                                    size={18}
+                                    color={theme.colors.textSecondary}
+                                />
+                            </Pressable>
                         </View>
                         <Text style={styles.meta}>
                             {t("dynamicWorkflows.stepCount", { count: wf.steps.length })}
@@ -174,16 +269,37 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
                                             {step.prompt}
                                         </Text>
                                         {run.branches?.[step.id] ? (
-                                            <View style={styles.branchRow}>
-                                                <Ionicons
-                                                    name="git-branch-outline"
-                                                    size={11}
-                                                    color={theme.colors.textSecondary}
-                                                />
-                                                <Text style={styles.branch} numberOfLines={1}>
-                                                    {run.branches[step.id]}
-                                                </Text>
-                                            </View>
+                                            <>
+                                                <Pressable
+                                                    style={styles.branchRow}
+                                                    onPress={() =>
+                                                        openBranchMenu(
+                                                            `${wf.id}:${step.id}`,
+                                                            run.branches![step.id],
+                                                        )
+                                                    }
+                                                >
+                                                    <Ionicons
+                                                        name="git-branch-outline"
+                                                        size={11}
+                                                        color={theme.colors.textSecondary}
+                                                    />
+                                                    <Text style={styles.branch} numberOfLines={1}>
+                                                        {run.branches[step.id]}
+                                                    </Text>
+                                                    <Ionicons
+                                                        name="ellipsis-horizontal"
+                                                        size={12}
+                                                        color={theme.colors.textSecondary}
+                                                    />
+                                                </Pressable>
+                                                {branchDiffs[`${wf.id}:${step.id}`] !== undefined ? (
+                                                    <Text style={styles.output} selectable>
+                                                        {branchDiffs[`${wf.id}:${step.id}`] ||
+                                                            t("dynamicWorkflows.noDiff")}
+                                                    </Text>
+                                                ) : null}
+                                            </>
                                         ) : null}
                                         {run.outputs?.[step.id] ? (
                                             <View>
@@ -247,8 +363,9 @@ const styles = StyleSheet.create((theme) => ({
         padding: 12,
         gap: 8,
     },
-    cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-    goal: { color: theme.colors.text, fontSize: 15, fontWeight: "600", flexShrink: 1 },
+    cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+    menuBtn: { padding: 2 },
+    goal: { color: theme.colors.text, fontSize: 15, fontWeight: "600", flex: 1 },
     badge: {
         fontSize: 11,
         fontWeight: "700",

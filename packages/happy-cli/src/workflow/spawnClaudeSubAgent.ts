@@ -23,6 +23,8 @@ export interface SubAgentSpawnOptions {
   claudeBin?: string;
   /** Per-step timeout in ms (default 10 min). */
   timeoutMs?: number;
+  /** Abort signal — killing running sub-agent processes on cancellation. */
+  signal?: AbortSignal;
   /**
    * When true, each sub-agent runs in its own git worktree (a fresh branch off
    * the current one) so concurrent steps can't clobber each other's files and
@@ -88,7 +90,7 @@ export interface CommandRunResult {
 /** Injectable process runner. Never rejects — failures surface as exitCode. */
 export type CommandRunner = (
   cmd: SubAgentCommand,
-  opts: { cwd: string; timeoutMs: number },
+  opts: { cwd: string; timeoutMs: number; signal?: AbortSignal },
 ) => Promise<CommandRunResult>;
 
 /** Default runner: spawns the real process via execFile. */
@@ -97,7 +99,7 @@ export const defaultCommandRunner: CommandRunner = (cmd, opts) =>
     execFile(
       cmd.file,
       cmd.args,
-      { cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 32 * 1024 * 1024 },
+      { cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 32 * 1024 * 1024, signal: opts.signal },
       (error, stdout, stderr) => {
         resolve({
           stdout: stdout ?? "",
@@ -140,7 +142,7 @@ export function makeClaudeSubAgentExecutor(
     }
 
     const cmd = buildSubAgentCommand(step, opts);
-    const res = await runner(cmd, { cwd: runCwd, timeoutMs });
+    const res = await runner(cmd, { cwd: runCwd, timeoutMs, signal: opts.signal });
     return {
       stepId: step.id,
       role: step.role,

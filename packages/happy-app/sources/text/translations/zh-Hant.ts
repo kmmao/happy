@@ -2887,6 +2887,12 @@ export const zhHant: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "停止",
+    rerun: "重跑",
+    merge: "合併",
+    discard: "丟棄",
+    noDiff: "（無差異）",
+    statusCancelled: "已取消",
     output: "輸出",
     noSession: "在該專案裡起一個工作階段，才能查看或執行工作流程。",
     isolation: "隔離（每個代理獨立 git worktree）",

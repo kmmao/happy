@@ -3068,6 +3068,12 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "停止",
+    rerun: "再実行",
+    merge: "マージ",
+    discard: "破棄",
+    noDiff: "（差分なし）",
+    statusCancelled: "キャンセル済み",
     output: "出力",
     noSession: "このプロジェクトでセッションを開始すると、ワークフローの表示・実行ができます。",
     isolation: "分離（エージェントごとに git worktree）",

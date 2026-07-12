@@ -31,7 +31,7 @@ describe("WorkflowRunReporter", () => {
     reporter.note("a", "running");
     reporter.note("a", "succeeded");
     reporter.note("b", "failed");
-    const path = await reporter.finish(false);
+    const path = await reporter.finish("failed");
     expect(path.endsWith("wf_run.json")).toBe(true);
 
     run = WorkflowRunSchema.parse(

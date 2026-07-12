@@ -36,6 +36,8 @@ export interface WorkflowRunResult {
   workflowId: string;
   results: WorkflowStepResult[];
   ok: boolean;
+  /** True when the run was aborted before all waves completed. */
+  cancelled: boolean;
 }
 
 /**
@@ -58,12 +60,21 @@ export async function runWorkflow(
   executor: WorkflowStepExecutor,
   onStepStatus?: StepStatusListener,
   onStepResult?: (result: WorkflowStepResult) => void,
+  signal?: AbortSignal,
 ): Promise<WorkflowRunResult> {
   const waves = groupWorkflowWaves(definition.steps);
   const results: WorkflowStepResult[] = [];
   let ok = true;
+  let cancelled = false;
 
   for (const wave of waves) {
+    // Stop before starting a new wave if the run was cancelled. In-flight steps
+    // of the current wave are killed via the executor's abort signal.
+    if (signal?.aborted) {
+      cancelled = true;
+      ok = false;
+      break;
+    }
     const settled = await Promise.all(
       wave.map(async (step): Promise<WorkflowStepResult> => {
         onStepStatus?.(step.id, "running");
@@ -84,11 +95,16 @@ export async function runWorkflow(
       }),
     );
     results.push(...settled);
+    if (signal?.aborted) {
+      cancelled = true;
+      ok = false;
+      break;
+    }
     if (settled.some((r) => !r.ok)) {
       ok = false;
       break;
     }
   }
 
-  return { workflowId: definition.id, results, ok };
+  return { workflowId: definition.id, results, ok, cancelled };
 }

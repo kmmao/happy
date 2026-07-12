@@ -2954,6 +2954,12 @@ export const ca: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    stop: "Atura",
+    rerun: "Torna a executar",
+    merge: "Fusiona",
+    discard: "Descarta",
+    noDiff: "(sense canvis)",
+    statusCancelled: "Cancel·lat",
     output: "Sortida",
     noSession: "Inicia una sessió en aquest projecte per veure o executar fluxos.",
     isolation: "Aïllament (worktree de git per agent)",
