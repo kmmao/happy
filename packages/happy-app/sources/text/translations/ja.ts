@@ -3065,6 +3065,13 @@ export const ja: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "ワークフロー",
+    empty: "ワークフローはまだありません。`happy workflow run <spec.json>` を実行してください。",
+    stepCount: ({ count }: { count: number }) => `${count} ステップ`,
+    wave: ({ index }: { index: number }) => `ウェーブ ${index}`,
+  },
+
   githubPr: {
     title: "PR Diff",
     reviewCard: "PR の Diff をレビュー",

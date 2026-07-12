@@ -139,6 +139,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="session/[id]/workflows"
+        options={{
+          headerShown: true,
+          headerTitle: t("dynamicWorkflows.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="settings/account"
         options={{
           headerTitle: t("settings.account"),

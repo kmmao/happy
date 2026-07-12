@@ -2885,6 +2885,13 @@ export const zhHans: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "工作流",
+    empty: "还没有工作流。运行 `happy workflow run <spec.json>`。",
+    stepCount: ({ count }: { count: number }) => `${count} 个步骤`,
+    wave: ({ index }: { index: number }) => `第 ${index} 波`,
+  },
+
   githubPr: {
     title: "PR Diff",
     reviewCard: "查看 PR Diff",

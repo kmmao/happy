@@ -2989,6 +2989,13 @@ export const en = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "Workflows",
+    empty: "No workflows yet. Run `happy workflow run <spec.json>`.",
+    stepCount: ({ count }: { count: number }) => `${count} steps`,
+    wave: ({ index }: { index: number }) => `Wave ${index}`,
+  },
+
   githubPr: {
     title: "PR Diff",
     reviewCard: "Review PR diff",

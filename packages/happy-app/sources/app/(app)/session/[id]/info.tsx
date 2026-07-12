@@ -807,6 +807,12 @@ function SessionInfoContent({ session }: { session: Session }) {
             showChevron
           />
           <Item
+            title={t("dynamicWorkflows.title")}
+            icon={<Ionicons name="git-network-outline" size={29} color="#AF52DE" />}
+            onPress={() => router.push(`/session/${session.id}/workflows` as any)}
+            showChevron
+          />
+          <Item
             title={t("sessionInfo.taskDebug")}
             subtitle={t("sessionInfo.taskDebugSubtitle")}
             icon={<Ionicons name="bug-outline" size={29} color="#FF9500" />}

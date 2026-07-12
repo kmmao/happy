@@ -45,6 +45,7 @@ import { handleSandboxCommand } from "./commands/sandbox";
 import { handleSupervisorCommand } from "./commands/supervisor";
 import { handleLoopCommand } from "./commands/loop";
 import { handleTranscriptCommand } from "./commands/transcript";
+import { handleWorkflowCommand } from "./workflow/handleWorkflowCommand";
 import { handleIssueCommand } from "./commands/issue";
 import { spawnHappyCLI } from "./utils/spawnHappyCLI";
 import { claudeCliPath } from "./claude/claudeLocal";
@@ -341,6 +342,18 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         error instanceof Error ? error.message : "Unknown error",
       );
       logger.debug("Transcript command error:", error);
+      process.exit(1);
+    }
+    return;
+  } else if (subcommand === "workflow") {
+    try {
+      await handleWorkflowCommand(args.slice(1));
+    } catch (error) {
+      logger.printError(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      logger.debug("Workflow command error:", error);
       process.exit(1);
     }
     return;

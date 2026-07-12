@@ -2896,6 +2896,13 @@ export const ru: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "Процессы",
+    empty: "Пока нет процессов. Запустите `happy workflow run <spec.json>`.",
+    stepCount: ({ count }: { count: number }) => `${count} шагов`,
+    wave: ({ index }: { index: number }) => `Волна ${index}`,
+  },
+
   githubPr: {
     title: "Diff PR",
     reviewCard: "Просмотреть diff PR",

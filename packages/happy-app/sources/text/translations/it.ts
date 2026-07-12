@@ -3087,6 +3087,13 @@ export const it: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "Flussi",
+    empty: "Ancora nessun flusso. Esegui `happy workflow run <spec.json>`.",
+    stepCount: ({ count }: { count: number }) => `${count} passi`,
+    wave: ({ index }: { index: number }) => `Ondata ${index}`,
+  },
+
   githubPr: {
     title: "Diff della PR",
     reviewCard: "Rivedi il diff della PR",

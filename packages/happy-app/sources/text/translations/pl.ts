@@ -2960,6 +2960,13 @@ export const pl: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "Przepływy",
+    empty: "Brak przepływów. Uruchom `happy workflow run <spec.json>`.",
+    stepCount: ({ count }: { count: number }) => `${count} kroków`,
+    wave: ({ index }: { index: number }) => `Fala ${index}`,
+  },
+
   githubPr: {
     title: "Różnica PR",
     reviewCard: "Przejrzyj różnicę PR",

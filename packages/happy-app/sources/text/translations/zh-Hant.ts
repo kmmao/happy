@@ -2884,6 +2884,13 @@ export const zhHant: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "工作流程",
+    empty: "還沒有工作流程。執行 `happy workflow run <spec.json>`。",
+    stepCount: ({ count }: { count: number }) => `${count} 個步驟`,
+    wave: ({ index }: { index: number }) => `第 ${index} 波`,
+  },
+
   githubPr: {
     title: "PR Diff",
     reviewCard: "查看 PR Diff",

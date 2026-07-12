@@ -2947,6 +2947,13 @@ export const pt: TranslationStructure = {
     },
   },
 
+  dynamicWorkflows: {
+    title: "Fluxos",
+    empty: "Ainda não há fluxos. Execute `happy workflow run <spec.json>`.",
+    stepCount: ({ count }: { count: number }) => `${count} passos`,
+    wave: ({ index }: { index: number }) => `Onda ${index}`,
+  },
+
   githubPr: {
     title: "Diff do PR",
     reviewCard: "Revisar diff do PR",
