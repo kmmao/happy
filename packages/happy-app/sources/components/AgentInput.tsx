@@ -1300,6 +1300,10 @@ export const AgentInput = React.memo(
                   const showThumbnail = uri && isImageFile;
                   const fileIcon: React.ComponentProps<typeof Ionicons>["name"] =
                     isImageFile ? "image"
+                    // HTML = a design prototype (Visual Intent, Phase 4) — show a
+                    // distinctive palette icon so the user sees it's recognized
+                    // as a visual spec, not a generic file.
+                    : [".html", ".htm"].includes(ext) ? "color-palette-outline"
                     : [".pdf"].includes(ext) ? "document-text-outline"
                     : [".xls", ".xlsx", ".csv"].includes(ext) ? "grid-outline"
                     : [".doc", ".docx", ".txt", ".rtf", ".md"].includes(ext) ? "document-text-outline"

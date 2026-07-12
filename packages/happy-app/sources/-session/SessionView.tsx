@@ -93,6 +93,7 @@ import { sync } from "@/sync/sync";
 import { t } from "@/text";
 import { tracking, trackMessageSent } from "@/track";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { formatVisualIntentRef } from "@kmmao/happy-wire";
 import { isRunningOnMac } from "@/utils/platform";
 import {
   useDeviceType,
@@ -2062,6 +2063,12 @@ function SessionViewInner({
             : pendingImagePathsRef.current;
           const imageRefs = currentPaths.map((p) => {
             const name = fileNameMap.get(p);
+            // HTML design drafts become a Visual Intent reference ([design: …])
+            // so the CLI harness treats them as an authoritative visual spec
+            // (Phase 4). Mirrors the new-session composer's routing.
+            if (name && /\.html?$/i.test(name)) {
+              return formatVisualIntentRef({ kind: "html", path: p });
+            }
             return name ? `[image: ${p} | ${name}]` : `[image: ${p}]`;
           }).join("\n");
           const finalMessage = [text, imageRefs].filter(Boolean).join("\n");
