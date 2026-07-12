@@ -63,14 +63,24 @@ const READONLY_BASH_HEADS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Read-only `git` subcommands. `git <sub>` is safe only when <sub> is here.
+ * Always-read-only `git` subcommands — `git <sub> …` only observes state.
  * Mutating/destructive git verbs (push, reset --hard, clean, restore, branch -D)
  * are caught earlier by DANGEROUS_BASH_PATTERNS.
  */
 const READONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
-  "status", "diff", "log", "show", "branch", "remote", "rev-parse", "describe",
+  "status", "diff", "log", "show", "rev-parse", "describe",
   "ls-files", "ls-remote", "blame", "shortlog", "reflog", "cat-file",
-  "whatchanged", "diff-tree", "name-rev", "symbolic-ref", "tag", "grep",
+  "whatchanged", "diff-tree", "name-rev", "symbolic-ref", "grep",
+]);
+
+/**
+ * Git subcommands that only read when invoked BARE (listing) but MUTATE when
+ * given an argument: `git branch` lists / `git branch x` creates; `git tag`
+ * lists / `git tag v1` creates; `git remote` lists / `git remote add …` mutates.
+ * So these are safe only with no further argument.
+ */
+const BARE_ONLY_READONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  "branch", "tag", "remote",
 ]);
 
 /**
@@ -134,11 +144,23 @@ function commandSecondWord(sub: string): string {
   return (parts[1] ?? "").replace(/^["']|["']$/g, "").toLowerCase();
 }
 
+/** Tokens of a sub-command after stripping leading env-var assignments. */
+function commandTokens(sub: string): string[] {
+  const withoutAssignments = sub.replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/, "");
+  return withoutAssignments.trim().split(/\s+/).filter(Boolean);
+}
+
 /** True when a single sub-command only observes state. */
 function isReadonlySubCommand(sub: string): boolean {
   const head = commandHead(sub);
   if (head === "git") {
-    return READONLY_GIT_SUBCOMMANDS.has(commandSecondWord(sub));
+    const gitSub = commandSecondWord(sub);
+    if (READONLY_GIT_SUBCOMMANDS.has(gitSub)) return true;
+    // branch/tag/remote read only when bare (no argument beyond the subcommand).
+    if (BARE_ONLY_READONLY_GIT_SUBCOMMANDS.has(gitSub)) {
+      return commandTokens(sub).length <= 2; // ["git", "<sub>"]
+    }
+    return false;
   }
   return READONLY_BASH_HEADS.has(head);
 }

@@ -37,6 +37,17 @@ describe("autoModeClassifier", () => {
     expect(classifyToolCall("Bash", { command: "yarn install" }).risk).toBe("neutral");
   });
 
+  it("treats bare git branch/tag/remote as safe but their mutating forms as neutral", () => {
+    // Bare = listing = read-only.
+    expect(classifyToolCall("Bash", { command: "git branch" }).risk).toBe("safe");
+    expect(classifyToolCall("Bash", { command: "git tag" }).risk).toBe("safe");
+    expect(classifyToolCall("Bash", { command: "git remote" }).risk).toBe("safe");
+    // With an argument they mutate → must not be silently auto-allowed.
+    expect(classifyToolCall("Bash", { command: "git branch new-feature" }).risk).toBe("neutral");
+    expect(classifyToolCall("Bash", { command: "git tag v1.0.0" }).risk).toBe("neutral");
+    expect(classifyToolCall("Bash", { command: "git remote add origin x" }).risk).toBe("neutral");
+  });
+
   it("treats ordinary edits as neutral but sensitive paths as dangerous", () => {
     expect(classifyToolCall("Write", { file_path: "/repo/src/index.ts" }).risk).toBe("neutral");
     expect(classifyToolCall("Edit", { file_path: "/home/u/.ssh/config" }).risk).toBe("dangerous");

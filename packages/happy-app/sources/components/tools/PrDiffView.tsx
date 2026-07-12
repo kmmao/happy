@@ -1,5 +1,12 @@
 import * as React from "react";
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import {
+    View,
+    Text,
+    ScrollView,
+    Pressable,
+    ActivityIndicator,
+    Platform,
+} from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { PrDiffResponse } from "@kmmao/happy-wire";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -36,15 +43,23 @@ function DiffLine({ line }: { line: string }) {
  */
 export const PrDiffView = React.memo<PrDiffViewProps>(({ owner, repo, number }) => {
     const [data, setData] = React.useState<PrDiffResponse | null>(null);
+    // Distinguishes "not fetched yet" from "fetched and failed" so we never
+    // flash the failure UI before the first attempt has completed.
+    const [failed, setFailed] = React.useState(false);
 
     const [loading, load] = useHappyAction(async () => {
+        setFailed(false);
         const credentials = await TokenStorage.getCredentials();
-        if (!credentials) return;
+        if (!credentials) {
+            setFailed(true);
+            return;
+        }
         try {
             const res = await fetchPrDiff(credentials, { owner, repo, number });
             setData(res);
         } catch (e) {
             log.error("Failed to load PR diff:", e);
+            setFailed(true);
             throw e;
         }
     });
@@ -54,7 +69,7 @@ export const PrDiffView = React.memo<PrDiffViewProps>(({ owner, repo, number }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [owner, repo, number]);
 
-    if (loading && !data) {
+    if (!data && !failed) {
         return (
             <View style={styles.center}>
                 <ActivityIndicator />
@@ -66,7 +81,7 @@ export const PrDiffView = React.memo<PrDiffViewProps>(({ owner, repo, number }) 
         return (
             <View style={styles.center}>
                 <Text style={styles.muted}>{t("githubPr.loadFailed")}</Text>
-                <Pressable onPress={() => load()} style={styles.retry}>
+                <Pressable onPress={() => load()} style={styles.retry} disabled={loading}>
                     <Text style={styles.retryText}>{t("common.retry")}</Text>
                 </Pressable>
             </View>
@@ -143,7 +158,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingVertical: 6,
     },
     diffLine: {
-        fontFamily: "Menlo",
+        fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
         fontSize: 11,
         lineHeight: 15,
     },

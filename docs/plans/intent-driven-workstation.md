@@ -64,20 +64,26 @@
    - `model?: string`（如 `haiku`）
    - `userInvocable?: boolean`（默认 true）
    - `disableModelInvocation?: boolean`（默认 false）
-3. **model 动态路由**：Agent 执行技能时，若 `frontmatter.model` 存在 → 覆盖本次调用模型（降级到便宜模型）。落点在 CLI 组装 Claude 调用参数处。
-4. **调用约束**：`userInvocable:false` 或 `disableModelInvocation:true` 的技能，Auto Mode 下分类器（Phase 1）直接拒绝模型自主调用，仅允许 app 手动触发。
+3. **model 动态路由**：Agent 执行技能时，若 `frontmatter.model` 存在 → 覆盖本次调用模型（降级到便宜模型）。
+4. **调用约束**：`userInvocable:false` 或 `disableModelInvocation:true` 的技能，非交互（webhook/cron）触发下被丢弃，仅允许 app 手动（interactive）触发。
 
-**验收**：含 `model: haiku` 的技能执行时实际走 haiku；`disable_model_invocation: true` 技能模型无法自调。
+**已确认端到端贯通**：`server/taskCreate.deriveSkillModelOverride` 从技能 front-matter 解析出模型 → dispatch `modelOverride` → task-trigger ephemeral → CLI `automation/TaskRunner.ts` 将其设为 `ANTHROPIC_MODEL`（`agentType==="claude"`）。model 消费点是**既有 CLI 基建**，故本阶段实为完整实现（非仅 server 端）。非交互触发的三条路径（manual 重试/swarm、webhook、cron）均已统一走 `resolveSkillContents` 做 front-matter 剥离 + model 路由 + user-only 守卫。
+
+**验收**：含 `model: haiku` 的技能执行时实际走 haiku；`disable_model_invocation: true` 技能在 webhook/cron 触发下不下发给模型。
 
 ---
 
 ## 4. Phase 4 — 视觉意图注入引擎
 
-1. `happy-wire/messages.ts`：`SessionMessageSchema` 内容体新增多模态分支 — `ImageContentSchema { type:"image", mediaType, dataRef }`（图片走 S3/加密引用，不塞 base64 进消息体）。
-2. `happy-app`：`RealtimeVoiceSession.tsx` 旁新增 HTML/图片投递入口（`expo-image-picker` / 文件选择）。
-3. `happy-server`：Harness 上下文组装处，将视觉素材作为 messages array 的多模态 content，与语音指令合并下发给 Agent。
+> **实现修正（对照真实机制）**：勘察后发现 happy 的多模态视觉输入**已有**一条成熟链路——素材经既有 upload 管线上传到 CLI 机器文件系统，消息体里追加 `[image: /path]` 引用，CLI 系统提示（`systemPrompt.ts`）指示 Claude 用 Read 工具读取该文件。因此**不需要**新建 `ImageContentSchema`（那会与既有机制重复）；图片投递入口也已存在于主输入框（`useImageUpload` 图片/文件选择）。Phase 4 的真实增量是把"设计原型"升级为一等视觉意图信号：
+>
+> 1. `happy-wire/visualIntent.ts`（新）：`[design: /path]` 引用约定 + `formatVisualIntentRef`/`parseVisualIntentRefs`，单测覆盖。
+> 2. `happy-cli/systemPrompt.ts`：新增 "Design prototypes (Visual Intent)" 段，指示 Claude 将 `[design:]`（HTML 原型）/被标注为设计稿的 `[image:]` 视为权威视觉规范，Read 后忠实重建组件，结合语音/文字指令。
+> 3. `happy-app`：HTML 稿上传时改发 `[design: path]`（经 `formatVisualIntentRef`），图片/其它文件仍走既有 `[image:]`。
 
-**验收**：投递 Claude Design 的 HTML 原型 + 语音指令，Agent 基于视觉生成/重构组件。
+**验收**：投递 Claude Design 的 HTML 原型 + 语音/文字指令，Agent 基于视觉生成/重构组件。
+
+**后续（如需专用投递入口 UI）**：实时语音界面为 headless class（`RealtimeVoiceSession.tsx`），最终汇入同一消息发送管线；若要在语音界面旁做独立"设计稿"按钮，可复用 `useImageUpload` + `formatVisualIntentRef`，属纯 UI 增量。
 
 ---
 
