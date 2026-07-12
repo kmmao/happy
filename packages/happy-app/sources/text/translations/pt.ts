@@ -2809,6 +2809,8 @@ export const pt: TranslationStructure = {
   },
 
   skills: {
+    routing: "Roteamento de front-matter",
+    userOnlyBadge: "apenas usuário",
     title: "Skills",
     newSkill: "New Skill",
     editSkill: "Edit Skill",
@@ -2948,6 +2950,7 @@ export const pt: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    output: "Saída",
     noSession: "Inicie uma sessão neste projeto para ver ou executar fluxos.",
     isolation: "Isolamento (worktree git por agente)",
     isolationHint: "Cada agente trabalha no seu próprio ramo; edições paralelas seguras, revise cada uma.",

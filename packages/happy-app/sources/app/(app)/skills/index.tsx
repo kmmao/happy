@@ -10,7 +10,19 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { useLayout } from "@/components/layout";
 import { Modal } from "@/modal";
+import { describeSkillRouting } from "@/utils/skillRouting";
 import { t } from "@/text";
+
+/** Subtitle including Phase 3 front-matter routing (model / user-only). */
+function skillSubtitle(skill: ServerSkill): string {
+    const base = skill.description ?? t("skills.contentPreview", { chars: skill.content.length });
+    const routing = describeSkillRouting(skill.content);
+    if (!routing) return base;
+    const parts = [routing.model, routing.userOnly ? t("skills.userOnlyBadge") : null].filter(
+        Boolean,
+    );
+    return parts.length > 0 ? `${base} · ${parts.join(" · ")}` : base;
+}
 
 function SkillListPage() {
     const layout = useLayout();
@@ -130,7 +142,7 @@ function SkillListPage() {
                         <Item
                             key={skill.id}
                             title={skill.name}
-                            subtitle={skill.description ?? t("skills.contentPreview", { chars: skill.content.length })}
+                            subtitle={skillSubtitle(skill)}
                             onPress={() => handleSkillPress(skill)}
                             showChevron
                         />
@@ -145,7 +157,7 @@ function SkillListPage() {
                         <Item
                             key={skill.id}
                             title={skill.name}
-                            subtitle={skill.description ?? t("skills.contentPreview", { chars: skill.content.length })}
+                            subtitle={skillSubtitle(skill)}
                             onPress={() => handleSkillPress(skill)}
                             showChevron
                         />

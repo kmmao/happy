@@ -57,6 +57,7 @@ export async function runWorkflow(
   definition: WorkflowDefinition,
   executor: WorkflowStepExecutor,
   onStepStatus?: StepStatusListener,
+  onStepResult?: (result: WorkflowStepResult) => void,
 ): Promise<WorkflowRunResult> {
   const waves = groupWorkflowWaves(definition.steps);
   const results: WorkflowStepResult[] = [];
@@ -69,6 +70,7 @@ export async function runWorkflow(
         try {
           const r = await executor(step);
           onStepStatus?.(step.id, r.ok ? "succeeded" : "failed");
+          onStepResult?.(r);
           return r;
         } catch (err) {
           onStepStatus?.(step.id, "failed");

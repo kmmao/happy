@@ -8,7 +8,7 @@
  * any workflow is still running.
  */
 import * as React from "react";
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -54,6 +54,9 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
     const router = useRouter();
     const { theme } = useUnistyles();
     const [runs, setRuns] = React.useState<WorkflowRun[] | null>(null);
+    const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+    const toggleOutput = (key: string) =>
+        setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
     const NewButton = (
         <Pressable
@@ -182,6 +185,32 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
                                                 </Text>
                                             </View>
                                         ) : null}
+                                        {run.outputs?.[step.id] ? (
+                                            <View>
+                                                <Pressable
+                                                    style={styles.outputToggle}
+                                                    onPress={() => toggleOutput(`${wf.id}:${step.id}`)}
+                                                >
+                                                    <Ionicons
+                                                        name={
+                                                            expanded[`${wf.id}:${step.id}`]
+                                                                ? "chevron-down"
+                                                                : "chevron-forward"
+                                                        }
+                                                        size={12}
+                                                        color={theme.colors.textSecondary}
+                                                    />
+                                                    <Text style={styles.outputToggleText}>
+                                                        {t("dynamicWorkflows.output")}
+                                                    </Text>
+                                                </Pressable>
+                                                {expanded[`${wf.id}:${step.id}`] ? (
+                                                    <Text style={styles.output} selectable>
+                                                        {run.outputs[step.id]}
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        ) : null}
                                     </View>
                                 ))}
                             </View>
@@ -250,4 +279,15 @@ const styles = StyleSheet.create((theme) => ({
     prompt: { color: theme.colors.textSecondary, fontSize: 12 },
     branchRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
     branch: { color: theme.colors.textSecondary, fontSize: 11, flexShrink: 1 },
+    outputToggle: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+    outputToggleText: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: "600" },
+    output: {
+        color: theme.colors.text,
+        fontSize: 11,
+        fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 6,
+        padding: 8,
+        marginTop: 4,
+    },
 }));

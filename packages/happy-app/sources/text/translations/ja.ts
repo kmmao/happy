@@ -2928,6 +2928,8 @@ export const ja: TranslationStructure = {
   },
 
   skills: {
+    routing: "front-matter ルーティング",
+    userOnlyBadge: "ユーザー限定",
     title: "スキル",
     newSkill: "新規スキル",
     editSkill: "スキルを編集",
@@ -3066,6 +3068,7 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    output: "出力",
     noSession: "このプロジェクトでセッションを開始すると、ワークフローの表示・実行ができます。",
     isolation: "分離（エージェントごとに git worktree）",
     isolationHint: "各エージェントは独自のブランチで動作します。並列編集が安全になり、個別にレビューできます。",

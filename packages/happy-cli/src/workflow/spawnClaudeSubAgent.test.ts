@@ -19,7 +19,7 @@ const step: WorkflowStep = {
 };
 
 describe("buildSubAgentCommand", () => {
-  it("builds a headless claude -p command with model", () => {
+  it("builds a headless claude -p command with permission mode + model", () => {
     const cmd = buildSubAgentCommand(step, { cwd: "/repo" });
     expect(cmd.file).toBe("claude");
     expect(cmd.args).toEqual([
@@ -27,9 +27,17 @@ describe("buildSubAgentCommand", () => {
       "Build the settings screen",
       "--output-format",
       "text",
+      "--permission-mode",
+      "acceptEdits",
       "--model",
       "claude-haiku-4-5-20251001",
     ]);
+  });
+
+  it("uses bypassPermissions when isolated", () => {
+    const cmd = buildSubAgentCommand(step, { cwd: "/repo", isolation: true });
+    expect(cmd.args).toContain("--permission-mode");
+    expect(cmd.args[cmd.args.indexOf("--permission-mode") + 1]).toBe("bypassPermissions");
   });
 
   it("omits --model when the step has none and honors claudeBin", () => {

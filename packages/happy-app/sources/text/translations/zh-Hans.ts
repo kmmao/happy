@@ -2750,6 +2750,8 @@ export const zhHans: TranslationStructure = {
   },
 
   skills: {
+    routing: "Front-matter 路由",
+    userOnlyBadge: "仅用户可触发",
     title: "技能",
     newSkill: "新建技能",
     editSkill: "编辑技能",
@@ -2886,6 +2888,7 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    output: "输出",
     noSession: "在该项目里起一个会话，才能查看或运行工作流。",
     isolation: "隔离（每个代理独立 git worktree）",
     isolationHint: "每个代理在自己的分支上跑——并发改动互不干扰，可逐个审查。",

@@ -32,6 +32,11 @@ export interface SubAgentSpawnOptions {
   isolation?: boolean;
   /** Workflow id — used to prefix isolation branch names. */
   workflowId?: string;
+  /**
+   * Headless permission mode passed to `claude -p --permission-mode`. Defaults
+   * to bypassPermissions when isolated, else acceptEdits.
+   */
+  permissionMode?: string;
 }
 
 /** Optional lifecycle hooks (e.g. surface an isolation branch as it's created). */
@@ -44,12 +49,30 @@ export interface SubAgentCommand {
   args: string[];
 }
 
+/**
+ * Effective headless permission mode for a step. Without one, `claude -p` can't
+ * edit files or run tools non-interactively and the sub-agent does nothing. An
+ * isolated step runs in its own throwaway worktree, so it's safe to let it act
+ * fully autonomously (bypassPermissions); a non-isolated step shares the repo,
+ * so we default to acceptEdits (auto-approve edits, still gate the rest).
+ */
+export function resolvePermissionMode(opts: SubAgentSpawnOptions): string {
+  return opts.permissionMode ?? (opts.isolation ? "bypassPermissions" : "acceptEdits");
+}
+
 /** Build the headless `claude -p` command for a step. Pure. */
 export function buildSubAgentCommand(
   step: WorkflowStep,
   opts: SubAgentSpawnOptions,
 ): SubAgentCommand {
-  const args = ["-p", step.prompt, "--output-format", "text"];
+  const args = [
+    "-p",
+    step.prompt,
+    "--output-format",
+    "text",
+    "--permission-mode",
+    resolvePermissionMode(opts),
+  ];
   if (step.model) {
     args.push("--model", step.model);
   }

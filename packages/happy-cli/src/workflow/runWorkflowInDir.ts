@@ -46,8 +46,13 @@ export async function runWorkflowInDir(
         undefined,
         { onBranch: (stepId, branch) => reporter.noteBranch(stepId, branch) },
       );
-  const result = await runWorkflow(definition, executor, (stepId, status) =>
-    reporter.note(stepId, status),
+  const result = await runWorkflow(
+    definition,
+    executor,
+    (stepId, status) => reporter.note(stepId, status),
+    (r) => {
+      if (r.output) reporter.noteOutput(r.stepId, r.output);
+    },
   );
 
   const statusPath = await reporter.finish(result.ok);

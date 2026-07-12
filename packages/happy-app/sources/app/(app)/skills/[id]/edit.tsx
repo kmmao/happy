@@ -9,6 +9,8 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchSkill, updateSkill } from "@/sync/apiSkills";
 import { ItemList } from "@/components/ItemList";
 import { ItemGroup } from "@/components/ItemGroup";
+import { Item } from "@/components/Item";
+import { describeSkillRouting } from "@/utils/skillRouting";
 import { t } from "@/text";
 
 function EditSkillPage() {
@@ -113,6 +115,22 @@ function EditSkillPage() {
                     />
                 </View>
             </ItemGroup>
+
+            {(() => {
+                const r = describeSkillRouting(content);
+                if (!r) return null;
+                const summary = [
+                    r.model ? `model: ${r.model}` : null,
+                    r.userOnly ? t("skills.userOnlyBadge") : null,
+                ]
+                    .filter(Boolean)
+                    .join("  ·  ");
+                return (
+                    <ItemGroup title={t("skills.routing")}>
+                        <Item title={summary} />
+                    </ItemGroup>
+                );
+            })()}
 
             <View style={styles.buttonContainer}>
                 <Pressable

@@ -2757,6 +2757,8 @@ export const ru: TranslationStructure = {
   },
 
   skills: {
+    routing: "Маршрутизация front-matter",
+    userOnlyBadge: "только пользователь",
     title: "Skills",
     newSkill: "New Skill",
     editSkill: "Edit Skill",
@@ -2897,6 +2899,7 @@ export const ru: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    output: "Вывод",
     noSession: "Запустите сессию в этом проекте, чтобы просматривать или запускать процессы.",
     isolation: "Изоляция (git worktree на агента)",
     isolationHint: "Каждый агент работает в своей ветке; безопасные параллельные правки, проверяйте каждую.",

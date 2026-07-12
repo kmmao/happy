@@ -68,6 +68,8 @@ export const WorkflowRunSchema = z.object({
    * sub-agent works on its own branch for conflict-free parallelism + review.
    */
   branches: z.record(z.string(), z.string()).optional(),
+  /** Per-step sub-agent output (truncated), for on-device review. */
+  outputs: z.record(z.string(), z.string()).optional(),
   updatedAt: z.number(),
 });
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
