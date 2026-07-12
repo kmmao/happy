@@ -56,7 +56,7 @@
     "@elevenlabs/react-native": "^1.0.0",
     "@expo/ui": "~55.0.12",
     "@expo/vector-icons": "^15.0.2",
-    "@kmmao/happy-wire": "^0.37.0",
+    "@kmmao/happy-wire": "^0.38.0",
     "@legendapp/list": "2.0.0-beta.3",
     "@livekit/react-native": "^2.9.0",
     "@livekit/react-native-expo-plugin": "^1.0.1",
