@@ -4,6 +4,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Project } from "@/sync/projectManager";
 import { storage, useSessionMessages } from "@/sync/storage";
+import { sync } from "@/sync/sync";
 import { useShallow } from "zustand/react/shallow";
 import type { ToolCallMessage, Message } from "@/sync/typesMessage";
 import { t } from "@/text";
@@ -136,9 +137,21 @@ const ActionTraceCard = React.memo(({ message }: ActionTraceCardProps) => {
     );
 });
 
-function SessionTraceView({ sessionId }: { sessionId: string }) {
+function SessionTraceView({ sessionId, isActive }: { sessionId: string; isActive: boolean }) {
     const { theme } = useUnistyles();
     const { messages, isLoaded } = useSessionMessages(sessionId, 300);
+
+    // Messages are only fetched (and `isLoaded` flipped) once a session is
+    // marked visible. Unlike the chat view, this tab never opens the session,
+    // so without this the spinner would spin forever for any session not yet
+    // opened this app run. Gate on `isActive` to avoid pulling messages (and
+    // hijacking voice focus / lastVisibleSessionId) for every backgrounded
+    // project detail page.
+    React.useEffect(() => {
+        if (isActive) {
+            sync.onSessionVisible(sessionId);
+        }
+    }, [isActive, sessionId]);
 
     const toolCalls = React.useMemo(
         () => flattenToolCalls(messages).slice().reverse(),
@@ -180,7 +193,7 @@ interface ProjectActionTraceTabProps {
 }
 
 export const ProjectActionTraceTab = React.memo(
-    ({ project }: ProjectActionTraceTabProps) => {
+    ({ project, isActive }: ProjectActionTraceTabProps) => {
         const { theme } = useUnistyles();
 
         const targetSessionId = storage(
@@ -213,7 +226,7 @@ export const ProjectActionTraceTab = React.memo(
             );
         }
 
-        return <SessionTraceView sessionId={targetSessionId} />;
+        return <SessionTraceView sessionId={targetSessionId} isActive={isActive} />;
     },
 );
 
