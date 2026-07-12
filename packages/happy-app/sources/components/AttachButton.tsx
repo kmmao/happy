@@ -8,7 +8,7 @@ import { hapticsLight } from "./haptics";
 import { MAX_IMAGES } from "@/utils/imageUpload";
 import { t } from "@/text";
 
-export type AttachAction = "gallery" | "camera" | "file";
+export type AttachAction = "gallery" | "camera" | "file" | "design";
 
 /** Detect whether the device has a camera. Cached after first check. */
 function useHasCamera(): boolean {
@@ -69,6 +69,10 @@ export const AttachButton = React.memo(function AttachButton({
                     onPress: () => onAction("file"),
                 },
                 {
+                    text: t("session.chooseDesign"),
+                    onPress: () => onAction("design"),
+                },
+                {
                     text: t("common.cancel"),
                     style: "cancel" as const,
                 },
@@ -94,6 +98,10 @@ export const AttachButton = React.memo(function AttachButton({
                 {
                     text: t("session.chooseFile"),
                     onPress: () => onAction("file"),
+                },
+                {
+                    text: t("session.chooseDesign"),
+                    onPress: () => onAction("design"),
                 },
                 {
                     text: t("common.cancel"),

@@ -20,6 +20,7 @@ export class WorkflowRunReporter {
   private readonly steps: Record<string, WorkflowStepStatus>;
   private readonly branches: Record<string, string> = {};
   private readonly outputs: Record<string, string> = {};
+  private synthesis?: string;
   // Serialize writes so overlapping transitions can't interleave / land out of
   // order — each note() chains its flush after the previous one.
   private writeChain: Promise<void> = Promise.resolve();
@@ -44,6 +45,7 @@ export class WorkflowRunReporter {
       steps: { ...this.steps },
       ...(hasBranches ? { branches: { ...this.branches } } : {}),
       ...(hasOutputs ? { outputs: { ...this.outputs } } : {}),
+      ...(this.synthesis ? { synthesis: this.synthesis } : {}),
       updatedAt: this.now(),
     };
   }
@@ -86,6 +88,13 @@ export class WorkflowRunReporter {
     const MAX = 8_000;
     this.outputs[stepId] =
       output.length > MAX ? `${output.slice(0, MAX)}\n… (truncated)` : output;
+    void this.enqueueFlush("running");
+  }
+
+  /** Record the final synthesis write-up. */
+  noteSynthesis(text: string): void {
+    const MAX = 16_000;
+    this.synthesis = text.length > MAX ? `${text.slice(0, MAX)}\n… (truncated)` : text;
     void this.enqueueFlush("running");
   }
 

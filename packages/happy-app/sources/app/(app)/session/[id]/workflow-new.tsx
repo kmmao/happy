@@ -41,6 +41,7 @@ export default React.memo(function WorkflowNewPage() {
     const [goal, setGoal] = React.useState("");
     const [dryRun, setDryRun] = React.useState(true);
     const [isolation, setIsolation] = React.useState(false);
+    const [synthesis, setSynthesis] = React.useState(false);
     const [steps, setSteps] = React.useState<StepDraft[]>([emptyStep()]);
 
     const updateStep = (i: number, patch: Partial<StepDraft>) =>
@@ -65,7 +66,7 @@ export default React.memo(function WorkflowNewPage() {
         const res = await sessionRunWorkflow(
             sessionId,
             { goal: goal.trim(), steps: cleaned },
-            { dryRun, isolation },
+            { dryRun, isolation, synthesis },
         );
         if (!res.success) {
             Modal.alert(t("common.error"), res.error ?? "Failed to start workflow");
@@ -144,6 +145,13 @@ export default React.memo(function WorkflowNewPage() {
                     <Text style={styles.isolationHint}>{t("dynamicWorkflows.isolationHint")}</Text>
                 </View>
                 <Switch value={isolation} onValueChange={setIsolation} />
+            </View>
+            <View style={styles.dryRunRow}>
+                <View style={styles.isolationLabelWrap}>
+                    <Text style={styles.dryRunLabel}>{t("dynamicWorkflows.synthesis")}</Text>
+                    <Text style={styles.isolationHint}>{t("dynamicWorkflows.synthesisHint")}</Text>
+                </View>
+                <Switch value={synthesis} onValueChange={setSynthesis} />
             </View>
 
             <Pressable

@@ -946,6 +946,7 @@ export const ca: TranslationStructure = {
     takePhoto: "Fer foto",
     chooseFromLibrary: "Triar de la galeria",
     chooseFile: "Triar fitxer",
+    chooseDesign: "Esborrany de disseny (HTML)",
     sentFile: "Fitxer enviat",
     sentFiles: ({ count }: { count: number }) => `${count} fitxers enviats`,
     fileTooLarge: "El fitxer és massa gran per enviar",
@@ -2954,6 +2955,8 @@ export const ca: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "Síntesi",
+    synthesisHint: "Un agent final resumeix tots els resultats dels subagents.",
     stop: "Atura",
     rerun: "Torna a executar",
     merge: "Fusiona",

@@ -38,6 +38,7 @@ interface WorkflowRunRequest {
   };
   dryRun?: boolean;
   isolation?: boolean;
+  synthesis?: boolean;
 }
 
 interface WorkflowRunResponse {
@@ -491,6 +492,7 @@ export function registerFilesystemHandlers(
       void runWorkflowInDir(definition, workingDirectory, {
         dryRun: data.dryRun === true,
         isolation: data.isolation === true,
+        synthesis: data.synthesis === true,
         signal: controller.signal,
       })
         .catch((error) => {

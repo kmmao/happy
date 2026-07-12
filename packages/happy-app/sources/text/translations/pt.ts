@@ -944,6 +944,7 @@ export const pt: TranslationStructure = {
     takePhoto: "Tirar foto",
     chooseFromLibrary: "Escolher da galeria",
     chooseFile: "Escolher arquivo",
+    chooseDesign: "Rascunho de design (HTML)",
     sentFile: "Arquivo enviado",
     sentFiles: ({ count }: { count: number }) => `${count} arquivos enviados`,
     fileTooLarge: "O arquivo é grande demais para enviar",
@@ -2950,6 +2951,8 @@ export const pt: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "Síntese",
+    synthesisHint: "Um agente final resume todos os resultados dos subagentes.",
     stop: "Parar",
     rerun: "Re-executar",
     merge: "Mesclar",

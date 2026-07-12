@@ -2192,7 +2192,9 @@ export const AgentInput = React.memo(
                         onAction={(action: AttachAction) => {
                           if (action === "gallery") props.images?.onImagePickPress?.();
                           else if (action === "camera") props.images?.onTakePhotoPress?.();
-                          else if (action === "file") props.images?.onFilePickPress?.();
+                          // "design" delivers a visual-intent draft; HTML picked
+                          // here is routed to [design:] downstream (Phase 4).
+                          else if (action === "file" || action === "design") props.images?.onFilePickPress?.();
                         }}
                         isPickingImage={props.images?.isPickingImage}
                         imagePaths={props.images?.imagePaths}

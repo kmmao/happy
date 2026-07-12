@@ -331,6 +331,23 @@ export const WorkflowsView = React.memo<{ sessionId: string }>(({ sessionId }) =
                                 ))}
                             </View>
                         ))}
+                        {run.synthesis ? (
+                            <View style={styles.synthesis}>
+                                <View style={styles.synthesisHeader}>
+                                    <Ionicons
+                                        name="sparkles-outline"
+                                        size={13}
+                                        color={theme.colors.text}
+                                    />
+                                    <Text style={styles.synthesisTitle}>
+                                        {t("dynamicWorkflows.synthesis")}
+                                    </Text>
+                                </View>
+                                <Text style={styles.synthesisText} selectable>
+                                    {run.synthesis}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
                 );
             })}
@@ -396,6 +413,18 @@ const styles = StyleSheet.create((theme) => ({
     prompt: { color: theme.colors.textSecondary, fontSize: 12 },
     branchRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
     branch: { color: theme.colors.textSecondary, fontSize: 11, flexShrink: 1 },
+    synthesis: {
+        marginTop: 4,
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surfacePressed,
+        gap: 4,
+    },
+    synthesisHeader: { flexDirection: "row", alignItems: "center", gap: 4 },
+    synthesisTitle: { color: theme.colors.text, fontSize: 12, fontWeight: "700" },
+    synthesisText: { color: theme.colors.text, fontSize: 12, lineHeight: 17 },
     outputToggle: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
     outputToggleText: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: "600" },
     output: {

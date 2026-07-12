@@ -30,10 +30,36 @@ export function workflowsDirFor(cwd: string): string {
   return join(cwd, ".happy", "workflows");
 }
 
+/** Build the summarizer prompt from the goal + each sub-agent's output. */
+export function buildSynthesisPrompt(
+  goal: string,
+  results: Array<{ role: string; output?: string; ok: boolean }>,
+): string {
+  const parts = results.map(
+    (r) => `## ${r.role} (${r.ok ? "ok" : "failed"})\n${r.output ?? "(no output)"}`,
+  );
+  return [
+    `You are the synthesis agent for a multi-agent build.`,
+    `Goal: ${goal}`,
+    ``,
+    `Here are the results from each sub-agent:`,
+    ``,
+    parts.join("\n\n"),
+    ``,
+    `Synthesize these into one cohesive summary: what was accomplished, any`,
+    `conflicts or gaps between the agents, and concrete next steps. Be concise.`,
+  ].join("\n");
+}
+
 export async function runWorkflowInDir(
   definition: WorkflowDefinition,
   cwd: string,
-  opts?: { dryRun?: boolean; isolation?: boolean; signal?: AbortSignal },
+  opts?: {
+    dryRun?: boolean;
+    isolation?: boolean;
+    synthesis?: boolean;
+    signal?: AbortSignal;
+  },
 ): Promise<RunWorkflowInDirResult> {
   const workflowsDir = workflowsDirFor(cwd);
   const reporter = new WorkflowRunReporter(definition, workflowsDir);
@@ -55,6 +81,22 @@ export async function runWorkflowInDir(
     },
     opts?.signal,
   );
+
+  // Optional synthesis: once the waves finish cleanly, a summarizer agent
+  // combines every sub-agent's output into one write-up. Runs non-isolated in
+  // the project dir (it only reads the collected outputs, doesn't touch files).
+  if (opts?.synthesis && result.ok && !result.cancelled) {
+    const synthExecutor = opts.dryRun
+      ? dryRunExecutor
+      : makeClaudeSubAgentExecutor({ cwd, signal: opts.signal });
+    const synth = await synthExecutor({
+      id: "__synthesis__",
+      role: "synthesis",
+      prompt: buildSynthesisPrompt(definition.goal, result.results),
+      order: 0,
+    });
+    if (synth.output) reporter.noteSynthesis(synth.output);
+  }
 
   const statusPath = await reporter.finish(
     result.cancelled ? "cancelled" : result.ok ? "completed" : "failed",

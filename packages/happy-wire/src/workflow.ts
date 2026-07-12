@@ -75,6 +75,11 @@ export const WorkflowRunSchema = z.object({
   branches: z.record(z.string(), z.string()).optional(),
   /** Per-step sub-agent output (truncated), for on-device review. */
   outputs: z.record(z.string(), z.string()).optional(),
+  /**
+   * Final synthesis (Phase 5) — a summarizer agent's combined write-up of all
+   * sub-agent results, produced after the waves complete when requested.
+   */
+  synthesis: z.string().optional(),
   updatedAt: z.number(),
 });
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;

@@ -2378,6 +2378,7 @@ interface WorkflowRunRequest {
   };
   dryRun?: boolean;
   isolation?: boolean;
+  synthesis?: boolean;
 }
 
 interface WorkflowRunResponse {
@@ -2394,7 +2395,7 @@ interface WorkflowRunResponse {
 export async function sessionRunWorkflow(
   sessionId: string,
   spec: WorkflowRunRequest["spec"],
-  opts: { dryRun: boolean; isolation: boolean },
+  opts: { dryRun: boolean; isolation: boolean; synthesis?: boolean },
 ): Promise<WorkflowRunResponse> {
   const rpcError = getSessionRpcUnavailableError(sessionId);
   if (rpcError) {
@@ -2404,7 +2405,7 @@ export async function sessionRunWorkflow(
     return await apiSocket.sessionRPC<WorkflowRunResponse, WorkflowRunRequest>(
       sessionId,
       "workflowRun",
-      { spec, dryRun: opts.dryRun, isolation: opts.isolation },
+      { spec, dryRun: opts.dryRun, isolation: opts.isolation, synthesis: opts.synthesis },
     );
   } catch (error) {
     return { success: false, error: getErrorMessage(error) };

@@ -44,16 +44,18 @@ async function runWorkflowCommand(rest: string[]): Promise<void> {
   const cwd = dirFlag && rest.includes("--dir") ? resolve(dirFlag) : process.cwd();
   const dryRun = rest.includes("--dry-run");
   const isolation = rest.includes("--isolation");
+  const synthesis = rest.includes("--synthesis");
   const specPath = isAbsolute(specArg) ? specArg : resolve(cwd, specArg);
 
   const definition = await loadSpec(specPath);
   logger.print(
-    `Running workflow "${definition.goal}" — ${definition.steps.length} step(s)${dryRun ? " (dry-run)" : ""}${isolation ? " (isolated)" : ""}`,
+    `Running workflow "${definition.goal}" — ${definition.steps.length} step(s)${dryRun ? " (dry-run)" : ""}${isolation ? " (isolated)" : ""}${synthesis ? " (+synthesis)" : ""}`,
   );
 
   const { ok, jsPath, statusPath } = await runWorkflowInDir(definition, cwd, {
     dryRun,
     isolation,
+    synthesis,
   });
   logger.print(`${ok ? "Workflow complete" : "Workflow finished with failures"}.`);
   logger.print(`Persisted replay: ${jsPath}`);

@@ -914,6 +914,7 @@ export const zhHant: TranslationStructure = {
     takePhoto: "拍照",
     chooseFromLibrary: "從相簿選擇",
     chooseFile: "選擇檔案",
+    chooseDesign: "設計稿（HTML）",
     sentFile: "已傳送一個檔案",
     sentFiles: ({ count }: { count: number }) => `已傳送 ${count} 個檔案`,
     fileTooLarge: "檔案太大，無法傳送",
@@ -2887,6 +2888,8 @@ export const zhHant: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "綜合彙整",
+    synthesisHint: "最後由一個代理綜合所有子代理的產出。",
     stop: "停止",
     rerun: "重跑",
     merge: "合併",

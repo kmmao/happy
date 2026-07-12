@@ -916,6 +916,7 @@ export const zhHans: TranslationStructure = {
     takePhoto: "拍照",
     chooseFromLibrary: "从相册选择",
     chooseFile: "选择文件",
+    chooseDesign: "设计稿（HTML）",
     sentFile: "已发送一个文件",
     sentFiles: ({ count }: { count: number }) => `已发送 ${count} 个文件`,
     fileTooLarge: "文件太大，无法发送",
@@ -2888,6 +2889,8 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "综合汇总",
+    synthesisHint: "最后由一个代理综合所有子代理的产出。",
     stop: "停止",
     rerun: "重跑",
     merge: "合并",

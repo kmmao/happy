@@ -1191,6 +1191,7 @@ export const ru: TranslationStructure = {
     takePhoto: "Сделать фото",
     chooseFromLibrary: "Выбрать из галереи",
     chooseFile: "Выбрать файл",
+    chooseDesign: "Макет дизайна (HTML)",
     sentFile: "Отправлен файл",
     sentFiles: ({ count }: { count: number }) => `Отправлено ${count} файлов`,
     fileTooLarge: "Файл слишком большой для отправки",
@@ -2899,6 +2900,8 @@ export const ru: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "Синтез",
+    synthesisHint: "Финальный агент обобщает результаты всех субагентов.",
     stop: "Остановить",
     rerun: "Перезапустить",
     merge: "Слить",

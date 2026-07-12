@@ -1068,6 +1068,7 @@ export const ja: TranslationStructure = {
     takePhoto: "写真を撮る",
     chooseFromLibrary: "ライブラリから選択",
     chooseFile: "ファイルを選択",
+    chooseDesign: "デザイン案（HTML）",
     sentFile: "ファイルを送信しました",
     sentFiles: ({ count }: { count: number }) => `${count}件のファイルを送信しました`,
     fileTooLarge: "ファイルが大きすぎて送信できません",
@@ -3068,6 +3069,8 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    synthesis: "統合",
+    synthesisHint: "最後にエージェントが全サブエージェントの結果を要約します。",
     stop: "停止",
     rerun: "再実行",
     merge: "マージ",
