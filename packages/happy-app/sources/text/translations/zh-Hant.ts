@@ -2885,6 +2885,16 @@ export const zhHant: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "新增工作流程",
+    goalPlaceholder: "這個工作流程要建立什麼？",
+    rolePlaceholder: "角色（如 frontend）",
+    promptPlaceholder: "給這個子代理的 prompt…",
+    modelPlaceholder: "模型（haiku / sonnet / opus）",
+    orderLabel: "波次",
+    addStep: "新增步驟",
+    dryRun: "空跑（不啟動代理、不花 token）",
+    run: "執行工作流程",
+    validationError: "請填寫目標，且至少一個步驟有角色和 prompt。",
     statusRunning: "執行中",
     statusCompleted: "已完成",
     statusFailed: "失敗",

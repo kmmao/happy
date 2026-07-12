@@ -2944,6 +2944,16 @@ export const en: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "New workflow",
+    goalPlaceholder: "What should this workflow build?",
+    rolePlaceholder: "Role (e.g. frontend)",
+    promptPlaceholder: "Prompt for this sub-agent…",
+    modelPlaceholder: "Model (haiku / sonnet / opus)",
+    orderLabel: "Wave",
+    addStep: "Add step",
+    dryRun: "Dry run (no agents, no tokens)",
+    run: "Run workflow",
+    validationError: "Add a goal and at least one step with a role and prompt.",
     statusRunning: "Running",
     statusCompleted: "Completed",
     statusFailed: "Failed",

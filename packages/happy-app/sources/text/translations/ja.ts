@@ -3066,6 +3066,16 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "新規ワークフロー",
+    goalPlaceholder: "このワークフローで何を作りますか？",
+    rolePlaceholder: "ロール（例: frontend）",
+    promptPlaceholder: "このサブエージェントへのプロンプト…",
+    modelPlaceholder: "モデル（haiku / sonnet / opus）",
+    orderLabel: "ウェーブ",
+    addStep: "ステップを追加",
+    dryRun: "ドライラン（エージェント・トークンなし）",
+    run: "ワークフローを実行",
+    validationError: "目標と、ロール・プロンプトを持つステップを1つ以上追加してください。",
     statusRunning: "実行中",
     statusCompleted: "完了",
     statusFailed: "失敗",

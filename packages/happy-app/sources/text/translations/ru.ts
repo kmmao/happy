@@ -2897,6 +2897,16 @@ export const ru: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "Новый процесс",
+    goalPlaceholder: "Что должен создать этот процесс?",
+    rolePlaceholder: "Роль (напр. frontend)",
+    promptPlaceholder: "Промпт для этого субагента…",
+    modelPlaceholder: "Модель (haiku / sonnet / opus)",
+    orderLabel: "Волна",
+    addStep: "Добавить шаг",
+    dryRun: "Пробный запуск (без агентов и токенов)",
+    run: "Запустить процесс",
+    validationError: "Добавьте цель и хотя бы один шаг с ролью и промптом.",
     statusRunning: "Выполняется",
     statusCompleted: "Завершено",
     statusFailed: "Ошибка",

@@ -2961,6 +2961,16 @@ export const pl: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "Nowy przepływ",
+    goalPlaceholder: "Co ma zbudować ten przepływ?",
+    rolePlaceholder: "Rola (np. frontend)",
+    promptPlaceholder: "Prompt dla tego subagenta…",
+    modelPlaceholder: "Model (haiku / sonnet / opus)",
+    orderLabel: "Fala",
+    addStep: "Dodaj krok",
+    dryRun: "Próba (bez agentów i tokenów)",
+    run: "Uruchom przepływ",
+    validationError: "Dodaj cel i przynajmniej jeden krok z rolą i promptem.",
     statusRunning: "W toku",
     statusCompleted: "Zakończono",
     statusFailed: "Niepowodzenie",

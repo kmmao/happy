@@ -2948,6 +2948,16 @@ export const pt: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "Novo fluxo",
+    goalPlaceholder: "O que este fluxo deve construir?",
+    rolePlaceholder: "Papel (ex.: frontend)",
+    promptPlaceholder: "Prompt para este subagente…",
+    modelPlaceholder: "Modelo (haiku / sonnet / opus)",
+    orderLabel: "Onda",
+    addStep: "Adicionar passo",
+    dryRun: "Simulação (sem agentes nem tokens)",
+    run: "Executar fluxo",
+    validationError: "Adicione um objetivo e ao menos um passo com papel e prompt.",
     statusRunning: "Em execução",
     statusCompleted: "Concluído",
     statusFailed: "Falhou",

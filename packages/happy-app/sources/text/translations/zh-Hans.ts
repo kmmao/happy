@@ -2886,6 +2886,16 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "新建工作流",
+    goalPlaceholder: "这个工作流要构建什么？",
+    rolePlaceholder: "角色（如 frontend）",
+    promptPlaceholder: "给这个子代理的 prompt…",
+    modelPlaceholder: "模型（haiku / sonnet / opus）",
+    orderLabel: "波次",
+    addStep: "添加步骤",
+    dryRun: "空跑（不启动代理、不花 token）",
+    run: "运行工作流",
+    validationError: "请填写目标，且至少一个步骤有角色和 prompt。",
     statusRunning: "运行中",
     statusCompleted: "已完成",
     statusFailed: "失败",

@@ -2951,6 +2951,16 @@ export const es: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "Nuevo flujo",
+    goalPlaceholder: "¿Qué debe construir este flujo?",
+    rolePlaceholder: "Rol (p. ej. frontend)",
+    promptPlaceholder: "Prompt para este subagente…",
+    modelPlaceholder: "Modelo (haiku / sonnet / opus)",
+    orderLabel: "Ola",
+    addStep: "Añadir paso",
+    dryRun: "Simulación (sin agentes ni tokens)",
+    run: "Ejecutar flujo",
+    validationError: "Añade un objetivo y al menos un paso con rol y prompt.",
     statusRunning: "En curso",
     statusCompleted: "Completado",
     statusFailed: "Fallido",

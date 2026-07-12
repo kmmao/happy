@@ -2952,6 +2952,16 @@ export const ca: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    newTitle: "Nou flux",
+    goalPlaceholder: "Què ha de construir aquest flux?",
+    rolePlaceholder: "Rol (p. ex. frontend)",
+    promptPlaceholder: "Prompt per a aquest subagent…",
+    modelPlaceholder: "Model (haiku / sonnet / opus)",
+    orderLabel: "Onada",
+    addStep: "Afegeix un pas",
+    dryRun: "Simulació (sense agents ni tokens)",
+    run: "Executa el flux",
+    validationError: "Afegeix un objectiu i almenys un pas amb rol i prompt.",
     statusRunning: "En curs",
     statusCompleted: "Completat",
     statusFailed: "Fallit",

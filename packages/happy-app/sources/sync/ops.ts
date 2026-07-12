@@ -2363,6 +2363,53 @@ export async function sessionListDirectory(
   }
 }
 
+// Dynamic Workflow run (Phase 5) — app-triggered.
+interface WorkflowRunRequest {
+  spec: {
+    id?: string;
+    goal: string;
+    steps: Array<{
+      id: string;
+      role: string;
+      prompt: string;
+      model?: string;
+      order: number;
+    }>;
+  };
+  dryRun?: boolean;
+}
+
+interface WorkflowRunResponse {
+  success: boolean;
+  workflowId?: string;
+  error?: string;
+}
+
+/**
+ * Trigger a Dynamic Workflow run on the session's machine (Phase 5). Fire-and-
+ * forget: the CLI returns the workflowId immediately and writes live progress
+ * to `<cwd>/.happy/workflows/<id>.json`, which the Workflows screen polls.
+ */
+export async function sessionRunWorkflow(
+  sessionId: string,
+  spec: WorkflowRunRequest["spec"],
+  dryRun: boolean,
+): Promise<WorkflowRunResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return { success: false, error: rpcError };
+  }
+  try {
+    return await apiSocket.sessionRPC<WorkflowRunResponse, WorkflowRunRequest>(
+      sessionId,
+      "workflowRun",
+      { spec, dryRun },
+    );
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
 /**
  * Get directory tree from the session
  */

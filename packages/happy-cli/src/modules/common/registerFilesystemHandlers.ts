@@ -5,7 +5,10 @@ import { readFile, writeFile, readdir, stat, mkdir } from "fs/promises";
 import { createHash } from "crypto";
 import { dirname, join, resolve } from "path";
 import { tmpdir } from "os";
+import { randomUUID } from "crypto";
+import { WorkflowDefinitionSchema } from "@kmmao/happy-wire";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
+import { runWorkflowInDir } from "@/workflow/runWorkflowInDir";
 import { validatePath } from "./pathSecurity";
 import { summarizeShellCommandForLog } from "@/utils/securityRedaction";
 import { checkBlockedBashCommand } from "@/utils/bashCommandPolicy";
@@ -17,6 +20,28 @@ const UPLOAD_TEMP_DIR = join(tmpdir(), "happy", "uploads");
 
 /** Maximum file size for writeFile RPC (10 MB base64 ≈ 7.5 MB decoded). */
 const MAX_WRITE_SIZE = 10 * 1024 * 1024;
+
+interface WorkflowRunRequest {
+  spec: {
+    id?: string;
+    goal: string;
+    createdAt?: number;
+    steps: Array<{
+      id: string;
+      role: string;
+      prompt: string;
+      model?: string;
+      order: number;
+    }>;
+  };
+  dryRun?: boolean;
+}
+
+interface WorkflowRunResponse {
+  success: boolean;
+  workflowId?: string;
+  error?: string;
+}
 
 interface BashRequest {
   command: string;
@@ -411,6 +436,34 @@ export function registerFilesystemHandlers(
       };
     }
   });
+
+  // Dynamic Workflow run handler (Phase 5). The app sends a spec; we run it in
+  // the session's working directory. Fire-and-forget: the run can take a while
+  // (real sub-agents), so we return the workflowId immediately and let the app
+  // poll the <cwd>/.happy/workflows/<id>.json run-state file for live progress.
+  rpcHandlerManager.registerHandler<WorkflowRunRequest, WorkflowRunResponse>(
+    "workflowRun",
+    async (data) => {
+      const withDefaults = {
+        id: data.spec?.id || `wf_${randomUUID().slice(0, 8)}`,
+        createdAt: typeof data.spec?.createdAt === "number" ? data.spec.createdAt : Date.now(),
+        ...data.spec,
+      };
+      const parsed = WorkflowDefinitionSchema.safeParse(withDefaults);
+      if (!parsed.success) {
+        return { success: false, error: `Invalid workflow spec: ${parsed.error.message}` };
+      }
+      const definition = parsed.data;
+      // Kick off the run without blocking the RPC response.
+      void runWorkflowInDir(definition, workingDirectory, {
+        dryRun: data.dryRun === true,
+      }).catch((error) => {
+        logger.debug("Workflow run failed:", error);
+      });
+      logger.debug(`Workflow run started: ${definition.id}`);
+      return { success: true, workflowId: definition.id };
+    },
+  );
 
   // Get directory tree handler - recursive with depth control
   rpcHandlerManager.registerHandler<

@@ -9,9 +9,9 @@
  * Route: /session/{id}/workflows
  */
 import * as React from "react";
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import type { WorkflowRun, WorkflowStep, WorkflowStepStatus } from "@kmmao/happy-wire";
 import { storage } from "@/sync/storage";
@@ -53,7 +53,19 @@ function StepStatusIcon({ status }: { status: WorkflowStepStatus | undefined }) 
 
 export default React.memo(function WorkflowsPage() {
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
+    const router = useRouter();
+    const { theme } = useUnistyles();
     const [runs, setRuns] = React.useState<WorkflowRun[] | null>(null);
+
+    const NewButton = (
+        <Pressable
+            style={styles.newButton}
+            onPress={() => router.push(`/session/${sessionId}/workflow-new` as any)}
+        >
+            <Ionicons name="add" size={18} color={theme.colors.text} />
+            <Text style={styles.newButtonText}>{t("dynamicWorkflows.newTitle")}</Text>
+        </Pressable>
+    );
 
     const [loading, load] = useHappyAction(async () => {
         const cwd = storage.getState().sessions[sessionId]?.metadata?.path;
@@ -111,12 +123,14 @@ export default React.memo(function WorkflowsPage() {
         return (
             <View style={styles.center}>
                 <Text style={styles.empty}>{t("dynamicWorkflows.empty")}</Text>
+                {NewButton}
             </View>
         );
     }
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ padding: 12, gap: 12 }}>
+            {NewButton}
             {runs.map((run) => {
                 const wf = run.definition;
                 const statusLabel =
@@ -172,8 +186,21 @@ export default React.memo(function WorkflowsPage() {
 
 const styles = StyleSheet.create((theme) => ({
     container: { flex: 1, backgroundColor: theme.colors.groupped.background },
-    center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
     empty: { color: theme.colors.textSecondary, textAlign: "center" },
+    newButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+        borderStyle: "dashed",
+    },
+    newButtonText: { color: theme.colors.text, fontWeight: "600" },
     card: {
         backgroundColor: theme.colors.surface,
         borderRadius: 12,

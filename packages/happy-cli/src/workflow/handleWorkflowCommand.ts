@@ -1,12 +1,9 @@
 import { readFile, readdir } from "node:fs/promises";
-import { join, resolve, isAbsolute } from "node:path";
+import { resolve, isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
 import { WorkflowDefinitionSchema, type WorkflowDefinition } from "@kmmao/happy-wire";
 import { logger } from "@/lib";
-import { runWorkflow, type WorkflowStepExecutor } from "./runWorkflow";
-import { persistWorkflow } from "./persistWorkflow";
-import { WorkflowRunReporter } from "./persistWorkflowRun";
-import { makeClaudeSubAgentExecutor } from "./spawnClaudeSubAgent";
+import { runWorkflowInDir, workflowsDirFor } from "./runWorkflowInDir";
 
 /**
  * `happy workflow` — the invocable entry that turns the Dynamic Workflow engine
@@ -25,10 +22,6 @@ import { makeClaudeSubAgentExecutor } from "./spawnClaudeSubAgent";
  * (parse → run → persist) can be exercised without spending tokens.
  */
 
-function workflowsDirFor(cwd: string): string {
-  return join(cwd, ".happy", "workflows");
-}
-
 /** Load a spec file leniently: fill id/createdAt when omitted, then validate. */
 async function loadSpec(specPath: string): Promise<WorkflowDefinition> {
   const raw = await readFile(specPath, "utf8");
@@ -40,13 +33,6 @@ async function loadSpec(specPath: string): Promise<WorkflowDefinition> {
   };
   return WorkflowDefinitionSchema.parse(withDefaults);
 }
-
-const dryRunExecutor: WorkflowStepExecutor = async (step) => ({
-  stepId: step.id,
-  role: step.role,
-  ok: true,
-  output: `[dry-run] ${step.role} (${step.model ?? "default"}): ${step.prompt.slice(0, 60)}`,
-});
 
 async function runWorkflowCommand(rest: string[]): Promise<void> {
   const specArg = rest.find((a) => !a.startsWith("--"));
@@ -64,28 +50,11 @@ async function runWorkflowCommand(rest: string[]): Promise<void> {
     `Running workflow "${definition.goal}" — ${definition.steps.length} step(s)${dryRun ? " (dry-run)" : ""}`,
   );
 
-  const executor = dryRun
-    ? dryRunExecutor
-    : makeClaudeSubAgentExecutor({ cwd });
-
-  // Live progress: write <id>.json (all-pending), update it on every step
-  // transition. The mobile app polls this file to render real-time status.
-  const reporter = new WorkflowRunReporter(definition, workflowsDirFor(cwd));
-  await reporter.start();
-
-  const result = await runWorkflow(definition, executor, (stepId, status) =>
-    reporter.note(stepId, status),
-  );
-  for (const r of result.results) {
-    logger.print(`  ${r.ok ? "✓" : "✗"} ${r.role} (${r.stepId})${r.error ? ` — ${r.error}` : ""}`);
-  }
-
-  const statusPath = await reporter.finish(result.ok);
-  const filePath = await persistWorkflow(definition, workflowsDirFor(cwd));
-  logger.print(`${result.ok ? "Workflow complete" : "Workflow finished with failures"}.`);
-  logger.print(`Persisted replay: ${filePath}`);
+  const { ok, jsPath, statusPath } = await runWorkflowInDir(definition, cwd, { dryRun });
+  logger.print(`${ok ? "Workflow complete" : "Workflow finished with failures"}.`);
+  logger.print(`Persisted replay: ${jsPath}`);
   logger.print(`Run state: ${statusPath}`);
-  process.exit(result.ok ? 0 : 1);
+  process.exit(ok ? 0 : 1);
 }
 
 async function listWorkflowsCommand(rest: string[]): Promise<void> {
