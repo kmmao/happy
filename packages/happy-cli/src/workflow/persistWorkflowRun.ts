@@ -18,6 +18,7 @@ import type {
 export class WorkflowRunReporter {
   private readonly filePath: string;
   private readonly steps: Record<string, WorkflowStepStatus>;
+  private readonly branches: Record<string, string> = {};
   // Serialize writes so overlapping transitions can't interleave / land out of
   // order — each note() chains its flush after the previous one.
   private writeChain: Promise<void> = Promise.resolve();
@@ -34,10 +35,12 @@ export class WorkflowRunReporter {
   }
 
   private build(status: WorkflowRunStatus): WorkflowRun {
+    const hasBranches = Object.keys(this.branches).length > 0;
     return {
       definition: this.definition,
       status,
       steps: { ...this.steps },
+      ...(hasBranches ? { branches: { ...this.branches } } : {}),
       updatedAt: this.now(),
     };
   }
@@ -66,6 +69,12 @@ export class WorkflowRunReporter {
    */
   note(stepId: string, status: WorkflowStepStatus): void {
     if (stepId in this.steps) this.steps[stepId] = status;
+    void this.enqueueFlush("running");
+  }
+
+  /** Record the isolation branch a step is running on. */
+  noteBranch(stepId: string, branch: string): void {
+    this.branches[stepId] = branch;
     void this.enqueueFlush("running");
   }
 

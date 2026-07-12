@@ -3066,6 +3066,9 @@ export const ja: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "このプロジェクトでセッションを開始すると、ワークフローの表示・実行ができます。",
+    isolation: "分離（エージェントごとに git worktree）",
+    isolationHint: "各エージェントは独自のブランチで動作します。並列編集が安全になり、個別にレビューできます。",
     newTitle: "新規ワークフロー",
     goalPlaceholder: "このワークフローで何を作りますか？",
     rolePlaceholder: "ロール（例: frontend）",
@@ -3755,6 +3758,7 @@ export const ja: TranslationStructure = {
     emptySubtitle: "CLIを接続するか、下のボタンをタップしてプロジェクトを追加してください",
     allProjects: "すべてのプロジェクト",
     tabSessions: "セッション",
+    tabWorkflows: "エージェント",
     tabGit: "Git",
     tabSupervisor: "モニター",
     tabHealth: "ヘルス",

@@ -40,6 +40,7 @@ export default React.memo(function WorkflowNewPage() {
     const { theme } = useUnistyles();
     const [goal, setGoal] = React.useState("");
     const [dryRun, setDryRun] = React.useState(true);
+    const [isolation, setIsolation] = React.useState(false);
     const [steps, setSteps] = React.useState<StepDraft[]>([emptyStep()]);
 
     const updateStep = (i: number, patch: Partial<StepDraft>) =>
@@ -61,7 +62,11 @@ export default React.memo(function WorkflowNewPage() {
             Modal.alert(t("common.error"), t("dynamicWorkflows.validationError"));
             return;
         }
-        const res = await sessionRunWorkflow(sessionId, { goal: goal.trim(), steps: cleaned }, dryRun);
+        const res = await sessionRunWorkflow(
+            sessionId,
+            { goal: goal.trim(), steps: cleaned },
+            { dryRun, isolation },
+        );
         if (!res.success) {
             Modal.alert(t("common.error"), res.error ?? "Failed to start workflow");
             return;
@@ -132,6 +137,13 @@ export default React.memo(function WorkflowNewPage() {
             <View style={styles.dryRunRow}>
                 <Text style={styles.dryRunLabel}>{t("dynamicWorkflows.dryRun")}</Text>
                 <Switch value={dryRun} onValueChange={setDryRun} />
+            </View>
+            <View style={styles.dryRunRow}>
+                <View style={styles.isolationLabelWrap}>
+                    <Text style={styles.dryRunLabel}>{t("dynamicWorkflows.isolation")}</Text>
+                    <Text style={styles.isolationHint}>{t("dynamicWorkflows.isolationHint")}</Text>
+                </View>
+                <Switch value={isolation} onValueChange={setIsolation} />
             </View>
 
             <Pressable
@@ -227,6 +239,8 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 4,
     },
     dryRunLabel: { color: theme.colors.text, fontSize: 14 },
+    isolationLabelWrap: { flex: 1, paddingRight: 12 },
+    isolationHint: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 },
     runButton: {
         backgroundColor: theme.colors.text,
         borderRadius: 12,

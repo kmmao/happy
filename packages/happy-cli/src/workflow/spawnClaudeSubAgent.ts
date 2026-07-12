@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import type { WorkflowStep } from "@kmmao/happy-wire";
 import type { WorkflowStepExecutor, WorkflowStepResult } from "./runWorkflow";
+import { createWorktreeLocal } from "@/webhook/createWorktreeLocal";
+import { logger } from "@/ui/logger";
 
 /**
  * Real sub-agent spawn for Dynamic Workflows (Phase 5).
@@ -21,6 +23,20 @@ export interface SubAgentSpawnOptions {
   claudeBin?: string;
   /** Per-step timeout in ms (default 10 min). */
   timeoutMs?: number;
+  /**
+   * When true, each sub-agent runs in its own git worktree (a fresh branch off
+   * the current one) so concurrent steps can't clobber each other's files and
+   * each agent's work is reviewable / mergeable independently. The workflow id
+   * scopes the branch prefix.
+   */
+  isolation?: boolean;
+  /** Workflow id — used to prefix isolation branch names. */
+  workflowId?: string;
+}
+
+/** Optional lifecycle hooks (e.g. surface an isolation branch as it's created). */
+export interface SubAgentExecutorHooks {
+  onBranch?: (stepId: string, branch: string) => void;
 }
 
 export interface SubAgentCommand {
@@ -77,17 +93,38 @@ export const defaultCommandRunner: CommandRunner = (cmd, opts) =>
 export function makeClaudeSubAgentExecutor(
   opts: SubAgentSpawnOptions,
   runner: CommandRunner = defaultCommandRunner,
+  hooks?: SubAgentExecutorHooks,
 ): WorkflowStepExecutor {
   const timeoutMs = opts.timeoutMs ?? 10 * 60_000;
   return async (step: WorkflowStep): Promise<WorkflowStepResult> => {
+    // Isolation: give this step its own worktree/branch off the project dir so
+    // concurrent steps never touch the same working tree. Best-effort — if the
+    // worktree can't be created (e.g. not a git repo), fall back to the shared
+    // cwd rather than failing the step.
+    let runCwd = opts.cwd;
+    let branch: string | undefined;
+    if (opts.isolation) {
+      const wt = await createWorktreeLocal(opts.cwd, {
+        prefix: `wf-${(opts.workflowId ?? "run").slice(0, 12)}-${step.id}`,
+      });
+      if (wt.success) {
+        runCwd = wt.worktreePath;
+        branch = wt.branchName;
+        hooks?.onBranch?.(step.id, wt.branchName);
+      } else {
+        logger.debug(`Worktree isolation failed for ${step.id}, using shared cwd: ${wt.error}`);
+      }
+    }
+
     const cmd = buildSubAgentCommand(step, opts);
-    const res = await runner(cmd, { cwd: opts.cwd, timeoutMs });
+    const res = await runner(cmd, { cwd: runCwd, timeoutMs });
     return {
       stepId: step.id,
       role: step.role,
       ok: res.exitCode === 0,
       output: res.stdout.trim() || undefined,
       error: res.exitCode === 0 ? undefined : res.stderr.trim() || `exit ${res.exitCode}`,
+      branch,
     };
   };
 }

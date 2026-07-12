@@ -4,6 +4,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
+import { ProjectWorkflowsTab } from "./ProjectWorkflowsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectSupervisorTab } from "./ProjectSupervisorTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
@@ -31,6 +32,7 @@ type TabKey = ProjectDetailTabKey;
 
 const TAB_LABELS: Record<TabKey, () => string> = {
     sessions: () => t("projects.tabSessions"),
+    workflows: () => t("projects.tabWorkflows"),
     git: () => t("projects.tabGit"),
     supervisor: () => t("projects.tabSupervisor"),
     health: () => t("projects.tabHealth"),
@@ -220,6 +222,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectSessionsTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "workflows"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectWorkflowsTab project={project} />
                     </View>
                     <View
                         style={

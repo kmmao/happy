@@ -2885,6 +2885,9 @@ export const zhHant: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "在該專案裡起一個工作階段，才能查看或執行工作流程。",
+    isolation: "隔離（每個代理獨立 git worktree）",
+    isolationHint: "每個代理在自己的分支上跑——並發改動互不干擾，可逐個審查。",
     newTitle: "新增工作流程",
     goalPlaceholder: "這個工作流程要建立什麼？",
     rolePlaceholder: "角色（如 frontend）",
@@ -3689,6 +3692,7 @@ export const zhHant: TranslationStructure = {
     emptySubtitle: "連接 CLI 或點擊下方按鈕新增專案",
     allProjects: "所有專案",
     tabSessions: "工作階段",
+    tabWorkflows: "代理",
     tabGit: "Git",
     tabSupervisor: "監控",
     tabHealth: "健康",

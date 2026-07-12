@@ -2961,6 +2961,9 @@ export const pl: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "Uruchom sesję w tym projekcie, aby zobaczyć lub uruchomić przepływy.",
+    isolation: "Izolacja (worktree git na agenta)",
+    isolationHint: "Każdy agent pracuje na własnej gałęzi; bezpieczne równoległe zmiany, przejrzyj każdą.",
     newTitle: "Nowy przepływ",
     goalPlaceholder: "Co ma zbudować ten przepływ?",
     rolePlaceholder: "Rola (np. frontend)",
@@ -3803,6 +3806,7 @@ export const pl: TranslationStructure = {
     emptySubtitle: "Połącz CLI lub naciśnij przycisk poniżej, aby dodać projekt",
     allProjects: "Wszystkie projekty",
     tabSessions: "Sesje",
+    tabWorkflows: "Agenci",
     tabGit: "Git",
     tabSupervisor: "Monitor",
     tabHealth: "Zdrowie",

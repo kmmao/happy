@@ -35,6 +35,7 @@ interface WorkflowRunRequest {
     }>;
   };
   dryRun?: boolean;
+  isolation?: boolean;
 }
 
 interface WorkflowRunResponse {
@@ -457,6 +458,7 @@ export function registerFilesystemHandlers(
       // Kick off the run without blocking the RPC response.
       void runWorkflowInDir(definition, workingDirectory, {
         dryRun: data.dryRun === true,
+        isolation: data.isolation === true,
       }).catch((error) => {
         logger.debug("Workflow run failed:", error);
       });

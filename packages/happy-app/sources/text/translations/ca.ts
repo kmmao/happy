@@ -2952,6 +2952,9 @@ export const ca: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "Inicia una sessió en aquest projecte per veure o executar fluxos.",
+    isolation: "Aïllament (worktree de git per agent)",
+    isolationHint: "Cada agent treballa a la seva branca; edicions paral·leles segures, revisa'n cadascuna.",
     newTitle: "Nou flux",
     goalPlaceholder: "Què ha de construir aquest flux?",
     rolePlaceholder: "Rol (p. ex. frontend)",
@@ -3781,6 +3784,7 @@ export const ca: TranslationStructure = {
     emptySubtitle: "Connecta un CLI o prem el botó de sota per afegir un projecte",
     allProjects: "Tots els projectes",
     tabSessions: "Sessions",
+    tabWorkflows: "Agents",
     tabGit: "Git",
     tabSupervisor: "Monitor",
     tabHealth: "Salut",

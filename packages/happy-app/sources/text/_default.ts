@@ -2990,6 +2990,9 @@ export const en = {
   },
 
   dynamicWorkflows: {
+    noSession: "Start a session in this project to view or run workflows.",
+    isolation: "Isolation (git worktree per agent)",
+    isolationHint: "Each agent runs on its own branch — safe parallel edits, review each separately.",
     newTitle: "New workflow",
     goalPlaceholder: "What should this workflow build?",
     rolePlaceholder: "Role (e.g. frontend)",
@@ -3826,6 +3829,7 @@ export const en = {
     emptySubtitle: "Connect a CLI or tap the button below to add a project",
     allProjects: "All Projects",
     tabSessions: "Sessions",
+    tabWorkflows: "Agents",
     tabGit: "Git",
     tabSupervisor: "Supervisor",
     tabHealth: "Health",

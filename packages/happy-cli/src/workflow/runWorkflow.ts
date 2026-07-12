@@ -28,6 +28,8 @@ export interface WorkflowStepResult {
   ok: boolean;
   output?: string;
   error?: string;
+  /** Git branch this step ran on, when worktree isolation was used. */
+  branch?: string;
 }
 
 export interface WorkflowRunResult {

@@ -33,13 +33,19 @@ export function workflowsDirFor(cwd: string): string {
 export async function runWorkflowInDir(
   definition: WorkflowDefinition,
   cwd: string,
-  opts?: { dryRun?: boolean },
+  opts?: { dryRun?: boolean; isolation?: boolean },
 ): Promise<RunWorkflowInDirResult> {
   const workflowsDir = workflowsDirFor(cwd);
   const reporter = new WorkflowRunReporter(definition, workflowsDir);
   await reporter.start();
 
-  const executor = opts?.dryRun ? dryRunExecutor : makeClaudeSubAgentExecutor({ cwd });
+  const executor = opts?.dryRun
+    ? dryRunExecutor
+    : makeClaudeSubAgentExecutor(
+        { cwd, isolation: opts?.isolation, workflowId: definition.id },
+        undefined,
+        { onBranch: (stepId, branch) => reporter.noteBranch(stepId, branch) },
+      );
   const result = await runWorkflow(definition, executor, (stepId, status) =>
     reporter.note(stepId, status),
   );

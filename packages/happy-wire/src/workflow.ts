@@ -63,6 +63,11 @@ export const WorkflowRunSchema = z.object({
   definition: WorkflowDefinitionSchema,
   status: WorkflowRunStatusSchema,
   steps: z.record(z.string(), WorkflowStepStatusSchema),
+  /**
+   * Per-step git branch, present when the run used worktree isolation — each
+   * sub-agent works on its own branch for conflict-free parallelism + review.
+   */
+  branches: z.record(z.string(), z.string()).optional(),
   updatedAt: z.number(),
 });
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;

@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { WorkflowStep } from "@kmmao/happy-wire";
 import {
   buildSubAgentCommand,
@@ -62,5 +66,38 @@ describe("makeClaudeSubAgentExecutor", () => {
     };
     await makeClaudeSubAgentExecutor({ cwd: "/repo", timeoutMs: 1234 }, runner)(step);
     expect(seen).toEqual({ cwd: "/repo", timeoutMs: 1234 });
+  });
+
+  it("isolation runs the step in its own worktree/branch", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "wf-iso-"));
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+    git("init", "-b", "main");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "t");
+    await writeFile(join(repo, "README.md"), "x");
+    git("add", ".");
+    git("commit", "-m", "init");
+
+    let ranCwd = "";
+    const branches: string[] = [];
+    const runner: CommandRunner = async (_cmd, opts) => {
+      ranCwd = opts.cwd;
+      return { stdout: "ok", stderr: "", exitCode: 0 };
+    };
+    const exec = makeClaudeSubAgentExecutor(
+      { cwd: repo, isolation: true, workflowId: "wf_iso" },
+      runner,
+      { onBranch: (_id, b) => branches.push(b) },
+    );
+
+    const r = await exec(step);
+    expect(r.ok).toBe(true);
+    expect(r.branch).toBeTruthy();
+    expect(branches).toHaveLength(1);
+    // The sub-agent ran in the isolated worktree, not the repo root.
+    expect(ranCwd).not.toBe(repo);
+    expect(ranCwd).toContain(".dev/worktree");
+
+    await rm(repo, { recursive: true, force: true });
   });
 });

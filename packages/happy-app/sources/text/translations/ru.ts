@@ -2897,6 +2897,9 @@ export const ru: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "Запустите сессию в этом проекте, чтобы просматривать или запускать процессы.",
+    isolation: "Изоляция (git worktree на агента)",
+    isolationHint: "Каждый агент работает в своей ветке; безопасные параллельные правки, проверяйте каждую.",
     newTitle: "Новый процесс",
     goalPlaceholder: "Что должен создать этот процесс?",
     rolePlaceholder: "Роль (напр. frontend)",
@@ -3799,6 +3802,7 @@ export const ru: TranslationStructure = {
     emptySubtitle: "Подключите CLI или нажмите кнопку ниже, чтобы добавить проект",
     allProjects: "Все проекты",
     tabSessions: "Сессии",
+    tabWorkflows: "Агенты",
     tabGit: "Git",
     tabSupervisor: "Монитор",
     tabHealth: "Здоровье",

@@ -2886,6 +2886,9 @@ export const zhHans: TranslationStructure = {
   },
 
   dynamicWorkflows: {
+    noSession: "在该项目里起一个会话，才能查看或运行工作流。",
+    isolation: "隔离（每个代理独立 git worktree）",
+    isolationHint: "每个代理在自己的分支上跑——并发改动互不干扰，可逐个审查。",
     newTitle: "新建工作流",
     goalPlaceholder: "这个工作流要构建什么？",
     rolePlaceholder: "角色（如 frontend）",
@@ -3690,6 +3693,7 @@ export const zhHans: TranslationStructure = {
     emptySubtitle: "连接 CLI 或点击下方按钮添加项目",
     allProjects: "所有项目",
     tabSessions: "会话",
+    tabWorkflows: "代理",
     tabGit: "Git",
     tabSupervisor: "监控",
     tabHealth: "健康",
