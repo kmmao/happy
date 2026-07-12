@@ -17,6 +17,7 @@ import { getToolDescriptor } from "./getToolDescriptor";
 import { delay } from "@/utils/time";
 import { createAllowedToolMatcher } from "./allowedToolMatcher";
 import { createToolCallTracker } from "./toolCallTracker";
+import { classifyToolCall, type Classification } from "./autoModeClassifier";
 
 interface PermissionResponse {
   id: string;
@@ -323,6 +324,24 @@ export class PermissionHandler {
     }
 
     //
+    // Auto Mode: silently allow classified-safe (read-only) operations to kill
+    // permission-popup fatigue. Dangerous/neutral calls fall through to the
+    // approval flow below, carrying the classification so the App can flag risk.
+    // AskUserQuestion always goes through — it's how Q&A reaches the App.
+    //
+    const classification = classifyToolCall(toolName, input);
+    if (
+      this.permissionMode === "auto" &&
+      toolName !== "AskUserQuestion" &&
+      classification.risk === "safe"
+    ) {
+      return {
+        behavior: "allow",
+        updatedInput: input as Record<string, unknown>,
+      };
+    }
+
+    //
     // Approval flow
     //
 
@@ -340,6 +359,7 @@ export class PermissionHandler {
       toolName,
       input,
       options.signal,
+      classification,
     );
   };
 
@@ -351,6 +371,7 @@ export class PermissionHandler {
     toolName: string,
     input: unknown,
     signal: AbortSignal,
+    classification?: Classification,
   ): Promise<PermissionResult> {
     return new Promise<PermissionResult>((resolve, reject) => {
       // Set up abort signal handling
@@ -402,6 +423,10 @@ export class PermissionHandler {
             tool: toolName,
             arguments: input,
             createdAt: Date.now(),
+            ...(classification && {
+              riskLevel: classification.risk,
+              classifierReason: classification.reason,
+            }),
           },
         },
       }));

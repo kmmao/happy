@@ -2892,7 +2892,15 @@ export const ru: TranslationStructure = {
       yesAllowAllEdits: "Да, разрешить все правки в этой сессии",
       yesForTool: "Да, больше не спрашивать для этого инструмента",
       noTellClaude: "Нет, дать обратную связь",
+      dangerBadge: "Опасно",
     },
+  },
+
+  githubPr: {
+    loadFailed: "Не удалось загрузить diff PR",
+    draft: "Черновик",
+    filesCount: ({ count }: { count: number }) => `${count} файлов`,
+    truncated: "… diff обрезан (слишком большой)",
   },
 
   plan: {

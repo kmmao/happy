@@ -3061,7 +3061,15 @@ export const ja: TranslationStructure = {
       yesAllowAllEdits: "はい、このセッション中のすべての編集を許可",
       yesForTool: "はい、このツールについては確認しない",
       noTellClaude: "いいえ、フィードバックを提供",
+      dangerBadge: "危険",
     },
+  },
+
+  githubPr: {
+    loadFailed: "PR diff の読み込みに失敗しました",
+    draft: "下書き",
+    filesCount: ({ count }: { count: number }) => `${count} 件のファイル`,
+    truncated: "… diff は切り詰められました（大きすぎます）",
   },
 
   plan: {

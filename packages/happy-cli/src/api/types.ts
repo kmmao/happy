@@ -626,6 +626,10 @@ export type AgentState = {
       tool: string;
       arguments: any;
       createdAt: number;
+      /** Auto Mode safety classification (present when classified). */
+      riskLevel?: "safe" | "dangerous" | "neutral";
+      /** Human-readable reason for the classification. */
+      classifierReason?: string;
     };
   };
   completedRequests?: {

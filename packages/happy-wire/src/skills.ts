@@ -12,6 +12,13 @@ export const SkillSummarySchema = z.object({
   archived: z.boolean(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  // ===== Front-matter routing (Phase 3) — parsed from `content` =====
+  /** Short alias (haiku/sonnet/opus/fable) or raw model id to run this skill. */
+  model: z.string().optional(),
+  /** When false, only a user may trigger the skill; the model must not. */
+  userInvocable: z.boolean().optional(),
+  /** When true, the model must never auto-invoke the skill (Auto Mode included). */
+  disableModelInvocation: z.boolean().optional(),
 });
 export type SkillSummary = z.infer<typeof SkillSummarySchema>;
 
@@ -40,5 +47,7 @@ export type UpdateSkillBody = z.infer<typeof UpdateSkillBodySchema>;
 export const SkillContentSchema = z.object({
   name: z.string(),
   content: z.string(),
+  /** Resolved model id for this skill (from front-matter), if any. */
+  model: z.string().optional(),
 });
 export type SkillContent = z.infer<typeof SkillContentSchema>;

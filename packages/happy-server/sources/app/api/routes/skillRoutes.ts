@@ -4,6 +4,7 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
 import { assertOwnedProject, ownedSkill } from "../ownership";
+import { parseSkillFrontmatter } from "@kmmao/happy-wire";
 
 // Inline Zod schemas (mirrored from @kmmao/happy-wire/skills — will import after wire publish)
 
@@ -244,6 +245,11 @@ function serializeSkill(skill: Record<string, unknown>): Record<string, unknown>
         updatedAt: Date;
     };
 
+    // Surface Phase 3 front-matter so the App can route/gate the skill (e.g.
+    // hide model-invocation, show the target model). Parsing is cheap and keeps
+    // the stored content untouched.
+    const { frontmatter } = parseSkillFrontmatter(s.content);
+
     return {
         id: s.id,
         projectId: s.projectId,
@@ -256,5 +262,12 @@ function serializeSkill(skill: Record<string, unknown>): Record<string, unknown>
         archived: s.archived,
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),
+        ...(frontmatter.model ? { model: frontmatter.model } : {}),
+        ...(frontmatter.userInvocable !== undefined
+            ? { userInvocable: frontmatter.userInvocable }
+            : {}),
+        ...(frontmatter.disableModelInvocation !== undefined
+            ? { disableModelInvocation: frontmatter.disableModelInvocation }
+            : {}),
     };
 }

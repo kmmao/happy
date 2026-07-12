@@ -46,6 +46,7 @@ import { voiceRoutes } from "./routes/voiceRoutes";
 import { sub2apiRoutes } from "./routes/sub2apiRoutes";
 import { taskRoutes } from "./routes/taskRoutes";
 import { skillRoutes } from "./routes/skillRoutes";
+import { githubPrRoutes } from "./routes/githubPrRoutes";
 import { triggerScheduleRoutes } from "./routes/triggerScheduleRoutes";
 import { webhookTriggerRoutes } from "./routes/webhookTriggerRoutes";
 import { inboxRoutes } from "./routes/inboxRoutes";
@@ -179,6 +180,7 @@ export async function startApi() {
   sub2apiRoutes(typed);
   taskRoutes(typed);
   skillRoutes(typed);
+  githubPrRoutes(typed);
   triggerScheduleRoutes(typed);
   webhookTriggerRoutes(typed);
   inboxRoutes(typed);

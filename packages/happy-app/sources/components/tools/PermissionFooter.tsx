@@ -30,6 +30,9 @@ interface PermissionFooterProps {
     mode?: string;
     allowedTools?: string[];
     decision?: "approved" | "approved_for_session" | "denied" | "abort";
+    /** Auto Mode safety classification (Phase 1) — drives danger highlighting. */
+    riskLevel?: "safe" | "dangerous" | "neutral";
+    classifierReason?: string;
   };
   sessionId: string;
   toolName: string;
@@ -364,7 +367,54 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
     iconDenied: {
       color: theme.colors.permissionButton.deny.background,
     },
+    dangerBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginBottom: 4,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.colors.permissionButton.deny.background,
+      backgroundColor: `${theme.colors.permissionButton.deny.background}14`,
+    },
+    dangerBadgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.colors.permissionButton.deny.background,
+    },
+    dangerReasonText: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      flexShrink: 1,
+    },
   });
+
+  // Auto Mode danger banner — shown when the CLI classifier flagged this call
+  // as potentially destructive (Phase 1). Renders above whichever button set
+  // this session type uses.
+  const dangerBanner =
+    permission.riskLevel === "dangerous" ? (
+      <View style={styles.dangerBanner}>
+        <Ionicons
+          name="warning"
+          size={14}
+          color={theme.colors.permissionButton.deny.background}
+        />
+        <Text style={styles.dangerBadgeText}>
+          {t("claude.permissions.dangerBadge")}
+        </Text>
+        {permission.classifierReason ? (
+          <Text
+            style={styles.dangerReasonText}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {permission.classifierReason}
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
 
   // Render Codex buttons if this is a Codex session
   if (isCodex) {
@@ -600,6 +650,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({
   // Render Claude buttons (existing behavior)
   return (
     <View style={styles.container}>
+      {dangerBanner}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[

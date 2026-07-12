@@ -1,4 +1,8 @@
 import { Prisma } from "@prisma/client";
+import {
+    parseSkillFrontmatter,
+    resolveSkillModelId,
+} from "@kmmao/happy-wire";
 import { db } from "@/storage/db";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import type { ResolvedRuntimeProfile } from "@/types/aiBackendProfile";
@@ -150,13 +154,58 @@ export function taskProfileFields(resolution: TaskRuntimeProfileResolution): {
 export async function loadTaskSkillContents(
     accountId: string,
     skillIds: string[],
-): Promise<Array<{ name: string; content: string }> | undefined> {
+    options?: { interactive?: boolean },
+): Promise<Array<{ name: string; content: string; model?: string }> | undefined> {
     if (skillIds.length === 0) return undefined;
     const skills = await db.skill.findMany({
         where: { id: { in: skillIds }, accountId, archived: false },
         orderBy: { name: "asc" },
     });
-    return skills.length > 0 ? skills.map((s) => ({ name: s.name, content: s.content })) : undefined;
+    return resolveSkillContents(skills, options);
+}
+
+/**
+ * Apply Phase 3 front-matter routing to a set of raw skill rows: strip the
+ * front-matter block from the injected body, resolve any per-skill `model`,
+ * and — for non-interactive triggers (webhook/cron) — drop skills the author
+ * marked as user-only (`disable_model_invocation` / `user_invocable: false`)
+ * so the model can never autonomously run a guarded skill.
+ *
+ * Pure so every dispatch path (create, retry, swarm) shares one behaviour.
+ */
+export function resolveSkillContents(
+    rawSkills: Array<{ name: string; content: string }>,
+    options?: { interactive?: boolean },
+): Array<{ name: string; content: string; model?: string }> | undefined {
+    const interactive = options?.interactive ?? false;
+    const resolved = rawSkills
+        .map((s) => {
+            const { frontmatter, body } = parseSkillFrontmatter(s.content);
+            return {
+                name: s.name,
+                content: body,
+                model: resolveSkillModelId(frontmatter.model),
+                userOnly:
+                    frontmatter.disableModelInvocation === true ||
+                    frontmatter.userInvocable === false,
+            };
+        })
+        .filter((s) => interactive || !s.userOnly)
+        .map(({ name, content, model }) => ({ name, content, ...(model ? { model } : {}) }));
+
+    return resolved.length > 0 ? resolved : undefined;
+}
+
+/**
+ * Derive the effective model override for a task from its resolved skill
+ * contents: the first skill that declares a front-matter `model` wins. Returns
+ * undefined when no skill pins a model, letting the caller keep the task's own
+ * model selection.
+ */
+export function deriveSkillModelOverride(
+    skillContents: Array<{ model?: string }> | undefined,
+): string | undefined {
+    return skillContents?.find((s) => s.model)?.model;
 }
 
 // ============================================================================
@@ -227,13 +276,18 @@ export interface DispatchTaskTriggerInput {
     directory: string;
     priority: string;
     projectId: string | null;
-    skillContents?: Array<{ name: string; content: string }>;
+    skillContents?: Array<{ name: string; content: string; model?: string }>;
     profileId?: string;
     runtimeProfile?: ResolvedRuntimeProfile;
     resultToken?: string;
     worktreeIsolation?: boolean;
     /** App model-mode KEY (e.g. "opus-4-8-1m") — drives 1M capability in the CLI. */
     modelMode?: string | null;
+    /**
+     * Raw model id override (e.g. from a skill's front-matter `model`). Takes
+     * effect for the run when set; null/omitted keeps the CLI default.
+     */
+    modelOverride?: string | null;
     /** Reasoning effort for the first turn (low|medium|high|xhigh|max). */
     effort?: string | null;
 }
@@ -259,6 +313,9 @@ export async function dispatchTaskTrigger(
         profileId: input.profileId,
         runtimeProfile: input.runtimeProfile,
         modelMode: input.modelMode ?? undefined,
+        // Prefer an explicit override; otherwise route from a skill's front-matter.
+        modelOverride:
+            input.modelOverride ?? deriveSkillModelOverride(input.skillContents) ?? undefined,
         effort: input.effort ?? undefined,
         worktreeIsolation: input.worktreeIsolation || undefined,
     });

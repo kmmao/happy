@@ -23,6 +23,8 @@ class Configuration {
   public readonly daemonStateFile: string;
   public readonly daemonLockFile: string;
   public readonly sessionKeysDir: string;
+  /** Persisted Dynamic Workflows (Phase 5) — `.happy/workflows/*.js`. */
+  public readonly workflowsDir: string;
   public readonly currentCliVersion: string;
 
   public readonly isExperimentalEnabled: boolean;
@@ -50,6 +52,7 @@ class Configuration {
     this.daemonStateFile = join(this.happyHomeDir, "daemon.state.json");
     this.daemonLockFile = join(this.happyHomeDir, "daemon.state.json.lock");
     this.sessionKeysDir = join(this.happyHomeDir, "session-keys");
+    this.workflowsDir = join(this.happyHomeDir, "workflows");
 
     // URL precedence (both): HAPPY_*_URL env > settings.<key> > default.
     // Settings are read sync here (avoid circular import with persistence.ts).

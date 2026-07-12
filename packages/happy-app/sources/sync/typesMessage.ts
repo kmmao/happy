@@ -21,6 +21,9 @@ export type ToolCall = {
     decision?: "approved" | "approved_for_session" | "denied" | "abort";
     date?: number;
     answers?: Record<string, string>;
+    /** Auto Mode safety classification (Phase 1) — drives danger highlighting. */
+    riskLevel?: "safe" | "dangerous" | "neutral";
+    classifierReason?: string;
   };
   /** Background task ID when Bash command runs with run_in_background */
   backgroundTaskId?: string;

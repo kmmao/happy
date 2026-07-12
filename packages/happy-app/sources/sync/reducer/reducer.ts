@@ -669,6 +669,10 @@ export function reducer(
             message.tool.permission = {
               id: permId,
               status: "pending",
+              ...(request.riskLevel && { riskLevel: request.riskLevel }),
+              ...(request.classifierReason && {
+                classifierReason: request.classifierReason,
+              }),
             };
             changed.add(existingMessageId);
           }
@@ -687,6 +691,10 @@ export function reducer(
             permission: {
               id: permId,
               status: "pending",
+              ...(request.riskLevel && { riskLevel: request.riskLevel }),
+              ...(request.classifierReason && {
+                classifierReason: request.classifierReason,
+              }),
             },
           };
 

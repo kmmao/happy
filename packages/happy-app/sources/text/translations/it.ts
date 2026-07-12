@@ -3083,7 +3083,15 @@ export const it: TranslationStructure = {
         "Sì, consenti tutte le modifiche durante questa sessione",
       yesForTool: "Sì, non chiedere più per questo strumento",
       noTellClaude: "No, fornisci feedback",
+      dangerBadge: "Pericoloso",
     },
+  },
+
+  githubPr: {
+    loadFailed: "Impossibile caricare il diff della PR",
+    draft: "Bozza",
+    filesCount: ({ count }: { count: number }) => `${count} file`,
+    truncated: "… diff troncato (troppo grande)",
   },
 
   plan: {

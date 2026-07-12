@@ -2985,7 +2985,15 @@ export const en = {
       yesAllowAllEdits: "Yes, allow all edits during this session",
       yesForTool: "Yes, don't ask again for this tool",
       noTellClaude: "No, and provide feedback",
+      dangerBadge: "Dangerous",
     },
+  },
+
+  githubPr: {
+    loadFailed: "Failed to load PR diff",
+    draft: "Draft",
+    filesCount: ({ count }: { count: number }) => `${count} files`,
+    truncated: "… diff truncated (too large)",
   },
 
   plan: {
