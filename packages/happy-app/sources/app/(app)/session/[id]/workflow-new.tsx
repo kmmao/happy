@@ -34,6 +34,13 @@ interface StepDraft {
 
 const emptyStep = (): StepDraft => ({ role: "", prompt: "", model: "", order: "0" });
 
+/**
+ * Model choices for a step. An empty value means "no `--model` flag" — the
+ * sub-agent inherits the default model. The rest map straight to `claude
+ * --model <id>`, so only the aliases the CLI accepts are offered.
+ */
+const MODEL_OPTIONS = ["", "haiku", "sonnet", "opus"] as const;
+
 export default React.memo(function WorkflowNewPage() {
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -109,14 +116,30 @@ export default React.memo(function WorkflowNewPage() {
                         multiline
                     />
                     <View style={styles.stepMetaRow}>
-                        <TextInput
-                            style={styles.modelInput}
-                            placeholder={t("dynamicWorkflows.modelPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={step.model}
-                            onChangeText={(v) => updateStep(i, { model: v })}
-                            autoCapitalize="none"
-                        />
+                        <View style={styles.modelBox}>
+                            <Text style={styles.modelLabel}>{t("dynamicWorkflows.modelLabel")}</Text>
+                            <View style={styles.modelChips}>
+                                {MODEL_OPTIONS.map((m) => {
+                                    const selected = step.model === m;
+                                    return (
+                                        <Pressable
+                                            key={m || "default"}
+                                            onPress={() => updateStep(i, { model: m })}
+                                            style={[styles.modelChip, selected && styles.modelChipSelected]}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.modelChipText,
+                                                    selected && styles.modelChipTextSelected,
+                                                ]}
+                                            >
+                                                {m || t("dynamicWorkflows.modelDefault")}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
                         <View style={styles.orderBox}>
                             <Text style={styles.orderLabel}>{t("dynamicWorkflows.orderLabel")}</Text>
                             <TextInput
@@ -206,16 +229,24 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         minHeight: 44,
     },
-    stepMetaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    modelInput: {
-        flex: 1,
+    stepMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+    modelBox: { flex: 1, minWidth: 200, gap: 4 },
+    modelLabel: { color: theme.colors.textSecondary, fontSize: 12 },
+    modelChips: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+    modelChip: {
         backgroundColor: theme.colors.surfacePressed,
         borderRadius: 8,
-        paddingHorizontal: 8,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+        paddingHorizontal: 10,
         paddingVertical: 6,
-        fontSize: 12,
-        color: theme.colors.text,
     },
+    modelChipSelected: {
+        backgroundColor: theme.colors.text,
+        borderColor: theme.colors.text,
+    },
+    modelChipText: { color: theme.colors.text, fontSize: 12 },
+    modelChipTextSelected: { color: theme.colors.groupped.background, fontWeight: "600" },
     orderBox: { flexDirection: "row", alignItems: "center", gap: 4 },
     orderLabel: { color: theme.colors.textSecondary, fontSize: 12 },
     orderInput: {
