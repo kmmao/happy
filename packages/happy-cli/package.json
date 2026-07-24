@@ -93,7 +93,7 @@
     "@agentclientprotocol/sdk": "^0.20.0",
     "@anthropic-ai/sandbox-runtime": "0.0.54",
     "@anthropic-ai/sdk": "^0.100.1",
-    "@kmmao/happy-wire": "^0.38.0",
+    "@kmmao/happy-wire": "^0.39.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "@stablelib/base64": "^2.0.1",
