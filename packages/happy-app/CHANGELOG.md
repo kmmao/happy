@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.47.0 - 2026-07-25
+
+Claude Opus 5 — Anthropic's newest Opus (same $5/$25 pricing as Opus 4.8, with capability approaching Fable 5) is now selectable everywhere you pick a model, in both 200K and 1M-context variants. This release also lands the Intent-Driven Development Workstation: a full Dynamic Workflows system you can trigger, watch, and steer from the App — a project-level Workflows tab, live progress visualization on mobile, per-agent worktree isolation, PR-diff review woven into the conversation, and design-draft delivery straight from the composer. Companion releases: `@kmmao/happy-coder@0.106.0`, `@kmmao/happy-wire@0.39.0`.
+
+### Models
+- Added Claude Opus 5 to the model picker in both 200K and 1M-context variants ($5/$25 per Mtok). Opus 5 is Anthropic's newest Opus — same price as Opus 4.8, with capability approaching Fable 5 — and it inherits the xhigh reasoning-effort option alongside the existing tiers. Opus 5 also becomes the default model used for proactive next-step suggestions.
+
+### Intent-Driven Development Workstation
+- Added a project-level Workflows tab so Dynamic Workflows live alongside your sessions, with per-agent worktree isolation so parallel agents don't stomp on each other's files.
+- Added the ability to trigger Dynamic Workflows straight from the App — no CLI command required — with a haiku/sonnet/opus model picker for the workflow's agents.
+- Added live workflow progress reporting and status visualization on mobile, so you can watch a running workflow's phases and agents in real time.
+- Added workflow lifecycle controls: cancel a running workflow, delete or re-run a finished one, and merge / discard / diff its branch.
+- Added a workflow synthesis step and discoverable design-draft attachment, plus skill-routing UI, workflow output surfacing, and headless-permission handling.
+- Added PR diff review woven directly into the conversation, and design-draft delivery from the main composer.
+
+### Sessions
+- Improved worktree sessions to group under their main project instead of floating separately.
+- Improved session cards by dropping the main/branch scope labels that added noise without adding signal.
+
+### Fixes
+- Fixed the project Traces tab not triggering a message load when opened.
+
 ## 2.46.0 - 2026-07-12
 
 The Sessions tab regains project grouping — Ad-hoc sessions are once again grouped under a project header so you can tell at a glance which project each one belongs to, even when many interleave. Agent loops pick up a pile of controls: a one-tap Run now, a per-iteration fresh-session toggle, an AI backend profile picker, 1M-context defaults, and full edit support. PTY sessions gain an authoritative goal bar, and a streaming-truncation bug plus a plan-mode auto-approve bug are fixed. Companion releases: `@kmmao/happy-coder@0.102.30`, `@kmmao/happy-wire@0.36.0`.

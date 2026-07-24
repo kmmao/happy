@@ -2,6 +2,24 @@
   "entries": {
     "en": [
       {
+        "version": "2.47.0",
+        "date": "2026-07-25",
+        "summary": "Claude Opus 5 — Anthropic's newest Opus (same $5/$25 pricing as Opus 4.8, with capability approaching Fable 5) is now selectable everywhere you pick a model, in both 200K and 1M-context variants. This release also lands the Intent-Driven Development Workstation: a full Dynamic Workflows system you can trigger, watch, and steer from the App — a project-level Workflows tab, live progress visualization on mobile, per-agent worktree isolation, PR-diff review woven into the conversation, and design-draft delivery straight from the composer. Companion releases: `@kmmao/happy-coder@0.106.0`, `@kmmao/happy-wire@0.39.0`.",
+        "changes": [
+          "Added Claude Opus 5 to the model picker in both 200K and 1M-context variants ($5/$25 per Mtok). Opus 5 is Anthropic's newest Opus — same price as Opus 4.8, with capability approaching Fable 5 — and it inherits the xhigh reasoning-effort option alongside the existing tiers. Opus 5 also becomes the default model used for proactive next-step suggestions.",
+          "Added a project-level Workflows tab so Dynamic Workflows live alongside your sessions, with per-agent worktree isolation so parallel agents don't stomp on each other's files.",
+          "Added the ability to trigger Dynamic Workflows straight from the App — no CLI command required — with a haiku/sonnet/opus model picker for the workflow's agents.",
+          "Added live workflow progress reporting and status visualization on mobile, so you can watch a running workflow's phases and agents in real time.",
+          "Added workflow lifecycle controls: cancel a running workflow, delete or re-run a finished one, and merge / discard / diff its branch.",
+          "Added a workflow synthesis step and discoverable design-draft attachment, plus skill-routing UI, workflow output surfacing, and headless-permission handling.",
+          "Added PR diff review woven directly into the conversation, and design-draft delivery from the main composer.",
+          "Improved worktree sessions to group under their main project instead of floating separately.",
+          "Improved session cards by dropping the main/branch scope labels that added noise without adding signal.",
+          "Fixed the project Traces tab not triggering a message load when opened."
+        ],
+        "rawMarkdown": "## 2.47.0 - 2026-07-25\n\n\nClaude Opus 5 — Anthropic's newest Opus (same $5/$25 pricing as Opus 4.8, with capability approaching Fable 5) is now selectable everywhere you pick a model, in both 200K and 1M-context variants. This release also lands the Intent-Driven Development Workstation: a full Dynamic Workflows system you can trigger, watch, and steer from the App — a project-level Workflows tab, live progress visualization on mobile, per-agent worktree isolation, PR-diff review woven into the conversation, and design-draft delivery straight from the composer. Companion releases: `@kmmao/happy-coder@0.106.0`, `@kmmao/happy-wire@0.39.0`.\n\n### Models\n- Added Claude Opus 5 to the model picker in both 200K and 1M-context variants ($5/$25 per Mtok). Opus 5 is Anthropic's newest Opus — same price as Opus 4.8, with capability approaching Fable 5 — and it inherits the xhigh reasoning-effort option alongside the existing tiers. Opus 5 also becomes the default model used for proactive next-step suggestions.\n\n### Intent-Driven Development Workstation\n- Added a project-level Workflows tab so Dynamic Workflows live alongside your sessions, with per-agent worktree isolation so parallel agents don't stomp on each other's files.\n- Added the ability to trigger Dynamic Workflows straight from the App — no CLI command required — with a haiku/sonnet/opus model picker for the workflow's agents.\n- Added live workflow progress reporting and status visualization on mobile, so you can watch a running workflow's phases and agents in real time.\n- Added workflow lifecycle controls: cancel a running workflow, delete or re-run a finished one, and merge / discard / diff its branch.\n- Added a workflow synthesis step and discoverable design-draft attachment, plus skill-routing UI, workflow output surfacing, and headless-permission handling.\n- Added PR diff review woven directly into the conversation, and design-draft delivery from the main composer.\n\n### Sessions\n- Improved worktree sessions to group under their main project instead of floating separately.\n- Improved session cards by dropping the main/branch scope labels that added noise without adding signal.\n\n### Fixes\n- Fixed the project Traces tab not triggering a message load when opened."
+      },
+      {
         "version": "2.46.0",
         "date": "2026-07-12",
         "summary": "The Sessions tab regains project grouping — Ad-hoc sessions are once again grouped under a project header so you can tell at a glance which project each one belongs to, even when many interleave. Agent loops pick up a pile of controls: a one-tap Run now, a per-iteration fresh-session toggle, an AI backend profile picker, 1M-context defaults, and full edit support. PTY sessions gain an authoritative goal bar, and a streaming-truncation bug plus a plan-mode auto-approve bug are fixed. Companion releases: `@kmmao/happy-coder@0.102.30`, `@kmmao/happy-wire@0.36.0`.",
@@ -1206,6 +1224,24 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.47.0",
+        "date": "2026-07-25",
+        "summary": "Claude Opus 5 —— Anthropic 最新的 Opus 模型（与 Opus 4.8 同为 $5/$25，能力接近 Fable 5）现已在所有模型选择处可选，并提供 200K 与 1M 上下文两种变体。本次还带来「意图驱动开发工作站」：一套可在 App 内触发、观察与操控的 Dynamic Workflows 系统 —— 项目级 Workflows 标签页、移动端实时进度可视化、每个 agent 独立的 worktree 隔离、编织进对话的 PR diff 评审，以及从输入框直接投递设计草稿。配套发布：`@kmmao/happy-coder@0.106.0`、`@kmmao/happy-wire@0.39.0`。",
+        "changes": [
+          "新增 Claude Opus 5 到模型选择器，提供 200K 与 1M 上下文两种变体（$5/$25 per Mtok）。Opus 5 是 Anthropic 最新的 Opus —— 与 Opus 4.8 同价、能力接近 Fable 5 —— 并在既有档位之外沿用 xhigh 推理强度选项。Opus 5 同时成为主动生成下一步建议时使用的默认模型。",
+          "新增项目级 Workflows 标签页，Dynamic Workflows 与会话并列展示，并为每个 agent 提供独立的 worktree 隔离，避免并行 agent 互相覆盖文件。",
+          "新增在 App 内直接触发 Dynamic Workflows 的能力 —— 无需 CLI 命令 —— 并为工作流的 agent 提供 haiku/sonnet/opus 模型选择器。",
+          "新增移动端实时工作流进度上报与状态可视化，可实时观察运行中工作流的各阶段与 agent。",
+          "新增工作流生命周期控制：取消运行中的工作流、删除或重跑已完成的工作流，以及对其分支进行 merge / discard / diff。",
+          "新增工作流综合（synthesis）步骤与可发现的设计草稿附件，以及 skill 路由 UI、工作流输出呈现与 headless 权限处理。",
+          "新增编织进对话的 PR diff 评审，以及从主输入框投递设计草稿。",
+          "改进 worktree 会话归入其主项目分组，不再单独浮动。",
+          "改进会话卡片，移除徒增噪音的主线/分支 scope 标签。",
+          "修复项目 Traces 标签页打开时未触发消息加载的问题。"
+        ],
+        "rawMarkdown": "## 2.47.0 - 2026-07-25\n\n\nClaude Opus 5 —— Anthropic 最新的 Opus 模型（与 Opus 4.8 同为 $5/$25，能力接近 Fable 5）现已在所有模型选择处可选，并提供 200K 与 1M 上下文两种变体。本次还带来「意图驱动开发工作站」：一套可在 App 内触发、观察与操控的 Dynamic Workflows 系统 —— 项目级 Workflows 标签页、移动端实时进度可视化、每个 agent 独立的 worktree 隔离、编织进对话的 PR diff 评审，以及从输入框直接投递设计草稿。配套发布：`@kmmao/happy-coder@0.106.0`、`@kmmao/happy-wire@0.39.0`。\n\n### 模型\n- 新增 Claude Opus 5 到模型选择器，提供 200K 与 1M 上下文两种变体（$5/$25 per Mtok）。Opus 5 是 Anthropic 最新的 Opus —— 与 Opus 4.8 同价、能力接近 Fable 5 —— 并在既有档位之外沿用 xhigh 推理强度选项。Opus 5 同时成为主动生成下一步建议时使用的默认模型。\n\n### 意图驱动开发工作站\n- 新增项目级 Workflows 标签页，Dynamic Workflows 与会话并列展示，并为每个 agent 提供独立的 worktree 隔离，避免并行 agent 互相覆盖文件。\n- 新增在 App 内直接触发 Dynamic Workflows 的能力 —— 无需 CLI 命令 —— 并为工作流的 agent 提供 haiku/sonnet/opus 模型选择器。\n- 新增移动端实时工作流进度上报与状态可视化，可实时观察运行中工作流的各阶段与 agent。\n- 新增工作流生命周期控制：取消运行中的工作流、删除或重跑已完成的工作流，以及对其分支进行 merge / discard / diff。\n- 新增工作流综合（synthesis）步骤与可发现的设计草稿附件，以及 skill 路由 UI、工作流输出呈现与 headless 权限处理。\n- 新增编织进对话的 PR diff 评审，以及从主输入框投递设计草稿。\n\n### 会话\n- 改进 worktree 会话归入其主项目分组，不再单独浮动。\n- 改进会话卡片，移除徒增噪音的主线/分支 scope 标签。\n\n### 修复\n- 修复项目 Traces 标签页打开时未触发消息加载的问题。"
+      },
+      {
         "version": "2.46.0",
         "date": "2026-07-12",
         "summary": "会话标签页恢复了按项目分组 —— 临时（Ad-hoc）会话重新归到项目分组头下，即便多个项目的会话交错在一起，也能一眼看出每条属于哪个项目。Agent 循环一口气加了一批控制项：一键立即执行、每轮全新会话开关、AI backend 配置文件选择器、1M 上下文默认值，以及完整的编辑支持。PTY 会话新增权威目标栏，另修复了一个流式截断 bug 和一个计划模式自动批准 bug。配套发布：`@kmmao/happy-coder@0.102.30`、`@kmmao/happy-wire@0.36.0`。",
@@ -2387,7 +2423,7 @@
       }
     ]
   },
-  "latestVersion": "2.46.0",
+  "latestVersion": "2.47.0",
   "availableLocales": [
     "en",
     "zh-Hans"

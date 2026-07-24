@@ -1,5 +1,27 @@
 # 更新日志
 
+## 2.47.0 - 2026-07-25
+
+Claude Opus 5 —— Anthropic 最新的 Opus 模型（与 Opus 4.8 同为 $5/$25，能力接近 Fable 5）现已在所有模型选择处可选，并提供 200K 与 1M 上下文两种变体。本次还带来「意图驱动开发工作站」：一套可在 App 内触发、观察与操控的 Dynamic Workflows 系统 —— 项目级 Workflows 标签页、移动端实时进度可视化、每个 agent 独立的 worktree 隔离、编织进对话的 PR diff 评审，以及从输入框直接投递设计草稿。配套发布：`@kmmao/happy-coder@0.106.0`、`@kmmao/happy-wire@0.39.0`。
+
+### 模型
+- 新增 Claude Opus 5 到模型选择器，提供 200K 与 1M 上下文两种变体（$5/$25 per Mtok）。Opus 5 是 Anthropic 最新的 Opus —— 与 Opus 4.8 同价、能力接近 Fable 5 —— 并在既有档位之外沿用 xhigh 推理强度选项。Opus 5 同时成为主动生成下一步建议时使用的默认模型。
+
+### 意图驱动开发工作站
+- 新增项目级 Workflows 标签页，Dynamic Workflows 与会话并列展示，并为每个 agent 提供独立的 worktree 隔离，避免并行 agent 互相覆盖文件。
+- 新增在 App 内直接触发 Dynamic Workflows 的能力 —— 无需 CLI 命令 —— 并为工作流的 agent 提供 haiku/sonnet/opus 模型选择器。
+- 新增移动端实时工作流进度上报与状态可视化，可实时观察运行中工作流的各阶段与 agent。
+- 新增工作流生命周期控制：取消运行中的工作流、删除或重跑已完成的工作流，以及对其分支进行 merge / discard / diff。
+- 新增工作流综合（synthesis）步骤与可发现的设计草稿附件，以及 skill 路由 UI、工作流输出呈现与 headless 权限处理。
+- 新增编织进对话的 PR diff 评审，以及从主输入框投递设计草稿。
+
+### 会话
+- 改进 worktree 会话归入其主项目分组，不再单独浮动。
+- 改进会话卡片，移除徒增噪音的主线/分支 scope 标签。
+
+### 修复
+- 修复项目 Traces 标签页打开时未触发消息加载的问题。
+
 ## 2.46.0 - 2026-07-12
 
 会话标签页恢复了按项目分组 —— 临时（Ad-hoc）会话重新归到项目分组头下，即便多个项目的会话交错在一起，也能一眼看出每条属于哪个项目。Agent 循环一口气加了一批控制项：一键立即执行、每轮全新会话开关、AI backend 配置文件选择器、1M 上下文默认值，以及完整的编辑支持。PTY 会话新增权威目标栏，另修复了一个流式截断 bug 和一个计划模式自动批准 bug。配套发布：`@kmmao/happy-coder@0.102.30`、`@kmmao/happy-wire@0.36.0`。

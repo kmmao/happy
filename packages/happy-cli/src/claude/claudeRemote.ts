@@ -160,6 +160,9 @@ export function resolveModelKey(
     case "opus-4-8":
     case "opus-4-8-1m":
       return "claude-opus-4-8[1m]";
+    case "opus-5":
+    case "opus-5-1m":
+      return "claude-opus-5[1m]";
     case "fable-5":
     case "fable-5-1m":
       return "claude-fable-5[1m]";
@@ -188,6 +191,8 @@ export function is1MModelKey(modelKey: string | undefined): boolean {
     case "opus-4-7-1m":
     case "opus-4-8":
     case "opus-4-8-1m":
+    case "opus-5":
+    case "opus-5-1m":
     case "fable-5":
     case "fable-5-1m":
       return true;

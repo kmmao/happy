@@ -78,6 +78,8 @@ const CLAUDE_MODEL_PRICING: Record<string, string> = {
   "haiku": "$1/$5 \u00B7 200K",
   "opus": "$5/$25",
   "opus-1m": "$5/$25",
+  "opus-5": "$5/$25",
+  "opus-5-1m": "$5/$25",
   "opus-4-7": "$5/$25",
   "opus-4-7-1m": "$5/$25",
   "opus-4-8": "$5/$25",
@@ -238,9 +240,19 @@ export function getClaudeModelModes(): ModelMode[] {
       description: "Fable 5 \u00B7 1M context \u00B7 $10/$50",
     },
     {
+      key: "opus-5",
+      name: "Opus 5",
+      description: "Opus 5 \u00B7 Newest Opus \u00B7 200K \u00B7 $5/$25",
+    },
+    {
+      key: "opus-5-1m",
+      name: "Opus 5 (1M)",
+      description: "Opus 5 \u00B7 1M context \u00B7 $5/$25",
+    },
+    {
       key: "opus-4-8",
       name: "Opus 4.8",
-      description: "Opus 4.8 \u00B7 Newest Opus \u00B7 200K \u00B7 $5/$25",
+      description: "Opus 4.8 \u00B7 200K \u00B7 $5/$25",
     },
     {
       key: "opus-4-8-1m",

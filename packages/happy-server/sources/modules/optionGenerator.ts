@@ -12,7 +12,7 @@ const SYSTEM_PROMPT =
     'Example: ["Fix edge case in payment validation", "Add unit tests for new endpoint", "Update API documentation"]';
 
 const DEFAULT_GENERATION_MODELS: Record<ScoringProvider, string> = {
-    anthropic: "claude-opus-4-8",
+    anthropic: "claude-opus-5",
     openai: "gpt-4.5",
     ollama: "llama3",
 };

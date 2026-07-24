@@ -46,7 +46,7 @@ describe("parseSkillFrontmatter", () => {
 describe("resolveSkillModelId", () => {
   it("maps short aliases to concrete ids", () => {
     expect(resolveSkillModelId("haiku")).toBe("claude-haiku-4-5-20251001");
-    expect(resolveSkillModelId("opus")).toBe("claude-opus-4-8");
+    expect(resolveSkillModelId("opus")).toBe("claude-opus-5");
     expect(resolveSkillModelId("SONNET")).toBe("claude-sonnet-5");
   });
 

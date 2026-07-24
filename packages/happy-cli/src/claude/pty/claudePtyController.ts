@@ -91,6 +91,7 @@ export interface UsageSnapshot {
  * without a code change.
  */
 const MODEL_CONTEXT_LIMITS: Array<[prefix: string, maxTokens: number]> = [
+  ["claude-opus-5", 200_000],
   ["claude-opus-4", 200_000],
   ["claude-sonnet-4", 200_000],
   ["claude-haiku-4", 200_000],
