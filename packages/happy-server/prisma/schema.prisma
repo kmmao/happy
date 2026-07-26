@@ -161,7 +161,6 @@ model Session {
     usageReports      UsageReport[]
     accessKeys        AccessKey[]
     sessionEvents     SessionEvent[]
-    knowledgeAccesses KnowledgeAccess[]
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
@@ -468,9 +467,6 @@ model Project {
     autoLoopDebounceMinutes           Int       @default(1440)
     lastAutoLoopStartedAt             DateTime?
 
-    // Knowledge base configuration (project-level overrides)
-    // null = inherit hardcoded defaults (enabled:false, mode:auto, sensitivity:balanced)
-    knowledgeConfig                   String?   // JSON: KnowledgeConfig
 
     // Lifecycle
     archived        Boolean   @default(false)
@@ -482,8 +478,6 @@ model Project {
     supervisorRuns        SupervisorRun[]
     agentLoops            AgentLoop[]
     supervisorDimensions  SupervisorDimension[]
-    knowledgeEntries      ProjectKnowledge[]
-    profile               ProjectProfile?
     tasks                 Task[]
     skills                Skill[]
     triggerSchedules      TriggerSchedule[]
@@ -800,133 +794,6 @@ model WebhookEvent {
     @@index([status])
 }
 
-//
-// Project Knowledge Base (medical record metaphor)
-//
-
-model ProjectKnowledge {
-    id              String   @id @default(cuid())
-    projectId       String
-    project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    // Classification
-    entryType       String   // discovery | decision | fix | convention | warning
-    category        String?  // user | feedback | project | reference (Claude Code 4-type taxonomy)
-    contributorType String   // session | supervisor | user | auto-dream
-    action          String   // create | amend | supersede | verify
-    status          String   @default("active") // active | superseded | archived
-
-    // Content
-    title           String
-    content         String   // Encrypted: narrative description
-    structured      String?  // Encrypted: JSON {request, findings, analysis, outcome, nextSteps}
-
-    // Metadata
-    tags            String   @default("[]")  // JSON array (plaintext for filtering)
-    confidence      String   @default("medium") // high | medium | low
-    model           String?  // Model that generated this entry
-    sessionId       String?  // Source session ID
-    affectedFiles   String   @default("[]")  // JSON array
-    relatedIds      String   @default("[]")  // JSON array of related entry IDs
-
-    // Embedding (pgvector — Phase 2 semantic search)
-    embedding       Unsupported("vector(1024)")?
-
-    // Relations (knowledge evolution)
-    supersedesId    String?
-    supersedes      ProjectKnowledge? @relation("KnowledgeSupersession", fields: [supersedesId], references: [id])
-    supersededBy    ProjectKnowledge[] @relation("KnowledgeSupersession")
-
-    // Graph relations (Phase 3 — replaces relatedIds JSON array)
-    relationsFrom   KnowledgeRelation[] @relation("RelationFrom")
-    relationsTo     KnowledgeRelation[] @relation("RelationTo")
-
-    // Lifecycle (Phase 2 — decay & archive)
-    lastAccessedAt  DateTime?
-    accessCount     Int      @default(0)
-
-    // User curation
-    pinned          Boolean  @default(false)
-
-    accesses        KnowledgeAccess[]
-
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
-
-    @@index([projectId, status])
-    @@index([projectId, entryType])
-    @@index([projectId, category])
-    @@index([projectId, createdAt])
-    @@index([projectId, status, lastAccessedAt])
-}
-
-//
-// Knowledge Relation Graph (Phase 3 — multi-type relations)
-//
-
-model KnowledgeRelation {
-    id             String   @id @default(cuid())
-
-    fromEntryId    String
-    fromEntry      ProjectKnowledge @relation("RelationFrom", fields: [fromEntryId], references: [id], onDelete: Cascade)
-
-    toEntryId      String
-    toEntry        ProjectKnowledge @relation("RelationTo", fields: [toEntryId], references: [id], onDelete: Cascade)
-
-    relationType   String   // "related" | "contradicts" | "refines" | "combines"
-    metadata       String?  // Optional JSON (e.g. LLM merge reasoning)
-
-    createdAt      DateTime @default(now())
-
-    @@unique([fromEntryId, toEntryId, relationType])
-    @@index([fromEntryId])
-    @@index([toEntryId])
-    @@index([relationType])
-}
-
-//
-// Knowledge Access Log (session-level reference tracking)
-//
-
-model KnowledgeAccess {
-    id          String   @id @default(cuid())
-
-    sessionId   String
-    session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-    knowledgeId String
-    knowledge   ProjectKnowledge @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
-
-    projectId   String
-    at          DateTime @default(now())
-
-    // Session-scoped TTL-by-turn (Phase: migrate-out countdown)
-    // initialTurns = starting budget at injection; maxTurns = cap for +1 growth; turnsRemaining = live counter.
-    // hotStatus: "hot" = still injected in-session, "evicted" = countdown hit zero, entry skipped in future turns.
-    initialTurns    Int      @default(5)
-    maxTurns        Int      @default(10)
-    turnsRemaining  Int      @default(5)
-    hitCount        Int      @default(0)
-    hotStatus       String   @default("hot") // hot | evicted
-    lastHitAt       DateTime?
-
-    @@unique([sessionId, knowledgeId])
-    @@index([knowledgeId])
-    @@index([projectId, sessionId])
-    @@index([sessionId, hotStatus])
-}
-
-model ProjectProfile {
-    id        String   @id @default(cuid())
-    projectId String   @unique
-    project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    content   String   // Encrypted: ProjectProfile JSON
-    version   Int      @default(1)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-}
 
 //
 // Tasks (Server-side persistent task queue)
@@ -1012,9 +879,6 @@ model Skill {
 
     // Optional attachment references (JSON array of file refs)
     attachments       String    @default("[]")
-
-    // Lineage from Knowledge Base
-    sourceKnowledgeId String?                       // ProjectKnowledge.id this was derived from
 
     archived          Boolean   @default(false)
     createdAt         DateTime  @default(now())
@@ -1139,7 +1003,7 @@ model InboxItem {
     account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
     // Classification
-    category    String   // task | trigger | supervisor | session | knowledge | system
+    category    String   // task | trigger | supervisor | session | system
     eventType   String   // e.g. "task.completed", "trigger.cron.fired"
     severity    String   @default("info") // info | warning | error
 
