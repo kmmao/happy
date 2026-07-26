@@ -326,7 +326,6 @@ export const ja: TranslationStructure = {
     categoryTrigger: "トリガー",
     categorySupervisor: "スーパーバイザー",
     categorySession: "セッション",
-    categoryKnowledge: "ナレッジ",
     categorySystem: "システム",
   },
 

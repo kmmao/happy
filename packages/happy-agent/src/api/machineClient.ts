@@ -462,50 +462,6 @@ export class MachineClient {
     this.socket?.emit("supervisor-run-status" as any, data);
   }
 
-  /** Submit a knowledge entry from a session. */
-  emitSubmitKnowledge(sid: string, entry: {
-    entryType: string;
-    contributorType: string;
-    action: string;
-    title: string;
-    content: string;
-    request?: string;
-    outcome?: string;
-    tags: string[];
-    confidence: string;
-    model?: string;
-    affectedFiles: string[];
-  }): void {
-    this.socket?.emit("submit-knowledge" as any, { sid, entry });
-  }
-
-  /** Fetch knowledge for a session. */
-  emitFetchKnowledge(
-    sid: string,
-    mode: "auto" | "full" | "minimal",
-    contextHints: string[] | undefined,
-    callback: (response: {
-      profile: {
-        techStack: string[];
-        architectureType?: string;
-        knownPitfalls: string[];
-        coreConventions: string[];
-        lastUpdatedAt: number;
-      } | null;
-      entries: {
-        id: string;
-        entryType: string;
-        title: string;
-        content: string;
-        tags: string[];
-        confidence: string;
-        createdAt: string;
-      }[];
-    }) => void,
-  ): void {
-    this.socket?.emit("fetch-knowledge" as any, { sid, mode, contextHints }, callback);
-  }
-
   /** Stream task log chunk. */
   emitTaskLog(sid: string, taskId: string, outputFile: string, chunk: string, offset: number): void {
     this.socket?.emit("task-log" as any, { sid, taskId, outputFile, chunk, offset });

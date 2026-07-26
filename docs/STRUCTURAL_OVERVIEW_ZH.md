@@ -33,7 +33,6 @@ Happy Coder 是一个基于云的 AI 编程助手系统，允许用户通过移�
 | `src/supervisor/` | 监督模式（自动化 bug 修复提示） |
 | `src/terminal/` | 终端仿真与 PTY 管理 |
 | `src/modules/` | 外部工具集成（ripgrep、difftastic、代理、任务日志） |
-| `src/knowledge/` | 知识库客户端、repo 映射生成 |
 | `src/webhook/` | webhook 触发的自动化与 worktree 创建 |
 
 **技术栈**：Node.js/TypeScript、Fastify、Ink + React、Zod、Socket.io-client、node-pty、MCP SDK、ACP SDK、Anthropic SDK、Vitest
@@ -144,7 +143,7 @@ Happy Coder 是一个基于云的 AI 编程助手系统，允许用户通过移�
 
 | 目录 | 职责 |
 |-----|------|
-| `src/` | 22 个模块覆盖：消息、协议（session/legacy）、机器类型、知识库、技能、任务、语音、MCP 注册表、Codex 后端选择 |
+| `src/` | 21 个模块覆盖：消息、协议（session/legacy）、机器类型、技能、任务、语音、MCP 注册表、Codex 后端选择 |
 | `dist/` | 编译输出（CJS + ESM 双包 + TypeScript 声明） |
 
 **技术栈**：TypeScript、Zod 4、pkgroll、Vitest、cuid2

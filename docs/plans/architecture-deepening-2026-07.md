@@ -1,5 +1,7 @@
 # Architecture deepening plan — 2026-07
 
+> ⚠️ **知识库子系统已于 2026-07-26 整体移除**（代码、API、UI、数据表）。本文中涉及 Knowledge 的条目为当时状态的记录，保留以备追溯。详见 `docs/plans/knowledge-removal-plan.md`。
+
 Output of `/improve-codebase-architecture`. 18 raw candidates were surfaced by
 exploration across happy-server, happy-app, happy-cli, happy-agent, then filtered
 against the 73 existing ADRs and the project's demonstrated anti-premature-

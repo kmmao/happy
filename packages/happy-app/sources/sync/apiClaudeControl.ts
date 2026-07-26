@@ -293,7 +293,7 @@ export async function toggleMcpServer(
 /**
  * Dynamically register a single MCP server on a running session.
  * The server is validated, merged with existing servers, and connected.
- * Protected server names (`happy`, `happy-knowledge`) are rejected.
+ * The protected server name (`happy`) is rejected.
  */
 export async function addRemoteMcpServer(
     sessionId: string,

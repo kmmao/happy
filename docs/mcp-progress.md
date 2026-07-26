@@ -1,6 +1,6 @@
 # MCP Progress & Session Summary
 
-Live session state（进度清单 + 概要）在 App 的 **Knowledge tab → 进度 sub-tab** 上展示。本文说明这些数据从哪里来、怎么流到 App，以及为什么采用这种设计。
+Live session state（进度清单 + 概要）由 App 侧面板展示。本文说明这些数据从哪里来、怎么流到 App，以及为什么采用这种设计。
 
 > 核心结论：**清单不是 Claude Code 原生 API 返回的**。我们没有办法"问 Claude Code 当前 todo 状态是什么"。清单是通过三条管道汇合而来：Agent 显式 MCP 调用、CLI 自动镜像 TodoWrite、App 兜底扫消息流。
 
@@ -118,7 +118,6 @@ Live session state（进度清单 + 概要）在 App 的 **Knowledge tab → 进
 // packages/happy-cli/src/claude/utils/startHappyServer.ts
 toolNames: [
   "change_title",
-  "query_project_knowledge",
   "update_progress",
   "update_session_summary",
 ]
@@ -128,7 +127,7 @@ toolNames: [
 
 ## 5. CLI 自动镜像（TodoWrite → metadata.progress）
 
-位置：`packages/happy-cli/src/claude/claudeRemoteLauncher.ts::onMessage`（紧跟知识库采集 block）
+位置：`packages/happy-cli/src/claude/claudeRemoteLauncher.ts::onMessage`
 
 CLI 在处理每条 assistant message 时，**同步**扫 `content` blocks 里的 `tool_use`：如果见到 `name === "TodoWrite"`，就**立即**把 `input.todos` 提取出来，调 `session.client.updateMetadata()` 写入 `metadata.progress`。
 

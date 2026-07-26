@@ -365,7 +365,6 @@ export const en = {
     categoryTrigger: "Triggers",
     categorySupervisor: "Supervisor",
     categorySession: "Sessions",
-    categoryKnowledge: "Knowledge",
     categorySystem: "System",
   },
 

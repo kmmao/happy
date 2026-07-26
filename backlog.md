@@ -44,6 +44,8 @@ CLI 侧已完成 SDK 选项映射（commit aff7302c），以下三个功能需�
 
 ## 项目知识库 Phase 2（2026-03-28 完成）
 
+> ⚠️ **该子系统已于 2026-07-26 整体移除**，代码、API、UI 与数据表均已删除；活跃条目归档于 `docs/archive/knowledge/`。详见 `docs/plans/knowledge-removal-plan.md`。以下为移除前的历史记录，保留以备追溯。
+
 语义检索 + 知识演化链 + 跨项目搜索 + Supervisor 自动贡献 + 概要自动重写
 
 ### ~~Phase 2.0: 基础设施~~ ✅ 已完成 (6647e111)
@@ -124,6 +126,8 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [x] 返回 {sessionWindow, pid} 用于跟踪
 
 ## 知识库配置统一到项目级（2026-04-14 记录）
+
+> ⚠️ **该子系统已于 2026-07-26 整体移除**，代码、API、UI 与数据表均已删除；活跃条目归档于 `docs/archive/knowledge/`。详见 `docs/plans/knowledge-removal-plan.md`。以下为移除前的历史记录，保留以备追溯。
 
 去掉设置页（Settings → Features）的知识库配置，所有配置统一到项目级 knowledgeConfig。
 

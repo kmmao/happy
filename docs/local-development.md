@@ -352,24 +352,14 @@ Server 启动时依次加载 `.env` 和 `.env.dev`（后者覆盖前者）。
 | `GITHUB_REDIRECT_URL` | OAuth 回调 URL，如 `https://your-domain/v1/connect/github/callback` |
 | `APP_URL` / `HAPPY_APP_URL` | OAuth 完成后跳转的前端 URL（无尾斜线） |
 
-### 嵌入模型（知识库语义检索）
+### 语义评分（LLM）
+
+用于 Auto-Option-Send 的候选项质量评分（`optionScorer`）。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `EMBEDDING_PROVIDER` | 自动检测 | 嵌入提供者：`ollama`（本地免费）或 `openai`（云端付费） |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama 服务地址 |
-| `OLLAMA_EMBED_MODEL` | `bge-m3` | Ollama 嵌入模型（1024 维，多语言） |
-| `OPENAI_API_KEY` / `EMBEDDING_API_KEY` | — | OpenAI API Key（使用 OpenAI 嵌入时必填） |
-| `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | OpenAI 嵌入模型（1024 维） |
-
-### 知识概要生成（LLM）
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PROFILE_PROVIDER` | 自动检测 | 概要生成提供者：`anthropic` 或 `ollama` |
-| `ANTHROPIC_API_KEY` | — | Anthropic API Key（使用 Anthropic 生成概要时必填） |
-| `ANTHROPIC_PROFILE_MODEL` | `claude-haiku-4-5-20251001` | 概要生成模型 |
-| `OLLAMA_CHAT_MODEL` | `gpt-oss:20b` | Ollama 对话模型（用于概要生成） |
+| `ANTHROPIC_API_KEY` | — | Anthropic API Key |
+| `ANTHROPIC_BASE_URL` | 官方地址 | 可选，自建代理时填写 |
 
 ### 语音服务（TTS/STT）
 
@@ -410,17 +400,6 @@ CLI 启动时加载 `.env.dev` 或 `.env.dev-local-server`。
 | `ANTHROPIC_MODEL` | SDK 默认 | Claude 模型 ID 或虚拟键（见下文「模型配置方案」） |
 | `ANTHROPIC_BASE_URL` | Anthropic 官方 | 自定义 API 端点（代理、路由器等） |
 | `GEMINI_MODEL` | `gemini-2.5-pro` | Gemini 模型（使用 `happy gemini` 时） |
-
-### 知识库
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `HAPPY_KNOWLEDGE_BASE` | `true` | 是否启用知识库功能 |
-| `HAPPY_KNOWLEDGE_MODE` | `auto` | 知识注入模式：`auto`（自动判断）/ `full`（全量）/ `minimal`（精简） |
-| `HAPPY_KNOWLEDGE_SENSITIVITY` | — | 知识提取灵敏度阈值 |
-| `HAPPY_KNOWLEDGE_TRACK_FILE_EDITS` | — | 追踪文件编辑操作 |
-| `HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS` | — | 追踪工具调用 |
-| `HAPPY_KNOWLEDGE_TRACK_TOKENS` | — | 追踪 token 用量 |
 
 ### 守护进程
 
@@ -615,55 +594,3 @@ happy gemini model set gemini-3-pro-preview
 happy gemini model get
 ```
 
-## Server 端模型配置
-
-Server 的模型配置影响**知识库**功能（嵌入 + 概要生成），不影响 Claude 会话本身。
-
-### 方案 A：全本地（免费，需 GPU 或较强 CPU）
-
-```bash
-# 嵌入：Ollama bge-m3（多语言，中英双优）
-EMBEDDING_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_EMBED_MODEL=bge-m3
-
-# 概要：Ollama 本地模型
-PROFILE_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=gpt-oss:20b
-```
-
-先安装 Ollama 并拉取模型：
-
-```bash
-ollama pull bge-m3
-ollama pull gpt-oss:20b    # 或其他你偏好的模型
-```
-
-### 方案 B：全云端（省心，按量付费）
-
-```bash
-# 嵌入：OpenAI
-EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=sk-xxx
-OPENAI_EMBED_MODEL=text-embedding-3-small
-
-# 概要：Anthropic
-PROFILE_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-xxx
-ANTHROPIC_PROFILE_MODEL=claude-haiku-4-5-20251001
-```
-
-### 方案 C：混合（推荐）
-
-```bash
-# 嵌入用本地（高频调用，省钱）
-EMBEDDING_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-
-# 概要用云端（低频，质量更好）
-PROFILE_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-xxx
-ANTHROPIC_PROFILE_MODEL=claude-haiku-4-5-20251001
-```
-
-> **提示**：不配置任何嵌入/概要变量时，知识库的语义检索和概要生成功能会静默跳过，不影响核心功能。

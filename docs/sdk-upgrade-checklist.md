@@ -163,7 +163,7 @@ SDK 升级经常会扩展 Agent 定义、Agent tool 行为或多 agent 配置能
 ### B. MCP Server 管理
 
 - [x] 注册/注销 MCP 服务器持久化到 KV 注册表
-- [x] 受保护服务器 (`happy`, `happy-knowledge`) 不可被覆盖或删除
+- [x] 受保护服务器 (`happy`) 不可被覆盖或删除
 - [ ] App → RPC → CLI 端到端 MCP 服务器热加载
 - [ ] App → REST API → KV 注册表 CRUD 操作
 - [ ] 注册表跨设备同步正常

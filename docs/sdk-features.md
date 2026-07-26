@@ -109,7 +109,7 @@ The SDK provides `Query.setMcpServers()` for hot-swapping MCP server configurati
 1. **Persistent Registry** — KV store via `/v1/mcp/servers` REST API (server-side), accessed through `mcpRegistry` (App-side)
 2. **Runtime Hot-load** — RPC via `claude-control:add_mcp_server` / `remove_mcp_server` → `mcpServerManager.ts` → `Query.setMcpServers()`
 
-Protected servers (`happy`, `happy-knowledge`) cannot be added/removed/overwritten by App RPCs.
+The protected server (`happy`) cannot be added/removed/overwritten by App RPCs.
 
 | RPC Method | Action | Notes |
 |-----------|--------|-------|

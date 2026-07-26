@@ -25,7 +25,7 @@ The server-side seam that turns any Task creation request — manual (`POST /v1/
 _Avoid_: TaskFactory, TaskService, createTask (too narrow — the seam is the whole intake, not one function).
 
 **Project**:
-A named codebase location on a specific Machine (`machineId:path`). Container for Knowledge, Skills, Supervisors, Triggers, and Tasks. Machine-scoped — the same git repo on two Machines produces two distinct Projects.
+A named codebase location on a specific Machine (`machineId:path`). Container for Skills, Supervisors, Triggers, and Tasks. Machine-scoped — the same git repo on two Machines produces two distinct Projects.
 _Avoid_: Repo, workspace, codebase
 
 **AccessKey**:
@@ -56,10 +56,6 @@ An individual finding from a SupervisorRun — title, description, suggested fix
 **SupervisorConfig**:
 The parsed, normalized shape of the opaque `Project.supervisorConfig` JSON blob, owned by one module (`modules/supervisorConfig.ts`, ADR-0059). Carries several independent sub-schemas — `autoApprove` severities per mode, `concurrency` caps, `maxFindings`, `defaultProfileId`, `analyzeAutoFix`. `parseSupervisorConfig(raw)` parses once into the typed shape (never throws; malformed/missing → documented defaults); callers read typed fields rather than re-running `JSON.parse`. The mode-dependent auto-approve defaults live in `resolveAutoApproveSeverities`, not on the shape. The sibling CSV column `supervisorEnabledDimensions` is NOT part of this blob — it has its own owner `parseEnabledDimensions`.
 _Avoid_: SupervisorSettings, config (too generic — the seam is the blob's schema owner, not one field).
-
-**Knowledge**:
-A learned fact stored in a Project. Types: discovery, decision, fix, convention, warning, repo_map, summary. Contributors: session (auto), supervisor (analysis), user (manual). Lifecycle: create → amend → supersede. Knowledge entries form a graph via KnowledgeRelation (related/contradicts/refines/combines). Code model name is `ProjectKnowledge`.
-_Avoid_: Note, memo, insight
 
 **Daemon**:
 The persistent background process running on a Machine. Maintains Socket.IO connection to Server, receives and executes Tasks, manages local Claude Code/Codex processes, and reports DaemonState. Not an independent entity — the runtime form of a Machine.
@@ -175,7 +171,7 @@ _Avoid_: SessionRuntime (collides with Daemon's "runtime form" semantics), Sessi
 - A **Session** is a sequence of **Turns**; each **Turn** is assembled from one **Provider**'s stream via that Provider's **ProviderAdapter** + the shared Turn lifecycle reducer
 - A **Session** is a sequence of **Turns**; a **Turn** contains ordered **SessionEvents** and zero or more concurrent **Subagents**, all bracketed by its turn-start/turn-end pair
 - A **Project** lives on exactly one **Machine** at a specific path
-- A **Project** contains **Knowledge**, **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**
+- A **Project** contains **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**
 - A **Task** is dispatched to a **Machine**, optionally within a **Project** context
 - A **Task** can be created by an **Account** (manual), a **TriggerSchedule**, or a **WebhookTrigger**
 - A **Task** binds one or more **Skills** via TaskSkillBinding (ordered)
@@ -185,7 +181,6 @@ _Avoid_: SessionRuntime (collides with Daemon's "runtime form" semantics), Sessi
 - An **AgentLoop** can cascade — completing or failing triggers downstream **AgentLoops** via `downstreamLoopIds`
 - A **SupervisorRun** belongs to a **Project** and produces **SupervisorActions**; if it was produced inside an AgentLoop iteration, it also belongs to that **AgentLoop**
 - A **SupervisorAction** can spawn a fix **Session**
-- **Knowledge** entries relate to each other via KnowledgeRelation (related/contradicts/refines/combines)
 - A **Trigger** belongs to a **Project** and references an **AiBackendProfile**
 - A **Session** has at most one active **Preview** (0..1)
 - A **Preview** has exactly one **PreviewCandidate** and at most one **PreviewTunnel**

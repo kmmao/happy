@@ -21,7 +21,7 @@
  *
  * - Registry is authoritative (source of truth for account-wide config).
  * - Runtime loading is best-effort (session may be offline or idle).
- * - Protected names (`happy`, `happy-knowledge`) are rejected by both the
+ * - The protected name (`happy`) is rejected by both the
  *   registry module and the CLI-side RPC handler.
  */
 

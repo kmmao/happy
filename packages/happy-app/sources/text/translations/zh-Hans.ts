@@ -326,7 +326,6 @@ export const zhHans: TranslationStructure = {
     categoryTrigger: "触发器",
     categorySupervisor: "监督者",
     categorySession: "会话",
-    categoryKnowledge: "知识库",
     categorySystem: "系统",
   },
 

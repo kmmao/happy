@@ -338,7 +338,6 @@ export const en: TranslationStructure = {
     categoryTrigger: "Triggers",
     categorySupervisor: "Supervisor",
     categorySession: "Sessions",
-    categoryKnowledge: "Knowledge",
     categorySystem: "System",
   },
 

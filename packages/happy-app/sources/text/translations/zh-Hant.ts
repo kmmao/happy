@@ -324,7 +324,6 @@ export const zhHant: TranslationStructure = {
     categoryTrigger: "觸發器",
     categorySupervisor: "監督者",
     categorySession: "會話",
-    categoryKnowledge: "知識庫",
     categorySystem: "系統",
   },
 

@@ -323,7 +323,6 @@ export const ca: TranslationStructure = {
     categoryTrigger: "Disparadors",
     categorySupervisor: "Supervisor",
     categorySession: "Sessions",
-    categoryKnowledge: "Coneixement",
     categorySystem: "Sistema",
   },
 

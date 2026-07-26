@@ -54,28 +54,13 @@ User text rollout toggle:
   - CLI emits modern user payloads (`role = 'session'`, `content.role = 'user'`)
   - app consumes modern user payloads and drops legacy user payloads
 
-### 3. Knowledge base schemas
-
-Shared from `knowledge.ts`:
-- `KnowledgeEntryTypeSchema` — entry categories: `discovery`, `decision`, `fix`, `convention`, `warning`
-- `KnowledgeContributorTypeSchema` — contributor types: `session`, `supervisor`, `user`
-- `KnowledgeActionSchema` — CRUD actions: `create`, `amend`, `supersede`, `verify`
-- `KnowledgeStatusSchema` — lifecycle states: `active`, `superseded`, `archived`
-- `KnowledgeConfidenceSchema` — confidence levels: `high`, `medium`, `low`
-- `CreateKnowledgeEntryBodySchema`, `UpdateKnowledgeEntryBodySchema`, `QueryKnowledgeParamsSchema`
-- `ProjectProfileSchema` — project tech stack, conventions, pitfalls
-- `KnowledgeInjectionRequestSchema` / `KnowledgeInjectionResponseSchema` — contextual injection
-- `KnowledgeChainEntrySchema`, `KnowledgeChainResponseSchema` — evolution chain (Phase 2)
-- `CrossProjectSearchResultSchema`, `CrossProjectSearchResponseSchema` — cross-project semantic search
-- `TurnKnowledgeExtractionSchema` — CLI → Server turn data for auto-extraction
-
-### 4. Voice schemas
+### 3. Voice schemas
 
 Shared from `voice.ts`:
 - `VoiceTokenResponseSchema` — discriminated union (`allowed: true` with token / `allowed: false` with denial reason)
 - Denial reasons: `voice_limit_reached`, `subscription_required`
 
-### 5. Task queue schemas
+### 4. Task queue schemas
 
 Shared from `tasks.ts`:
 - `TaskPrioritySchema` — `urgent`, `user`, `background`
@@ -87,7 +72,7 @@ Shared from `tasks.ts`:
 - `TaskStatusReportSchema` — CLI → Server status updates
 - `TaskStatusChangedSchema` — Server → App ephemeral event
 
-### 6. Skill schemas
+### 5. Skill schemas
 
 Shared from `skills.ts`:
 - `SkillSummarySchema` — skill metadata for App display

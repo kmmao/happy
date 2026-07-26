@@ -336,7 +336,6 @@ export const ru: TranslationStructure = {
     categoryTrigger: "Триггеры",
     categorySupervisor: "Супервизор",
     categorySession: "Сессии",
-    categoryKnowledge: "База знаний",
     categorySystem: "Система",
   },
 

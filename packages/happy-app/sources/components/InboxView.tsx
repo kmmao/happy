@@ -34,7 +34,6 @@ const CATEGORY_ICONS: Record<string, string> = {
     trigger: "timer-outline",
     supervisor: "shield-checkmark-outline",
     session: "terminal-outline",
-    knowledge: "library-outline",
     decision: "help-circle-outline",
     system: "notifications-outline",
 };

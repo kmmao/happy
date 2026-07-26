@@ -323,7 +323,6 @@ export const pt: TranslationStructure = {
     categoryTrigger: "Gatilhos",
     categorySupervisor: "Supervisor",
     categorySession: "Sessões",
-    categoryKnowledge: "Conhecimento",
     categorySystem: "Sistema",
   },
 

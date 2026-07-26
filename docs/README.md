@@ -47,7 +47,6 @@ Two layers:
 - plans/cli-v3-messages-api.md: CLI migration to v3 HTTP messages (not shipped).
 - plans/reliable-http-messages-api.md: Server side of v3 HTTP messages (not shipped).
 - plans/codex-divergence-register.md: Living register of Happy ↔ openai/codex divergences.
-- plans/knowledge-injection-optimizations.md: Backlog (draft).
 
 ## Archive
 - archive/plans/ — 14 shipped or superseded plans.

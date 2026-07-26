@@ -7,6 +7,8 @@ relates-to: ADR-0022 (AgentLoop convergence)
 
 # Sessions × Automation IA — unifying manual conversations and scheduled work
 
+> ⚠️ **知识库子系统已于 2026-07-26 整体移除**（代码、API、UI、数据表）。本文中涉及 Knowledge 的条目为当时状态的记录，保留以备追溯。详见 `docs/plans/knowledge-removal-plan.md`。
+
 > **Status: ACCEPTED & IMPLEMENTED (Option B, phases 1–3).** The Workflow term is now in CONTEXT.md. The Sessions tab has been renamed to Workflows and renders the `useWorkflows()` derivation. The legacy machine sub-pages (automation / loops / tasks / triggers / webhook-trigger) and their support modules have been removed. Phase 2's "Make this recurring" promote action is shipped on Ad-hoc Workflow detail pages; "Attach to existing Loop" and "Promote to Loop" are gated on the CLI/Agent update tracked in ADR-0022 phase 3b.
 
 ## TL;DR
