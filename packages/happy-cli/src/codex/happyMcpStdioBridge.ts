@@ -2,7 +2,7 @@
  * Happy MCP STDIO Bridge
  *
  * Minimal STDIO MCP server exposing Happy tools like `change_title`,
- * `query_project_knowledge`, `update_progress`, and
+ * `update_progress` and
  * `update_session_summary`.
  * On invocation it forwards the tool call to an existing Happy HTTP MCP server
  * using the StreamableHTTPClientTransport.

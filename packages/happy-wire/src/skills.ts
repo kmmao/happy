@@ -8,7 +8,6 @@ export const SkillSummarySchema = z.object({
   description: z.string().optional(),
   content: z.string(),
   attachments: z.array(z.string()),
-  sourceKnowledgeId: z.string().optional(),
   archived: z.boolean(),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -29,7 +28,6 @@ export const CreateSkillBodySchema = z.object({
   description: z.string().max(500).optional(),
   content: z.string().min(1).max(50000),
   attachments: z.array(z.string()).max(10).default([]),
-  sourceKnowledgeId: z.string().optional(),
 });
 export type CreateSkillBody = z.infer<typeof CreateSkillBodySchema>;
 

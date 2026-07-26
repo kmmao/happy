@@ -202,19 +202,16 @@ describe("createClaudePtyController — mcpServerStatus", () => {
     expect(result).toEqual([]);
   });
 
-  it("marks happy and happy-knowledge as connected", async () => {
+  it("marks happy as connected", async () => {
     const servers = {
       happy: { command: "node", args: ["happy-mcp.js"] },
-      "happy-knowledge": { command: "node", args: ["knowledge-mcp.js"] },
     };
     const controller = createClaudePtyController(makeStubPty(), () => null, () => servers);
     const result = await controller.mcpServerStatus();
 
     const names = result.map((s) => s.name);
     expect(names).toContain("happy");
-    expect(names).toContain("happy-knowledge");
     expect(result.find((s) => s.name === "happy")?.status).toBe("connected");
-    expect(result.find((s) => s.name === "happy-knowledge")?.status).toBe("connected");
   });
 
   it("marks user / plugin servers as connected (PTY has no live status, so we report optimistically)", async () => {

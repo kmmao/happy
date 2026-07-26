@@ -24,40 +24,6 @@ import {
   type AskUserResponseRequest,
 } from "@kmmao/happy-wire";
 
-type McpTextResponse = {
-  content: Array<{ type: "text"; text: string }>;
-  isError: boolean;
-};
-
-export async function queryProjectKnowledge(
-  client: Pick<ApiSessionClient, "fetchKnowledge">,
-  query: string,
-): Promise<McpTextResponse> {
-  try {
-    const result = await client.fetchKnowledge("auto", [query]);
-    if (!result || result.entries.length === 0) {
-      return {
-        content: [{ type: "text", text: "No relevant knowledge found." }],
-        isError: false,
-      };
-    }
-
-    const lines = result.entries.map((entry) =>
-      `[${entry.entryType}] ${entry.title} (${entry.confidence})\n${entry.content.slice(0, 500)}`,
-    );
-
-    return {
-      content: [{ type: "text", text: lines.join("\n\n") }],
-      isError: false,
-    };
-  } catch (error) {
-    logger.debug(`[happyMCP] query_project_knowledge failed: ${error}`);
-    return {
-      content: [{ type: "text", text: "Knowledge query failed." }],
-      isError: true,
-    };
-  }
-}
 
 /**
  * 30 minutes — bound on how long an `ask_user` MCP handler will block waiting
@@ -292,11 +258,6 @@ export async function startHappyServer(client: ApiSessionClient) {
             isError: true,
           };
         }
-      });
-
-    registerHappyTool("query_project_knowledge", async (args: any) => {
-        const query = typeof args.query === "string" ? args.query : "";
-        return queryProjectKnowledge(client, query);
       });
 
     registerHappyTool("update_progress", async (args: any) => {

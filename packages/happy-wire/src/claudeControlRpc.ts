@@ -346,7 +346,7 @@ export type ToggleMcpServerResponse = z.infer<typeof ToggleMcpServerResponseSche
 /**
  * Register a single MCP server on a running session. The server is validated,
  * merged with existing user servers, and connected via `setMcpServers()`.
- * Protected server names (`happy`, `happy-knowledge`) are rejected.
+ * The protected server name (`happy`) is rejected.
  */
 export const AddMcpServerRequestSchema = z.object({
     /** Unique server name. Must not collide with protected names. */

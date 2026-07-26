@@ -31,7 +31,7 @@ interface SessionLogEntry {
 
 /**
  * Scans Claude Code session JSONL files and extracts valuable turns
- * for knowledge base integration. Filters for turns with substantive
+ * for downstream consumers. Filters for turns with substantive
  * file edits or significant assistant output.
  */
 export async function scanSessionTranscripts(options: {

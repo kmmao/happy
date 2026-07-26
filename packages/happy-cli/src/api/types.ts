@@ -209,51 +209,6 @@ export interface ClientToServerEvents {
       suggestedFix?: string;
     }[];
   }) => void;
-  "submit-knowledge": (data: {
-    sid: string;
-    entry: {
-      entryType: string;
-      contributorType: string;
-      action: string;
-      title: string;
-      content: string;
-      request?: string;
-      outcome?: string;
-      tags: string[];
-      confidence: string;
-      model?: string;
-      affectedFiles: string[];
-    };
-  }) => void;
-  "knowledge-turn-end": (data: {
-    sid: string;
-    hitIds: string[];
-  }) => void;
-  "fetch-knowledge": (
-    data: {
-      sid: string;
-      mode: "auto" | "full" | "minimal";
-      contextHints?: string[];
-    },
-    callback: (response: {
-      profile: {
-        techStack: string[];
-        architectureType?: string;
-        knownPitfalls: string[];
-        coreConventions: string[];
-        lastUpdatedAt: number;
-      } | null;
-      entries: {
-        id: string;
-        entryType: string;
-        title: string;
-        content: string;
-        tags: string[];
-        confidence: string;
-        createdAt: string;
-      }[];
-    }) => void,
-  ) => void;
   "fetch-world-config": (
     data: { sid: string },
     callback: (response: { narrative: string; laws: string; policy: string } | null) => void,

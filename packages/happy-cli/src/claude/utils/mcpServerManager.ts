@@ -9,8 +9,8 @@
  *
  * ## Security invariants
  *
- * 1. **Protected servers** (`happy`, `happy-knowledge`) cannot be added,
- *    removed, or overwritten by App RPC calls. They are always re-injected
+ * 1. **Protected servers** (`happy`) cannot be added, removed, or
+ *    overwritten by App RPC calls. They are always re-injected
  *    into the config before calling the SDK.
  * 2. **Transport validation** — every config is validated before it reaches
  *    the SDK: stdio must have `command`, network transports must have `url`,
@@ -41,7 +41,7 @@ import { resetMcpProbeCache } from "@/claude/utils/mcpStatusProbe";
  * can reject mutations to these names with a consistent error message
  * instead of redefining the set.
  */
-export const PROTECTED_SERVER_NAMES = new Set(["happy", "happy-knowledge"]);
+export const PROTECTED_SERVER_NAMES = new Set(["happy"]);
 
 // ─── Known transport types ────────────────────────────────────────────────────
 

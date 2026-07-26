@@ -2376,9 +2376,6 @@ export async function startDaemon(): Promise<void> {
     autoDreamCoordinator = new AutoDreamCoordinator({
       store: autoDreamStore,
       onChange: () => scheduleAutomationStatePublish(),
-      onTranscriptsFound: (turns) => {
-        try { apiMachine.emitTranscriptKnowledge(turns); } catch { /* best-effort */ }
-      },
     });
     await autoDreamCoordinator.start();
     scheduleAutomationStatePublish();

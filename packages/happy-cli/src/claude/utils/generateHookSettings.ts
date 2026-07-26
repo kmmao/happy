@@ -41,28 +41,20 @@ export type HappyMcpServerEntry =
  * `claudeCliFlags.mcpServers` to inject it via `--mcp-config`.
  *
  * `httpUrl` is the base URL from `startHappyServer()` (e.g.
- * `http://127.0.0.1:54321/`). The same URL serves both the `happy` and
- * (when knowledge is enabled) `happy-knowledge` namespaces — they're
- * registered as separate MCP servers so the App / claude can address them
- * by name, but the actual transport is a single HTTP endpoint.
+ * `http://127.0.0.1:54321/`), serving the `happy` namespace.
  *
- * Both servers are marked `alwaysLoad: true` so happy tools (permission
- * prompts, App sync, knowledge lookup) stay attached when Claude reloads
- * tool config mid-session — otherwise the App appears to go briefly
- * "deaf" until the user invokes a happy tool again.
+ * The server is marked `alwaysLoad: true` so happy tools (permission
+ * prompts, App sync) stay attached when Claude reloads tool config
+ * mid-session — otherwise the App appears to go briefly "deaf" until the
+ * user invokes a happy tool again.
  */
 export function buildHappyMcpServers(
   httpUrl: string,
-  options: { includeKnowledge?: boolean } = {},
 ): Record<string, HappyMcpServerEntry> {
   const normalized = httpUrl.endsWith("/") ? httpUrl.slice(0, -1) : httpUrl;
-  const out: Record<string, HappyMcpServerEntry> = {
+  return {
     happy: { type: "http", url: normalized, alwaysLoad: true },
   };
-  if (options.includeKnowledge) {
-    out["happy-knowledge"] = { type: "http", url: normalized, alwaysLoad: true };
-  }
-  return out;
 }
 
 /**

@@ -3,7 +3,7 @@
  *
  * In PTY mode the Claude TUI has no programmatic toggle API, so happy-cli
  * implements the behaviour itself:
- *   1. Reject mutations to protected names (happy / happy-knowledge).
+ *   1. Reject mutations to the protected name (happy).
  *   2. Persist the new `disabledMcpServers` list to ~/.claude.json.
  *   3. Mutate the live in-memory map so the next mcpServerStatus() poll
  *      reflects the new state without restarting the session.
@@ -144,15 +144,12 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
     });
   });
 
-  it('rejects toggling protected names (happy / happy-knowledge)', async () => {
+  it('rejects toggling the protected name (happy)', async () => {
     const { handler } = setup({
       liveMcpServers: { happy: { command: 'node' } },
     });
 
     await expect(handler({ serverName: 'happy', enabled: false })).rejects.toThrow(/protected/);
-    await expect(handler({ serverName: 'happy-knowledge', enabled: false })).rejects.toThrow(
-      /protected/,
-    );
 
     // Disk never written.
     expect(existsSync(testRootConfigPath)).toBe(false);

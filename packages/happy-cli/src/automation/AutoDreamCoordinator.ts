@@ -276,7 +276,7 @@ export class AutoDreamCoordinator {
 
       // Phase 2: Analyzing and scanning transcripts
       await updateStage("analyzing");
-      // Scan session transcripts and submit valuable turns to knowledge base
+      // Scan session transcripts for valuable turns
       try {
         const transcripts = await scanSessionTranscripts({
           sinceMs: current.lastRunAt ?? startedAt - 24 * 60 * 60_000,

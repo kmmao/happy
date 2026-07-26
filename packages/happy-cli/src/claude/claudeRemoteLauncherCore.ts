@@ -86,8 +86,6 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
-import { TurnCollector, generateRepoMap } from "@/knowledge";
-import type { TurnCollectorConfig } from "@/knowledge";
 import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
 import { TaskMirrorState } from "@/utils/taskMirrorState";
 import {
@@ -107,13 +105,7 @@ import { createAppliedSettingsState } from "./utils/applyFlagSettings";
 import { createMcpServerState } from "./utils/mcpServerManager";
 import packageJson from "../../package.json";
 import { createContextDetailRpcHandler } from "./contextDetailRpc";
-import {
-  buildWorldConfigPrefix,
-  extractKnowledgeHints,
-  extractTags,
-  formatKnowledgeForInjection,
-  inferEntryType,
-} from "./remoteKnowledgeHelpers";
+import { buildWorldConfigPrefix } from "./remoteWorldHelpers";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 
 interface PermissionsField {
@@ -698,101 +690,16 @@ export async function claudeRemoteLauncher(
   // Track current PTY controller for runtime control (interrupt, stopTask).
   // Most methods are stub no-ops (TUI has no equivalent) — see ClaudePtyController.
   let currentQuery: ClaudePtyController | null = null;
-  // Knowledge base: turn-level data collection + injection
-  // Default ON — collection runs silently in background (minimal overhead).
-  // App setting `knowledgeBase` controls Tab visibility; env HAPPY_KNOWLEDGE_BASE=false to fully disable.
-  const knowledgeEnabled = process.env.HAPPY_KNOWLEDGE_BASE !== "false";
-  const turnCollectorConfig: Partial<TurnCollectorConfig> = {};
-  const rawSensitivity = process.env.HAPPY_KNOWLEDGE_SENSITIVITY;
-  if (rawSensitivity === "conservative" || rawSensitivity === "balanced" || rawSensitivity === "aggressive") {
-    turnCollectorConfig.sensitivity = rawSensitivity;
-  }
-  if (process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== undefined) {
-    turnCollectorConfig.trackFileEdits = process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== "false";
-  }
-  const turnCollector = knowledgeEnabled ? new TurnCollector(turnCollectorConfig) : null;
-  let knowledgeInjected = false; // Track whether knowledge was already injected
-  let knowledgeContext: string | null = null; // Cached knowledge for system prompt
   let worldConfig: { narrative: string; laws: string; policy: string } | null = null;
   let worldConfigInjected = false;
-  let pendingKnowledgeRefresh = false; // Whether a per-turn refresh is pending
-  // Injected knowledge entries (id → metadata). Used both for dedup and for per-turn hit detection.
-  let knowledgeEntries = new Map<string, { id: string; title: string; tags: string[] }>();
-  let pendingFileHint: string | null = null; // File-based knowledge hint for next message
-  let currentTurnFilePaths = new Set<string>(); // Files edited in the current turn
-
-  // Sync server-side knowledgeConfig to TurnCollector at runtime
-  let summaryEnabled = true;
-  function syncKnowledgeConfig(cfg: {
-    sensitivity?: string;
-    trackFileEdits?: boolean;
-    trackTokens?: boolean;
-    summaryEnabled?: boolean;
-  } | undefined): void {
-    if (!cfg || !turnCollector) return;
-    const patch: Partial<TurnCollectorConfig> = {};
-    if (cfg.sensitivity === "conservative" || cfg.sensitivity === "balanced" || cfg.sensitivity === "aggressive") {
-      patch.sensitivity = cfg.sensitivity;
-    }
-    if (cfg.trackFileEdits !== undefined) patch.trackFileEdits = cfg.trackFileEdits;
-    if (cfg.trackTokens !== undefined) patch.trackTokens = cfg.trackTokens;
-    if (cfg.summaryEnabled !== undefined) summaryEnabled = cfg.summaryEnabled;
-    if (Object.keys(patch).length > 0) {
-      turnCollector.updateConfig(patch);
-    }
-  }
 
   // Pre-fetch global world config (narrative/laws) for injection (non-blocking).
-  // Gated by knowledgeEnabled: world-config is part of the knowledge-base feature
-  // and should not generate any server requests when the user has disabled it.
-  if (knowledgeEnabled) {
-    session.client.fetchWorldConfig().then((cfg) => {
-      if (cfg && (cfg.narrative || cfg.laws)) {
-        worldConfig = cfg;
-        logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
-      }
-    }).catch(() => {});
-  }
-
-  // Pre-fetch knowledge context for injection (non-blocking)
-  if (knowledgeEnabled) {
-    const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
-    session.client.fetchKnowledge(mode).then((result) => {
-      if (result && (result.profile || result.entries.length > 0)) {
-        knowledgeContext = formatKnowledgeForInjection(result);
-        for (const e of result.entries) {
-          knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
-        }
-        logger.debug(`[knowledge] Pre-fetched context: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
-      }
-      syncKnowledgeConfig(result?.knowledgeConfig);
-    }).catch((err) => {
-      logger.debug(`[knowledge] Failed to pre-fetch: ${err}`);
-    });
-  }
-
-  // Non-blocking: generate and submit repo map on session start so the knowledge
-  // base has an up-to-date file-tree snapshot. Server consolidate handles dedup.
-  if (knowledgeEnabled) {
-    generateRepoMap(session.path).then((mapResult) => {
-      if (mapResult.success) {
-        const dirName = session.path.split("/").filter(Boolean).pop() ?? "project";
-        session.client.submitKnowledge({
-          entryType: "repo_map",
-          contributorType: "session",
-          action: "create",
-          title: `Repo Map: ${dirName}`,
-          content: mapResult.content,
-          tags: ["repo-map", "codebase-structure"],
-          confidence: "high",
-          affectedFiles: mapResult.affectedFiles,
-        });
-        logger.debug(`[repo-map] Submitted repo map for ${dirName} (${mapResult.affectedFiles.length} files)`);
-      }
-    }).catch((err) => {
-      logger.debug(`[repo-map] Failed to generate repo map: ${err}`);
-    });
-  }
+  session.client.fetchWorldConfig().then((cfg) => {
+    if (cfg && (cfg.narrative || cfg.laws)) {
+      worldConfig = cfg;
+      logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
+    }
+  }).catch(() => {});
 
   // Project CONTEXT.md: load once per session for injection into the first message.
   // File lives at <workingDir>/.happy/CONTEXT.md — created by the user or via the App.
@@ -1351,51 +1258,6 @@ export async function claudeRemoteLauncher(
 
     // Write to permission handler for tool id resolving
     permissionHandler.onMessage(message);
-
-    // Knowledge base: collect turn data from SDK messages
-    // Wrapped in try-catch to never interfere with message processing
-    try {
-      if (turnCollector) {
-        if (message.type === "user") {
-          const uMsg = message as ClaudeJsonlUserMessage;
-          const content = uMsg.message?.content;
-          let text = "";
-          if (typeof content === "string") {
-            text = content;
-          } else if (Array.isArray(content)) {
-            text = content
-              .filter((c: any) => c.type === "text" && typeof c.text === "string")
-              .map((c: any) => c.text)
-              .join("\n");
-          }
-          if (text) {
-            turnCollector.collectUserMessage(text);
-          }
-        }
-        if (message.type === "assistant") {
-          const aMsg = message as ClaudeJsonlAssistantMessage;
-          if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
-            for (const c of aMsg.message.content) {
-              if (c.type === "text") {
-                turnCollector.collectAssistantText(c.text);
-              }
-              if (c.type === "tool_use") {
-                turnCollector.collectToolCall();
-                if (c.name === "Write" || c.name === "Edit") {
-                  const filePath = (c.input as Record<string, unknown>)?.file_path;
-                  if (typeof filePath === "string") {
-                    turnCollector.collectFileEdit(filePath, c.name === "Write" ? "create" : "edit");
-                    currentTurnFilePaths.add(filePath);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      logger.debug(`[knowledge] Error collecting turn data: ${err}`);
-    }
 
     // Auto-mirror TaskCreate/TaskUpdate → metadata.progress.
     // Claude Code (Opus 4.6+) replaced SDK-native TodoWrite with runtime
@@ -2754,14 +2616,8 @@ export async function claudeRemoteLauncher(
         logger.debug(
           `[remote]: New session detected (previous: ${previousSessionId}, current: ${session.sessionId})`,
         );
-        // Reset knowledge injection state for the new session (/clear creates a new session)
-        knowledgeInjected = false;
+        // Reset injection state for the new session (/clear creates a new session)
         worldConfigInjected = false;
-        knowledgeContext = null;
-        knowledgeEntries = new Map();
-        pendingKnowledgeRefresh = false;
-        pendingFileHint = null;
-        currentTurnFilePaths = new Set<string>();
         // Reset CONTEXT.md injection and re-read for the new session
         contextMdInjected = false;
         contextMdContent = null;
@@ -2772,18 +2628,6 @@ export async function claudeRemoteLauncher(
             logger.debug(`[context] Re-loaded project CONTEXT.md after session reset: ${contextMdContent.length} chars`);
           }
         }).catch(() => {});
-        if (knowledgeEnabled) {
-          const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
-          session.client.fetchKnowledge(mode).then((result) => {
-            if (result && (result.profile || result.entries.length > 0)) {
-              knowledgeContext = formatKnowledgeForInjection(result);
-              logger.debug(`[knowledge] Re-fetched context after session reset: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
-            }
-            syncKnowledgeConfig(result?.knowledgeConfig);
-          }).catch((err) => {
-            logger.debug(`[knowledge] Failed to re-fetch after session reset: ${err}`);
-          });
-        }
       } else {
         messageBuffer.addMessage("Continuing Claude session...", "status");
         logger.debug(
@@ -2977,13 +2821,8 @@ export async function claudeRemoteLauncher(
       // PTY migration: in-process SDK MCP servers were replaced by an HTTP MCP
       // server hosted on the CLI side (see startHappyServer). Claude TUI is
       // wired to this server via `--mcp-config` (see claudePtyRuntime), which
-      // exposes the `happy` namespace with all four tools (change_title,
-      // update_progress, update_session_summary, query_project_knowledge).
-      // We retain the in-process closures only to handle one extra side effect
-      // (`syncKnowledgeConfig` after each knowledge query) — but that fires
-      // inside the HTTP handler via its own client reference, so nothing here
-      // needs to be wired into Claude. Subscribe knowledge tracking through
-      // session.client.fetchKnowledge directly.
+      // exposes the `happy` namespace with its tools (change_title,
+      // update_progress, update_session_summary).
       const happyHttp = await startHappyServer(session.client);
       const happyHttpUrl = `${happyHttp.url.replace(/\/$/, "")}/mcp`;
       logger.debug(`[happyMCP] HTTP url=${happyHttpUrl}`);
@@ -2996,12 +2835,8 @@ export async function claudeRemoteLauncher(
       // Code 2.1.121+) stays attached to every happy server — that keeps the
       // App's permission/sync tools loaded across `/clear`, plan-mode swaps,
       // and skill-driven tool-search deferrals.
-      const happyServers = buildHappyMcpServers(happyHttpUrl, {
-        includeKnowledge: knowledgeEnabled,
-      });
+      const happyServers = buildHappyMcpServers(happyHttpUrl);
       const happyMcpServer: HappyMcpServerEntry = happyServers.happy;
-      const knowledgeMcpServer: HappyMcpServerEntry | null =
-        happyServers["happy-knowledge"] ?? null;
 
       // Fetch persistent MCP registry from server KV (non-blocking — falls back to {} on error)
       const registryServers = await fetchMcpRegistryServers(session.api);
@@ -3010,7 +2845,6 @@ export async function claudeRemoteLauncher(
       // and user servers from local settings + registry for diffing.
       mcpServerState.protectedServers = {
         happy: happyMcpServer as unknown as Record<string, unknown>,
-        ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer as unknown as Record<string, unknown> } : {}),
       };
       // Tag any MCP the user disabled (via `/mcp disable` in Claude Code,
       // persisted to `~/.claude.json` → projects[cwd].disabledMcpServers) so
@@ -3044,7 +2878,6 @@ export async function claudeRemoteLauncher(
         ...userMcpServers,               // User's Claude Code MCPs from ~/.claude.json (+settings.json fallback) — lowest priority
         ...registryServers,              // Account-level MCP registry (medium priority)
         happy: happyMcpServer,           // Happy-owned MCPs (highest priority)
-        ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
       });
 
       try {
@@ -3255,89 +3088,6 @@ export async function claudeRemoteLauncher(
               // claudeRemote.ts buildSystemReminderPrefix(). Do NOT inject here
               // — it causes the same content to appear twice in each message.
 
-              // Knowledge injection: prepend to message (appendSystemPrompt path is broken)
-              let effectiveKnowledgeContext = knowledgeContext;
-
-              if (!knowledgeInjected && knowledgeEnabled) {
-                // If pre-fetch hasn't completed yet, do a contextual fetch with hints (max 1500ms)
-                if (!effectiveKnowledgeContext) {
-                  const hints = extractKnowledgeHints(msg.message, 8);
-                  if (hints.length > 0) {
-                    try {
-                      const fetchMode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
-                      const contextualResult = await Promise.race([
-                        session.client.fetchKnowledge(fetchMode, hints),
-                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
-                      ]);
-                      if (contextualResult && (contextualResult.profile || contextualResult.entries.length > 0)) {
-                        effectiveKnowledgeContext = formatKnowledgeForInjection(contextualResult);
-                        knowledgeContext = effectiveKnowledgeContext;
-                        logger.debug(`[knowledge] Contextual fetch on first message: ${effectiveKnowledgeContext.length} chars, ${contextualResult.entries.length} entries`);
-                      }
-                      syncKnowledgeConfig(contextualResult?.knowledgeConfig);
-                    } catch (err) {
-                      logger.debug(`[knowledge] Contextual fetch failed: ${err}`);
-                    }
-                  }
-                }
-              } else if (knowledgeInjected && pendingKnowledgeRefresh && knowledgeEnabled) {
-                // Per-turn refresh: check if new knowledge entries exist since last injection.
-                // Prepend a lightweight notification to the user message so Claude can use
-                // the query_project_knowledge MCP tool to fetch relevant details on demand.
-                pendingKnowledgeRefresh = false;
-                const hints = extractKnowledgeHints(msg.message, 8);
-                logger.debug(`[knowledge] Per-turn refresh check: ${hints.length} hints from message`);
-                try {
-                  const refreshResult = await Promise.race([
-                    session.client.fetchKnowledge("auto", hints.length > 0 ? hints : undefined),
-                    new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
-                  ]);
-                  syncKnowledgeConfig(refreshResult?.knowledgeConfig);
-                  if (refreshResult && refreshResult.entries.length > 0) {
-                    const newEntries = refreshResult.entries.filter((e) => !knowledgeEntries.has(e.id));
-                    logger.debug(`[knowledge] Per-turn refresh: ${refreshResult.entries.length} total, ${newEntries.length} new`);
-                    if (newEntries.length > 0) {
-                      for (const e of newEntries) {
-                        knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
-                      }
-                      // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
-                      const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
-                      const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
-                      nextPromptSource = msg.source;
-                      return {
-                        message: hint + msg.message,
-                        mode: msg.mode,
-                      };
-                    }
-                  } else {
-                    logger.debug(`[knowledge] Per-turn refresh: timeout or no entries`);
-                  }
-                } catch (err) {
-                  logger.debug(`[knowledge] Per-turn refresh failed: ${err}`);
-                }
-              }
-
-              // File-aware hint: prepend if available and no higher-priority injection is pending
-              if (knowledgeInjected && pendingFileHint) {
-                const hint = pendingFileHint;
-                pendingFileHint = null;
-                nextPromptSource = msg.source;
-                return {
-                  message: hint + msg.message,
-                  mode: msg.mode,
-                };
-              }
-
-              // First-time knowledge injection: prepend to message instead of mode.appendSystemPrompt
-              // (appendSystemPrompt via IPC is broken in SDK 0.2.119+ native binary)
-              const knowledgePrefix = !knowledgeInjected && effectiveKnowledgeContext
-                ? effectiveKnowledgeContext + "\n\n"
-                : "";
-              if (!knowledgeInjected && effectiveKnowledgeContext) {
-                knowledgeInjected = true;
-                logger.debug("[knowledge] Injected knowledge into first message");
-              }
-
               // World config injection: inject narrative/laws once per session
               const worldConfigPrefix = !worldConfigInjected && worldConfig
                 ? buildWorldConfigPrefix(worldConfig)
@@ -3358,7 +3108,7 @@ export async function claudeRemoteLauncher(
 
               nextPromptSource = msg.source;
               return {
-                message: contextMdPrefix + worldConfigPrefix + knowledgePrefix + msg.message,
+                message: contextMdPrefix + worldConfigPrefix + msg.message,
                 mode: msg.mode,
               };
             }
@@ -3495,8 +3245,8 @@ export async function claudeRemoteLauncher(
           // payload, including any once-per-session prefixes the launcher
           // prepended) as the in-flight prompt. If a tier-1 Esc recovery has
           // to clear the composer before this turn ever ran, the watchdog
-          // re-delivers this verbatim — preserving CONTEXT.md/world-config/
-          // knowledge that raw msg.message would lose (their *Injected flags
+          // re-delivers this verbatim — preserving CONTEXT.md/world-config
+          // that raw msg.message would lose (their *Injected flags
           // suppress re-injection). `mode` is the launcher's current turn mode,
           // which matches currentColdHash at strand time so the re-pushed
           // message is accepted by the still-alive mid-turn drain.
@@ -3573,12 +3323,6 @@ export async function claudeRemoteLauncher(
           },
           onQueryReady: (query) => {
             currentQuery = query;
-            // Knowledge base: mark new turn start
-            if (turnCollector) {
-              const turnId = `turn-${Date.now()}`;
-              const model = session.model ?? "unknown";
-              turnCollector.startTurn(turnId, model);
-            }
           },
           onMessagesReady: (pushFn) => {
             midTurnPushFn = pushFn;
@@ -3638,117 +3382,6 @@ export async function claudeRemoteLauncher(
           onReady: async () => {
             // Stop mid-turn drain before flushing — prevents race with nextMessage()
             stopMidTurnDrain();
-
-            // Knowledge base: process turn end and check if extraction needed
-            // Wrapped in try-catch to never block session flow
-            try {
-              if (turnCollector) {
-                const outputTokens = lastResultData?.modelUsage
-                  ? Object.values(lastResultData.modelUsage).reduce((sum, m) => sum + m.outputTokens, 0)
-                  : 0;
-                const readyTurns = turnCollector.onTurnEnd(outputTokens);
-                if (readyTurns) {
-                  pendingKnowledgeRefresh = true;
-                  logger.debug(`[knowledge] Submitting ${readyTurns.length} turns`);
-                  for (const turn of readyTurns) {
-                    session.client.submitKnowledge({
-                      entryType: inferEntryType(turn.userMessage, turn.assistantText),
-                      contributorType: "session",
-                      action: "create",
-                      title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                      content: turn.assistantText.slice(0, 4000),
-                      request: turn.userMessage.slice(0, 500),
-                      outcome: turn.fileEdits.length > 0
-                        ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
-                        : undefined,
-                      tags: extractTags(turn.fileEdits),
-                      confidence: turn.outputTokens > 1000 ? "high" : "medium",
-                      model: turn.model,
-                      affectedFiles: turn.fileEdits.map((f) => f.path),
-                    });
-                  }
-                }
-              }
-            } catch (err) {
-              logger.debug(`[knowledge] Error in onReady turn processing: ${err}`);
-            }
-
-            // Per-turn hit detection: which injected knowledge entries were referenced
-            // by the assistant in this turn? Substring match on full title, title words,
-            // and tags catches real usage without an extra LLM pass. Server uses this
-            // to tick TTL counters. Emit even when hitIds is empty so the server can
-            // decrement misses on every turn.
-            try {
-              if (turnCollector && knowledgeEntries.size > 0) {
-                const assistantText = turnCollector.getAssistantTextSnapshot().toLowerCase();
-                const hitIds: string[] = [];
-                if (assistantText.length > 0) {
-                  for (const entry of knowledgeEntries.values()) {
-                    let matched = false;
-                    const lowerTitle = entry.title.toLowerCase();
-                    if (lowerTitle.length >= 6 && assistantText.includes(lowerTitle)) {
-                      matched = true;
-                    }
-                    // Match any significant title word (>=4 chars, alphanumeric) so partial
-                    // paraphrases still register as a hit without reaching a full-title match.
-                    if (!matched) {
-                      const titleWords = lowerTitle
-                        .split(/[^\p{L}\p{N}]+/u)
-                        .filter((w) => w.length >= 4);
-                      for (const word of titleWords) {
-                        if (assistantText.includes(word)) {
-                          matched = true;
-                          break;
-                        }
-                      }
-                    }
-                    if (!matched) {
-                      for (const tag of entry.tags) {
-                        const lowerTag = tag.toLowerCase();
-                        if (lowerTag.length >= 2 && assistantText.includes(lowerTag)) {
-                          matched = true;
-                          break;
-                        }
-                      }
-                    }
-                    if (matched) hitIds.push(entry.id);
-                  }
-                }
-                session.client.emitKnowledgeTurnEnd(hitIds);
-                logger.debug(
-                  `[knowledge] Turn-end hits: ${hitIds.length}/${knowledgeEntries.size} (injected entries)`,
-                );
-              }
-            } catch (err) {
-              logger.debug(`[knowledge] Error detecting turn hits: ${err}`);
-            }
-
-            // File-aware knowledge hint: check edited files against knowledge base
-            // Fire-and-forget — result stored for next message prefix
-            if (knowledgeEnabled && currentTurnFilePaths.size > 0) {
-              const editedPaths = [...currentTurnFilePaths];
-              currentTurnFilePaths = new Set<string>();
-              const fileHints = extractTags(editedPaths.map((p) => ({ path: p, type: "edit" as const })));
-              if (fileHints.length > 0) {
-                session.client.fetchKnowledge("auto", fileHints).then((result) => {
-                  syncKnowledgeConfig(result?.knowledgeConfig);
-                  if (!result || result.entries.length === 0) return;
-                  const newEntries = result.entries.filter((e) => !knowledgeEntries.has(e.id));
-                  if (newEntries.length === 0) return;
-                  for (const e of newEntries) {
-                    knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
-                  }
-                  const fileNames = editedPaths.map((p) => p.split("/").pop()).filter(Boolean).join(", ");
-                  const titles = newEntries.slice(0, 3).map((e) => `"${e.title}"`).join(", ");
-                  pendingFileHint = `[File knowledge hint: you edited ${fileNames} — ${newEntries.length} related knowledge ${newEntries.length === 1 ? "entry" : "entries"} found (${titles}). Use query_project_knowledge if relevant.]\n\n`;
-                  logger.debug(`[knowledge] File-aware hint queued for ${newEntries.length} entries`);
-                }).catch((err) => {
-                  logger.debug(`[knowledge] File-aware hint fetch failed: ${err}`);
-                });
-              }
-            } else {
-              currentTurnFilePaths = new Set<string>();
-            }
 
             // Flush queued messages before closing the turn to prevent
             // turn-end from arriving at the App before delayed tool call messages
@@ -3840,53 +3473,6 @@ export async function claudeRemoteLauncher(
           }
         }
         ongoingToolCalls.clear();
-
-        // Knowledge base: flush any pending turns before session teardown
-        // Wrapped in try-catch to never block session cleanup
-        try {
-          if (turnCollector) {
-            const finalTurns = turnCollector.flush();
-            if (finalTurns) {
-              logger.debug(`[knowledge] Flushing ${finalTurns.length} pending turns on exit`);
-              for (const turn of finalTurns) {
-                session.client.submitKnowledge({
-                  entryType: inferEntryType(turn.userMessage, turn.assistantText),
-                  contributorType: "session",
-                  action: "create",
-                  title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                  content: turn.assistantText.slice(0, 4000),
-                  request: turn.userMessage.slice(0, 500),
-                  outcome: turn.fileEdits.length > 0
-                    ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
-                    : undefined,
-                  tags: extractTags(turn.fileEdits),
-                  confidence: turn.outputTokens > 1000 ? "high" : "medium",
-                  model: turn.model,
-                  affectedFiles: turn.fileEdits.map((f) => f.path),
-                });
-              }
-            }
-
-            // Generate and submit session-end summary (respects project config toggle)
-            const summary = summaryEnabled ? turnCollector.buildSessionSummary() : null;
-            if (summary) {
-              logger.debug(`[knowledge] Submitting session summary (${summary.fileEdits.length} files, ${summary.outputTokens} tokens)`);
-              session.client.submitKnowledge({
-                entryType: "summary",
-                contributorType: "session",
-                action: "create",
-                title: summary.userMessage.slice(0, 200) || "Session summary",
-                content: summary.assistantText.slice(0, 4000),
-                tags: extractTags(summary.fileEdits),
-                confidence: "high",
-                model: summary.model,
-                affectedFiles: summary.fileEdits.map((f) => f.path),
-              });
-            }
-          }
-        } catch (err) {
-          logger.debug(`[knowledge] Error flushing turns on exit: ${err}`);
-        }
 
         // Stop all task-log watchers
         try {

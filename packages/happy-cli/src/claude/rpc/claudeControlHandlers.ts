@@ -666,7 +666,7 @@ export function registerClaudeControlHandlers(
   //
   // PTY mode has no programmatic toggle API in the Claude TUI, so we
   // implement the behaviour ourselves:
-  //   1. Reject mutations to Happy's own MCPs (happy / happy-knowledge).
+  //   1. Reject mutations to Happy's own MCP (happy).
   //   2. Persist the new disabled list to ~/.claude.json (the same file
   //      Claude Code's `/mcp disable` writes to). On next session start,
   //      Claude Code reads it natively.

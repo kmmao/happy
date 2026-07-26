@@ -42,7 +42,6 @@ import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
 import type { TunnelManager } from "@/tunnel";
 import { TerminalManager } from "@/terminal/TerminalManager";
-import { generateAndSubmitRepoMap } from "@/knowledge";
 import { buildMachineRpcRoutes } from "./machineRpcRoutes";
 
 
@@ -138,20 +137,6 @@ interface DaemonToServerEvents {
     status: string;
     sessionId?: string;
     errorMessage?: string;
-  }) => void;
-  "transcript-knowledge": (data: {
-    turns: Array<{
-      sessionId: string;
-      entryType: string;
-      title: string;
-      content: string;
-      request?: string;
-      outcome?: string;
-      tags: string[];
-      confidence: string;
-      model?: string;
-      affectedFiles: string[];
-    }>;
   }) => void;
   "session-event": (data: {
     sessionId: string;
@@ -598,23 +583,6 @@ export class ApiMachineClient {
       return { success: true, closed: count };
     });
 
-    // Machine-level repo map generator: triggered from App to force-refresh the
-    // codebase structure snapshot stored in the project knowledge base.
-    this.rpcHandlerManager.registerHandler("generate-repo-map", async (params: any) => {
-      const { projectId } = params || {};
-      if (!projectId || typeof projectId !== "string") {
-        return { success: false, error: "projectId is required" };
-      }
-      const result = await generateAndSubmitRepoMap(
-        process.cwd(),
-        configuration.serverUrl,
-        this.token,
-        projectId,
-        undefined,
-        true, // force=true bypasses the "recent exists" check
-      );
-      return { success: result.submitted || result.skipped === true, ...result };
-    });
   }
 
   /**
@@ -843,45 +811,6 @@ export class ApiMachineClient {
     for (const item of pending) {
       this.socket.emit("task-status", item);
     }
-  }
-
-  /**
-   * Submit session transcript turns as knowledge entries.
-   * Reuses the existing "submit-knowledge" socket event.
-   * Fire-and-forget — server maps sessions to projects and stores entries.
-   */
-  emitTranscriptKnowledge(turns: Array<{
-    sessionId: string;
-    userMessage: string;
-    assistantText: string;
-    fileEdits: Array<{ path: string; type: string }>;
-    toolCallCount: number;
-    outputTokens: number;
-    model: string;
-  }>) {
-    if (!this.socket.connected) return;
-    const entries = turns.slice(0, 10).map((turn) => {
-      const text = `${turn.userMessage} ${turn.assistantText}`.toLowerCase();
-      const entryType = text.includes("fix") || text.includes("bug") ? "fix"
-        : text.includes("decision") || text.includes("选型") ? "decision"
-        : "discovery";
-      const firstLine = turn.userMessage.split("\n")[0].trim().slice(0, 200) || "Session activity";
-      return {
-        sessionId: turn.sessionId,
-        entryType,
-        title: firstLine,
-        content: turn.assistantText.slice(0, 2000),
-        request: turn.userMessage.slice(0, 500),
-        outcome: turn.fileEdits.length > 0
-          ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
-          : undefined,
-        tags: [...new Set(turn.fileEdits.map((f) => f.path.split(".").pop()).filter(Boolean))].slice(0, 10) as string[],
-        confidence: turn.outputTokens > 1000 ? "high" : "medium",
-        model: turn.model,
-        affectedFiles: turn.fileEdits.map((f) => f.path),
-      };
-    });
-    this.socket.emit("transcript-knowledge", { turns: entries });
   }
 
   /**

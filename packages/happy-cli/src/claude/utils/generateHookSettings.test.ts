@@ -9,7 +9,7 @@
  *
  * These tests pin:
  *   • the settings.json structure (hooks only — no mcpServers key)
- *   • the Happy MCP server builder (URL normalisation, knowledge toggle)
+ *   • the Happy MCP server builder (URL normalisation)
  */
 
 import { describe, it, expect } from "vitest";
@@ -92,24 +92,10 @@ describe("buildHookSettings", () => {
 });
 
 describe("buildHappyMcpServers", () => {
-  it("returns happy only by default", () => {
+  it("returns the happy server", () => {
     const map = buildHappyMcpServers("http://127.0.0.1:54321/");
     expect(map).toEqual({
       happy: { type: "http", url: "http://127.0.0.1:54321", alwaysLoad: true },
-    });
-  });
-
-  it("includes happy-knowledge when requested", () => {
-    const map = buildHappyMcpServers("http://127.0.0.1:54321", {
-      includeKnowledge: true,
-    });
-    expect(map).toEqual({
-      happy: { type: "http", url: "http://127.0.0.1:54321", alwaysLoad: true },
-      "happy-knowledge": {
-        type: "http",
-        url: "http://127.0.0.1:54321",
-        alwaysLoad: true,
-      },
     });
   });
 
@@ -123,9 +109,7 @@ describe("buildHappyMcpServers", () => {
   });
 
   it("marks every server with alwaysLoad=true so happy tools survive Claude's tool-search deferral (Claude Code 2.1.121+)", () => {
-    const map = buildHappyMcpServers("http://127.0.0.1:1234", {
-      includeKnowledge: true,
-    });
+    const map = buildHappyMcpServers("http://127.0.0.1:1234");
     for (const entry of Object.values(map)) {
       expect(entry.alwaysLoad).toBe(true);
     }

@@ -33,8 +33,8 @@ describe("happyMcp", () => {
       "Update Session Summary",
     );
     expect(
-      getHappyMcpToolAction("happy__query_project_knowledge", "dynamic"),
-    ).toBe("Searching project knowledge");
+      getHappyMcpToolAction("happy__report_preview", "dynamic"),
+    ).toBe(getHappyMcpToolAction("mcp__happy__report_preview", "dynamic"));
   });
 
   it("keeps policy-oriented subsets in sync with the shared spec", () => {
@@ -59,7 +59,7 @@ describe("happyMcp", () => {
       shouldAutoApproveHappyMcpReason("Allow Happy MCP session summary write"),
     ).toBe(true);
     expect(
-      shouldAutoApproveHappyMcpReason("Allow Happy MCP project knowledge lookup"),
+      shouldAutoApproveHappyMcpReason("Allow Happy MCP unrelated operation"),
     ).toBe(false);
   });
 

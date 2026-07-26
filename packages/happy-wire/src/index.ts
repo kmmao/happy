@@ -4,7 +4,6 @@ export * from './sessionProtocol';
 export * from './machineTypes';
 export * from './tunnelProvider';
 export * from './tailscaleUtils';
-export * from './knowledge';
 export * from './voice';
 export * from './tasks';
 export * from './skills';

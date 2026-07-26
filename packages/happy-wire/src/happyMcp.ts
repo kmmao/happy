@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const HAPPY_MCP_TOOL_NAMES = [
   "change_title",
-  "query_project_knowledge",
   "update_progress",
   "update_session_summary",
   "ask_user",
@@ -87,21 +86,6 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
     dynamicAction: "Updating chat title",
     fallbackAction: "Update chat title",
     reasonPhrases: ["title update", "title updates", "change_title"],
-  },
-  query_project_knowledge: {
-    title: "Project Knowledge",
-    description:
-      "Search the project knowledge base for relevant context, past decisions, known pitfalls, and conventions.",
-    failureLabel: "Knowledge query failed",
-    inputSchema: {
-      query: z.string().describe("Search query describing what you want to know"),
-    },
-    hideSuccessfulCall: false,
-    autoApproveByDefault: false,
-    permissionAction: "Waiting for approval to search project knowledge",
-    dynamicAction: "Searching project knowledge",
-    fallbackAction: "Search project knowledge",
-    reasonPhrases: [],
   },
   update_progress: {
     title: "Update Progress",

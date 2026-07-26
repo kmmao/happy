@@ -6,7 +6,6 @@ export const InboxCategorySchema = z.enum([
   "trigger",      // Cron/webhook trigger fired
   "supervisor",   // Supervisor run results
   "session",      // Session lifecycle events
-  "knowledge",    // Knowledge base changes
   "system",       // System notifications
 ]);
 export type InboxCategory = z.infer<typeof InboxCategorySchema>;

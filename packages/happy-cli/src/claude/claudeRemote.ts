@@ -781,7 +781,7 @@ export async function claudeRemote(opts: {
   /**
    * Fires with the EXACT text written to the PTY composer for a turn —
    * the bracketed-paste payload as Claude actually received it, including any
-   * once-per-session prefixes (CONTEXT.md / world-config / knowledge) the
+   * once-per-session prefixes (CONTEXT.md / world-config) the
    * launcher prepended. The launcher captures this as the "in-flight prompt"
    * so the stranded-turn watchdog can re-deliver verbatim if a tier-1 Esc
    * recovery had to clear the composer before the prompt ever ran. Capturing
