@@ -113,7 +113,7 @@ export async function ownedWebhookRoute(accountId: string, webhookRouteId: strin
 // Same ownership predicate and error mode as the loaders above, but they fetch
 // nothing (select: { id: true }) and return void. Use these when the route
 // only needs the 404 guard — the full-row loaders pull every column, which on
-// hot paths (message pagination, knowledge two-step checks) means shipping
+// hot paths (message pagination, two-step checks) means shipping
 // large encrypted text columns (Session.metadata/agentState,
 // Project.metadata/supervisorConfig) that the handler never reads.
 

@@ -61,7 +61,6 @@ async function mergeProjects(
             "SupervisorRun",
             "SupervisorAction",
             "AgentLoop",
-            "ProjectKnowledge",
         ] as const;
 
         for (const table of tables) {

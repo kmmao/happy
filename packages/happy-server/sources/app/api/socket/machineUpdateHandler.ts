@@ -7,8 +7,6 @@ import { db } from "@/storage/db";
 import { Socket } from "socket.io";
 import { runDueMachineHeartbeatScans } from "@/app/api/socket/machineHeartbeatScans";
 import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
-import { consolidate } from "@/modules/knowledgeConsolidate";
-import { writeKnowledgeEntry } from "@/modules/knowledgeWrite";
 
 // Track last seen brief timestamp per machine to detect new briefs
 const lastBriefTimestamp = new Map<string, number>();
@@ -178,96 +176,6 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in session-sync: ${error}`);
             callback?.({ ok: false, error: 'Internal error' });
-        }
-    });
-
-    // Handle transcript knowledge submissions from AutoDream
-    socket.on('transcript-knowledge', async (data: any) => {
-        try {
-            const turns = data?.turns;
-            if (!Array.isArray(turns) || turns.length === 0) return;
-
-            const updatedSessionIds = new Set<string>();
-
-            for (const turn of turns.slice(0, 10)) {
-                const sessionId = turn.sessionId;
-                if (!sessionId) continue;
-
-                // Map session to project
-                const session = await db.session.findFirst({
-                    where: { id: sessionId, accountId: userId },
-                    select: { projectId: true },
-                });
-                if (!session?.projectId) continue;
-
-                const projectId = session.projectId;
-                const action = await consolidate(projectId, {
-                    title: turn.title ?? "Session activity",
-                    entryType: turn.entryType ?? "discovery",
-                    tags: turn.tags ?? [],
-                    content: turn.content ?? "",
-                });
-
-                if (action.type === "noop") continue;
-
-                const created = await writeKnowledgeEntry(action, {
-                    projectId,
-                    entryType: turn.entryType ?? "discovery",
-                    contributorType: "auto-dream",
-                    action: "create",
-                    title: turn.title ?? "Session activity",
-                    content: turn.content ?? "",
-                    structured: turn.request || turn.outcome
-                        ? JSON.stringify({ request: turn.request, outcome: turn.outcome })
-                        : null,
-                    tags: JSON.stringify(turn.tags ?? []),
-                    confidence: turn.confidence ?? "medium",
-                    model: turn.model ?? null,
-                    sessionId,
-                    affectedFiles: JSON.stringify(turn.affectedFiles ?? []),
-                    supersedesId: null,
-                });
-
-                updatedSessionIds.add(sessionId);
-
-                // Push unified world event for Stream Mode real-time updates
-                {
-                    let tags: string[] = [];
-                    try { tags = JSON.parse(created.tags) as string[]; } catch { /* ignore */ }
-                    const label = tags.length > 0
-                        ? `${created.entryType}: ${tags.slice(0, 3).join(", ")}`
-                        : created.entryType;
-                    await emitSyncEphemeral(userId, {
-                        t: "world-event-created",
-                        event: {
-                            id: `memory-${created.id}`,
-                            eventType: "memory.created",
-                            title: label,
-                            summary: `${created.entryType} · ${created.confidence}`,
-                            occurredAt: created.createdAt.getTime(),
-                            severity: "info",
-                            source: {
-                                type: "project",
-                                projectId: created.projectId,
-                                sessionId: created.sessionId ?? null,
-                            },
-                            originalId: created.id,
-                        },
-                    });
-                }
-            }
-
-            // Notify App once per affected session so the "changes" tab updates in real time.
-            for (const sessionId of updatedSessionIds) {
-                const knowledgeCount = await db.projectKnowledge.count({
-                    where: { sessionId, status: "active" },
-                });
-                await emitSyncEphemeral(userId, { t: "knowledge-count", sessionId, count: knowledgeCount });
-            }
-
-            log({ module: 'knowledge' }, `Processed ${turns.length} transcript knowledge entries`);
-        } catch (error) {
-            log({ module: 'knowledge', level: 'error' }, `Error processing transcript knowledge: ${error}`);
         }
     });
 }

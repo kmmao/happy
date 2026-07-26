@@ -305,9 +305,6 @@ export type SyncEphemeralBody =
           iterationStatus: string;
           generatedAt: number;
       }
-    // --- knowledge ---
-    | { t: "knowledge-count"; sessionId: string; count: number }
-    | { t: "knowledge-access-update"; sessionId: string; hit?: number; miss?: number; evicted?: number }
     // --- task ---
     | ({ t: "task-trigger"; machineId: string } & TaskTriggerOptions)
     | ({ t: "task-status-changed" } & TaskStatusChangedOptions)
@@ -439,8 +436,6 @@ function recipientFilterFor(body: SyncEphemeralBody): RecipientFilter {
         case "agent-loop-status":
         case "agent-loop-brief":
         case "auto-loop-fired":
-        case "knowledge-count":
-        case "knowledge-access-update":
         case "task-status-changed":
         case "inbox-new-item":
         case "inbox-unread-count":
@@ -554,15 +549,6 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
                 projectId: body.projectId,
                 fixStatus: body.fixStatus,
             };
-        case "knowledge-count":
-            return buildKnowledgeCountPayload(body.sessionId, body.count);
-        case "knowledge-access-update":
-            return buildKnowledgeAccessUpdatePayload({
-                sessionId: body.sessionId,
-                hit: body.hit,
-                miss: body.miss,
-                evicted: body.evicted,
-            });
         case "task-trigger": {
             const { t: _t, machineId: _m, ...opts } = body;
             return buildTaskTriggerPayload(opts);
@@ -757,29 +743,6 @@ function buildSupervisorLoopBriefPayload(
 
 function buildAutoLoopFiredPayload(opts: AutoLoopFiredOptions): EphemeralPayload {
     return { type: "auto-loop-fired", ...opts };
-}
-
-function buildKnowledgeCountPayload(
-    sessionId: string,
-    count: number,
-): EphemeralPayload {
-    return { type: "knowledge-count", id: sessionId, count };
-}
-
-function buildKnowledgeAccessUpdatePayload(opts: {
-    sessionId: string;
-    hit?: number;
-    miss?: number;
-    evicted?: number;
-}): EphemeralPayload {
-    return {
-        type: "knowledge-access-update",
-        sessionId: opts.sessionId,
-        at: Date.now(),
-        hit: opts.hit,
-        miss: opts.miss,
-        evicted: opts.evicted,
-    };
 }
 
 function buildTaskTriggerPayload(opts: TaskTriggerOptions): EphemeralPayload {

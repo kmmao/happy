@@ -400,19 +400,6 @@ export type EphemeralEvent =
       firedAt: number;
     }
   | {
-      type: "knowledge-count";
-      id: string;
-      count: number;
-    }
-  | {
-      type: "knowledge-access-update";
-      sessionId: string;
-      at: number;
-      hit?: number;
-      miss?: number;
-      evicted?: number;
-    }
-  | {
       type: "task-log";
       sessionId: string;
       taskId: string;

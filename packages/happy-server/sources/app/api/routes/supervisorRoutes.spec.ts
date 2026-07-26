@@ -322,9 +322,6 @@ vi.mock("@/app/webhook/webhookProviderApi", () => ({
 vi.mock("@/modules/encrypt", () => ({
     decryptString: vi.fn(() => "decrypted-token"),
 }));
-vi.mock("@/modules/knowledgeContributor", () => ({
-    contributeSupervisorKnowledge: vi.fn(async () => {}),
-}));
 vi.mock("@/modules/inboxCreate", () => ({
     inboxCreate: vi.fn(async () => {}),
 }));

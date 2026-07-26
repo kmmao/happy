@@ -7,13 +7,13 @@
  *   - Claude's in-session curl POST → the run-status route.
  * Both used to inline their own copy of "a run reached status X", and the two
  * copies had silently drifted — one path computed a health score and archived
- * the session, the other sent the push / inbox / knowledge notifications, so
+ * the session, the other sent the push / inbox notifications, so
  * the side effects a run got depended on which transport reported it. This
  * module is the union of both: everything a "run reached status X" means lives
  * here exactly once — the atomic pending/running → terminal transition, action
  * de-duplication (including skipped/ignored resurfacing), health scoring, usage
  * aggregation, session archival, App + daemon notifications, push, inbox,
- * knowledge contribution, auto-approval, and loop progression.
+ * auto-approval, and loop progression.
  *
  * Because the transition is a single atomic `updateMany` guarded by the current
  * status, only the FIRST transport to flip a run terminal runs the side
@@ -54,7 +54,6 @@ import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEn
 import { handleAutoApproval } from "./supervisorAutoApproval";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { inboxCreate } from "@/modules/inboxCreate";
-import { contributeSupervisorKnowledge } from "@/modules/knowledgeContributor";
 import { classifyReportedActions } from "@/modules/supervisorActionResurfacing";
 
 /** A single finding reported alongside a terminal status. */
@@ -306,11 +305,6 @@ export async function supervisorRunStatusApply(
             { module: "supervisor" },
             `supervisor-run-status: ${plan.toCreate.length} new, ${plan.toUpdatePending.length} deduped, ${plan.toRestoreFromSkip.length} restored from skip, ${plan.toSuppressIgnored.length} suppressed by ignore`,
         );
-
-        // Contribute findings to the knowledge base, terminal status only.
-        if (status === "completed") {
-            void contributeSupervisorKnowledge(id, runId, reportedActions);
-        }
     }
 
     // Compute and persist healthScore + usage on completion, then archive.

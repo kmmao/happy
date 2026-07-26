@@ -14,7 +14,6 @@ const CreateSkillBodySchema = z.object({
     content: z.string().min(1).max(50000),
     projectId: z.string().optional(),
     attachments: z.array(z.string()).max(20).default([]),
-    sourceKnowledgeId: z.string().optional(),
 });
 
 const UpdateSkillBodySchema = z.object({
@@ -47,7 +46,7 @@ export function skillRoutes(app: Fastify) {
             schema: { body: CreateSkillBodySchema },
         },
         async (request, reply) => {
-            const { name, description, content, projectId, attachments, sourceKnowledgeId } = request.body;
+            const { name, description, content, projectId, attachments } = request.body;
 
             // Verify project ownership if scoped
             if (projectId) {
@@ -63,7 +62,6 @@ export function skillRoutes(app: Fastify) {
                         description: description ?? null,
                         content,
                         attachments: JSON.stringify(attachments),
-                        sourceKnowledgeId: sourceKnowledgeId ?? null,
                     },
                 });
 
@@ -239,7 +237,6 @@ function serializeSkill(skill: Record<string, unknown>): Record<string, unknown>
         content: string;
         contentVersion: number;
         attachments: string;
-        sourceKnowledgeId: string | null;
         archived: boolean;
         createdAt: Date;
         updatedAt: Date;
@@ -258,7 +255,6 @@ function serializeSkill(skill: Record<string, unknown>): Record<string, unknown>
         content: s.content,
         contentVersion: s.contentVersion,
         attachments: safeParseJsonArray(s.attachments),
-        sourceKnowledgeId: s.sourceKnowledgeId,
         archived: s.archived,
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),

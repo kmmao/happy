@@ -23,7 +23,7 @@
  *
  * Scope: ONLY the fire-and-forget variant (no acknowledgement callback). The
  * request/response handlers that take a `callback` (session update/adopt/
- * preferences, machine update, knowledge, preview-proxy) carry an additional
+ * preferences, machine update, preview-proxy) carry an additional
  * response contract and stay on the RPC path (ADR-0035) — they are NOT this
  * seam's adapters.
  */

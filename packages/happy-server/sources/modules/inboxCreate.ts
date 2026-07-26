@@ -7,7 +7,7 @@ const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 interface InboxCreateInput {
     accountId: string;
-    category: string;       // task | trigger | supervisor | session | knowledge | system
+    category: string;       // task | trigger | supervisor | session | system
     eventType: string;      // e.g. "task.completed"
     severity?: string;      // info | warning | error (default: info)
     title: string;

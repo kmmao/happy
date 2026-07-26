@@ -72,7 +72,6 @@ const {
             }),
         },
         sessionEvent: { findFirst: vi.fn() },
-        projectKnowledge: { count: vi.fn() },
     };
 
     const emitEphemeralMock = vi.fn();
@@ -103,8 +102,6 @@ vi.mock("@/modules/pushSend", () => ({
     buildBriefPushBody: buildBriefPushBodyMock,
     pushSend: pushSendMock,
 }));
-vi.mock("@/modules/knowledgeConsolidate", () => ({ consolidate: vi.fn() }));
-vi.mock("@/modules/knowledgeEmbedding", () => ({ storeKnowledgeEmbedding: vi.fn() }));
 vi.mock("@/storage/inTx", () => ({ inTx: vi.fn() }));
 vi.mock("@/app/monitoring/metrics2", () => ({
     machineAliveEventsCounter: { inc: vi.fn() },
@@ -133,11 +130,6 @@ vi.mock("@/app/events/eventRouter", () => ({
         thinking,
     })),
     buildUpdateMachineUpdate: vi.fn(() => ({ id: "update-id", body: { t: "update-machine" } })),
-    buildKnowledgeCountEphemeral: vi.fn((sessionId: string, knowledgeCount: number) => ({
-        type: "knowledge-count",
-        sessionId,
-        knowledgeCount,
-    })),
 }));
 
 import { machineUpdateHandler } from "./machineUpdateHandler";

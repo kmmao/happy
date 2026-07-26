@@ -38,10 +38,6 @@ import { agentLoopRoutes } from "./routes/agentLoopRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { provisionRoutes } from "./routes/provisionRoutes";
-import { knowledgeRoutes } from "./routes/knowledgeRoutes";
-import { knowledgeSearchRoutes } from "./routes/knowledgeSearchRoutes";
-import { knowledgeConfigRoutes } from "./routes/knowledgeConfigRoutes";
-import { knowledgeLifecycleRoutes } from "./routes/knowledgeLifecycleRoutes";
 import { voiceRoutes } from "./routes/voiceRoutes";
 import { sub2apiRoutes } from "./routes/sub2apiRoutes";
 import { taskRoutes } from "./routes/taskRoutes";
@@ -62,7 +58,6 @@ import { webDiagnosticsRoutes } from "./routes/webDiagnosticsRoutes";
 import { attachPreviewWsGateway } from "./routes/previewWsGateway";
 import { startPreviewCleanup, stopPreviewCleanup } from "@/app/preview/previewCleanup";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
-import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
 import * as path from "path";
 import * as fs from "fs";
@@ -172,10 +167,6 @@ export async function startApi() {
   sessionRoutes(typed);
   v3SessionRoutes(typed);
   provisionRoutes(typed);
-  knowledgeRoutes(typed);
-  knowledgeSearchRoutes(typed);
-  knowledgeConfigRoutes(typed);
-  knowledgeLifecycleRoutes(typed);
   voiceRoutes(typed);
   sub2apiRoutes(typed);
   taskRoutes(typed);
@@ -211,12 +202,6 @@ export async function startApi() {
   startPreviewCleanup();
   onShutdown("preview-cleanup", async () => {
     stopPreviewCleanup();
-  });
-
-  // Start knowledge lifecycle scheduler (decay/merge jobs)
-  startKnowledgeLifecycleScheduler();
-  onShutdown("knowledge-lifecycle", async () => {
-    stopKnowledgeLifecycleScheduler();
   });
 
   // Start stale task reaper (server-side timeout safety net)

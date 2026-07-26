@@ -4,7 +4,7 @@ import { z } from "zod";
 import { apiError } from "../utils/apiError";
 
 const InboxCategorySchema = z.enum([
-    "task", "trigger", "supervisor", "session", "knowledge", "system", "decision",
+    "task", "trigger", "supervisor", "session", "system", "decision",
 ]);
 
 function serializeInboxItem(item: {

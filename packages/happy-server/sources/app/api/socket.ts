@@ -25,7 +25,6 @@ import { supervisorFixStatusHandler } from "./socket/supervisorFixStatusHandler"
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { sessionPreferencesHandler } from "./socket/sessionPreferencesHandler";
-import { knowledgeHandler } from "./socket/knowledgeHandler";
 import { taskLogHandler } from "./socket/taskLogHandler";
 import { taskStatusHandler } from "./socket/taskStatusHandler";
 import { sessionEventHandler } from "./socket/sessionEventHandler";
@@ -247,7 +246,6 @@ export function startSocket(app: Fastify) {
     webhookStatusHandler(socket, userId);
     supervisorRunStatusHandler(socket, userId);
     supervisorFixStatusHandler(socket, userId);
-    knowledgeHandler(userId, socket);
     taskLogHandler(userId, socket);
     taskStatusHandler(socket, userId);
     sessionEventHandler(socket, userId);
