@@ -1300,27 +1300,6 @@ export const knownTools = {
       return "Update chat title";
     },
   },
-  mcp__happy__query_project_knowledge: {
-    title: formatHappyMcpToolTitle("mcp__happy__query_project_knowledge"),
-    icon: ICON_READ,
-    minimal: true,
-    noStatus: true,
-    input: z
-      .object({
-        query: z.string().optional().describe("Knowledge query"),
-      })
-      .partial()
-      .passthrough(),
-    extractDescription: (opts: {
-      metadata: Metadata | null;
-      tool: ToolCall;
-    }) => {
-      if (typeof opts.tool.input?.query === "string" && opts.tool.input.query) {
-        return opts.tool.input.query;
-      }
-      return "Search project knowledge";
-    },
-  },
   mcp__happy__update_progress: {
     title: formatHappyMcpToolTitle("mcp__happy__update_progress"),
     icon: ICON_TODO,
@@ -1498,13 +1477,6 @@ export const knownTools = {
           opts.tool.input.title
         ) {
           return opts.tool.input.title;
-        }
-        if (
-          requestedToolName === "mcp__happy__query_project_knowledge" &&
-          typeof opts.tool.input?.query === "string" &&
-          opts.tool.input.query
-        ) {
-          return opts.tool.input.query;
         }
         return formatHappyMcpToolAction(requestedToolName, "dynamic");
       }

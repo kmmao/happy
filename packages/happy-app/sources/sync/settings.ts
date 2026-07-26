@@ -87,9 +87,6 @@ export const SettingsSchema = z.object({
     .describe(
       "Show the horizontal agent sessions dashboard at the top of the session list when 2+ sessions are active",
     ),
-  knowledgeBase: z
-    .boolean()
-    .describe("Enable project knowledge base (experimental). Controls Tab visibility and CLI kill-switch; per-project mode/sensitivity/track options live on Project.knowledgeConfig."),
   enablePreviewTab: z
     .boolean()
     .describe("Enable preview tab in session side panel (experimental)"),
@@ -429,7 +426,6 @@ export const settingsDefaults: Settings = {
   autoApprovePlanInYolo: true,
   showAgentActivity: true,
   showAgentsDashboard: false,
-  knowledgeBase: false,
   enablePreviewTab: false,
   expResumeSession: false,
   useEnhancedSessionWizard: false,

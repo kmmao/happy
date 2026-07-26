@@ -138,8 +138,8 @@ export type IngestEvent =
 
     // --- SyncEphemeral-side: listener-set fan-outs (PR 6) ----------------
     // Storage-only ephemerals (activity, machine-activity, rpc-ready, usage,
-    // knowledge-count, knowledge-access-update, webhook-issue-linked,
-    // webhook-pr-merged) are applied inline in the seam and emit no events.
+    // webhook-issue-linked, webhook-pr-merged) are applied inline in the seam
+    // and emit no events.
     // The variants below mirror the `Set<Listener>` callbacks in Sync today
     // — subscribers iterate the matching Set when an event fires.
     | {

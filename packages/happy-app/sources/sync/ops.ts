@@ -229,16 +229,6 @@ export async function machineSpawnNewSession(
       };
     }
 
-    // Global kill-switch only. Per-project mode/sensitivity/track options are
-    // synced from server `knowledgeConfig` at runtime via syncKnowledgeConfig().
-    const settings = storage.getState().settings;
-    const knowledgeEnvVars: Record<string, string> = {
-        HAPPY_KNOWLEDGE_BASE: settings.knowledgeBase ? "true" : "false",
-    };
-
-    // Caller env vars (e.g. from profile) take precedence
-    const mergedEnvironmentVariables = { ...knowledgeEnvVars, ...environmentVariables };
-
     const result = await apiSocket.machineRPC<
       SpawnSessionResult,
       {
@@ -265,7 +255,7 @@ export async function machineSpawnNewSession(
       forkSourceId,
       profileId: profileId ?? normalizedRuntimeProfile?.profileId,
       runtimeProfile: normalizedRuntimeProfile ?? undefined,
-      environmentVariables: mergedEnvironmentVariables,
+      environmentVariables,
     });
     return result;
   } catch (error) {

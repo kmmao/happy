@@ -22,7 +22,7 @@ describe("resolveProjectDetailTabPresentation", () => {
         });
     });
 
-    it("assigns distinct semantics to health, research, and knowledge", () => {
+    it("assigns distinct semantics to health and research", () => {
         expectPresentation("health", {
             icon: "pulse-outline",
             tone: "green",
@@ -30,10 +30,6 @@ describe("resolveProjectDetailTabPresentation", () => {
         expectPresentation("research", {
             icon: "search-outline",
             tone: "blue",
-        });
-        expectPresentation("knowledge", {
-            icon: "library-outline",
-            tone: "purple",
         });
     });
 });

@@ -411,21 +411,6 @@ export type ApiEphemeralSupervisorLoopBrief = z.infer<
   typeof ApiEphemeralSupervisorLoopBriefSchema
 >;
 
-export const ApiEphemeralKnowledgeCountSchema = z.object({
-  type: z.literal("knowledge-count"),
-  id: z.string(),  // sessionId
-  count: z.number(),
-});
-
-export const ApiEphemeralKnowledgeAccessUpdateSchema = z.object({
-  type: z.literal("knowledge-access-update"),
-  sessionId: z.string(),
-  at: z.number(),
-  hit: z.number().optional(),
-  miss: z.number().optional(),
-  evicted: z.number().optional(),
-});
-
 export const ApiEphemeralTaskLogSchema = z.object({
     type: z.literal("task-log"),
     sessionId: z.string(),
@@ -527,8 +512,6 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorLoopStatusSchema,
   ApiEphemeralSupervisorLoopBriefSchema,
   ApiEphemeralAutoLoopFiredSchema,
-  ApiEphemeralKnowledgeCountSchema,
-  ApiEphemeralKnowledgeAccessUpdateSchema,
   ApiEphemeralTaskLogSchema,
   ApiEphemeralTaskStatusChangedSchema,
   ApiEphemeralInboxNewItemSchema,

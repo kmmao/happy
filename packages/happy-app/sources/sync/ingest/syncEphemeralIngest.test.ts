@@ -9,9 +9,6 @@ const mocks = vi.hoisted(() => {
         machines: {} as Record<string, any>,
         sessions: {} as Record<string, any>,
         applyMachines: vi.fn(),
-        sessionKnowledgeCount: {} as Record<string, number>,
-        sessionKnowledgeChangesRevision: {} as Record<string, number>,
-        sessionKnowledgeAccessRevision: {} as Record<string, number>,
     };
     return {
         storageState,
@@ -85,9 +82,6 @@ beforeEach(() => {
     vi.clearAllMocks();
     mocks.storageState.machines = {};
     mocks.storageState.sessions = {};
-    mocks.storageState.sessionKnowledgeCount = {};
-    mocks.storageState.sessionKnowledgeChangesRevision = {};
-    mocks.storageState.sessionKnowledgeAccessRevision = {};
 });
 
 // ---------------------------------------------------------------------------
@@ -196,28 +190,6 @@ describe("ingestSyncEphemeral: storage-only variants", () => {
             totalOutputTokens: 5 + 7,
             timestamp: 1000,
         });
-    });
-
-    it("knowledge-count → storage.setState bumps count + revision", () => {
-        const { ctx } = makeCtx();
-        ingestSyncEphemeral(
-            { type: "knowledge-count", id: "s1", count: 42 } as any,
-            ctx,
-        );
-        expect(mocks.setStateMock).toHaveBeenCalledTimes(1);
-        const newState = mocks.setStateMock.mock.calls[0][0];
-        expect(newState.sessionKnowledgeCount.s1).toBe(42);
-        expect(newState.sessionKnowledgeChangesRevision.s1).toBe(1);
-    });
-
-    it("knowledge-access-update → storage.setState bumps access revision", () => {
-        const { ctx } = makeCtx();
-        ingestSyncEphemeral(
-            { type: "knowledge-access-update", sessionId: "s1" } as any,
-            ctx,
-        );
-        const newState = mocks.setStateMock.mock.calls[0][0];
-        expect(newState.sessionKnowledgeAccessRevision.s1).toBe(1);
     });
 
     it("webhook-issue-linked → fires module call", () => {

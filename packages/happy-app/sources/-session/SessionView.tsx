@@ -27,7 +27,6 @@ import { ChatList, ChatListHandle, LOAD_MORE_INCREMENT } from "@/components/Chat
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover, type OptionItem } from "@/components/OptionsPopover";
-import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
@@ -80,7 +79,6 @@ import {
   useBackgroundTaskEntries,
   useSessionUsage,
   useSessionContextUsage,
-  useSessionKnowledgeCount,
   useProjectForSession,
   useSetting,
   useMachine,
@@ -402,9 +400,6 @@ export const SessionView = React.memo((props: { id: string }) => {
       return null;
     });
   }, []);
-  const knowledgeCount = useSessionKnowledgeCount(sessionId);
-  const sessionProject = useProjectForSession(sessionId);
-  const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
   const [showMobilePanelSheet, setShowMobilePanelSheet] = React.useState(false);
 
 
@@ -532,8 +527,6 @@ export const SessionView = React.memo((props: { id: string }) => {
             >
               <ChatHeaderView
                 {...headerProps}
-                knowledgeCount={knowledgeCount}
-                onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
                 onPanelPress={shouldShowMobilePanelButton ? () => setShowMobilePanelSheet(true) : undefined}
                 onBackPress={() => router.back()}
                 onResumePress={canReactivate ? performReactivation : undefined}
@@ -645,12 +638,6 @@ export const SessionView = React.memo((props: { id: string }) => {
       <MobileSessionPanelSheet
         visible={showMobilePanelSheet}
         onClose={() => setShowMobilePanelSheet(false)}
-        sessionId={sessionId}
-      />
-      <SessionKnowledgeSheet
-        visible={showKnowledgeSheet}
-        onClose={() => setShowKnowledgeSheet(false)}
-        projectServerId={sessionProject?.serverId ?? undefined}
         sessionId={sessionId}
       />
         </React.Fragment>

@@ -2601,7 +2601,7 @@ class Sync {
    * it through `ingestSyncEphemeral`; subscribers registered in
    * `registerIngestSubscribers` translate the returned events back into
    * listener-Set fan-out. Storage mutations (activity, machine-activity,
-   * rpc-ready, usage, knowledge-count / -access-update) are applied inside
+   * rpc-ready, usage) are applied inside
    * the seam. The legacy `EphemeralHandlerContext` and the per-listener-Set
    * wiring it carried are gone.
    */

@@ -36,10 +36,6 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "search-outline",
         tone: "blue",
     },
-    knowledge: {
-        icon: "library-outline",
-        tone: "purple",
-    },
     traces: {
         icon: "pulse-outline",
         tone: "green",

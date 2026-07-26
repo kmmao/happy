@@ -291,34 +291,6 @@ export function handleEphemeralUpdateAction(
     }
   }
 
-  // Handle knowledge-count
-  if (updateData.type === "knowledge-count") {
-    const knowledgeState = storage.getState();
-    storage.setState({
-      sessionKnowledgeCount: {
-        ...knowledgeState.sessionKnowledgeCount,
-        [updateData.id]: updateData.count,
-      },
-      sessionKnowledgeChangesRevision: {
-        ...knowledgeState.sessionKnowledgeChangesRevision,
-        [updateData.id]:
-          (knowledgeState.sessionKnowledgeChangesRevision[updateData.id] ?? 0) + 1,
-      },
-    });
-  }
-
-  // Handle knowledge-access-update
-  if (updateData.type === "knowledge-access-update") {
-    const accessState = storage.getState();
-    storage.setState({
-      sessionKnowledgeAccessRevision: {
-        ...accessState.sessionKnowledgeAccessRevision,
-        [updateData.sessionId]:
-          (accessState.sessionKnowledgeAccessRevision[updateData.sessionId] ?? 0) + 1,
-      },
-    });
-  }
-
   // Handle task-log
   if (updateData.type === "task-log") {
     for (const listener of ctx.taskLogListeners) {

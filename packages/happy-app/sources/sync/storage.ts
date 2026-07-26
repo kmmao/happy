@@ -163,9 +163,6 @@ interface StorageState {
   sessionMessages: Record<string, SessionMessages>;
   sessionMessagesLRU: string[];
   sessionGitStatus: Record<string, GitStatus | null>;
-  sessionKnowledgeCount: Record<string, number>;
-  sessionKnowledgeAccessRevision: Record<string, number>;
-  sessionKnowledgeChangesRevision: Record<string, number>;
   sessionPromptSuggestions: Record<string, string | null>;
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   sessionNeedsContinue: Record<string, boolean>;
@@ -604,9 +601,6 @@ const storageStore = create<StorageState>()((set, get) => {
     sessionMessages: {},
     sessionMessagesLRU: [],
     sessionGitStatus: {},
-    sessionKnowledgeCount: {},
-    sessionKnowledgeAccessRevision: {},
-    sessionKnowledgeChangesRevision: {},
     sessionPromptSuggestions: {},
     setPromptSuggestion: (sessionId: string, suggestion: string | null) =>
       set((prev) => ({
@@ -3014,22 +3008,6 @@ export function useSessionTerminalStatus(
 ): TerminalLiveStatus | null {
   return storage(
     useShallow((state) => state.sessionTerminalStatus[sessionId] ?? null),
-  );
-}
-
-export function useSessionKnowledgeCount(sessionId: string): number {
-  return storage((state) => state.sessionKnowledgeCount[sessionId] ?? 0);
-}
-
-export function useSessionKnowledgeAccessRevision(sessionId: string): number {
-  return storage(
-    (state) => state.sessionKnowledgeAccessRevision[sessionId] ?? 0,
-  );
-}
-
-export function useSessionKnowledgeChangesRevision(sessionId: string): number {
-  return storage(
-    (state) => state.sessionKnowledgeChangesRevision[sessionId] ?? 0,
   );
 }
 

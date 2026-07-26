@@ -15,7 +15,6 @@ function NewSkillPage() {
     const router = useRouter();
     const { theme } = useUnistyles();
     const params = useLocalSearchParams<{
-        fromKnowledgeId?: string;
         fromTitle?: string;
         fromContent?: string;
         fromProjectId?: string;
@@ -39,7 +38,6 @@ function NewSkillPage() {
                     description: description.trim() || undefined,
                     content: content.trim(),
                     projectId: params.fromProjectId || undefined,
-                    sourceKnowledgeId: params.fromKnowledgeId || undefined,
                 });
             } catch (error) {
                 if (String(error).includes("skill-name-conflict")) {

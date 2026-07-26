@@ -34,7 +34,6 @@ function ProjectDetailScreen() {
 
     const initialTab = resolveProjectDetailInitialTab({
         requestedTab: tab,
-        knowledgeBaseEnabled: true,
     });
 
     return <ProjectDetailView project={project} initialTab={initialTab} />;

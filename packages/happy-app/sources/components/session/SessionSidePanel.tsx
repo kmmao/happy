@@ -8,11 +8,9 @@ import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { Typography } from "@/constants/Typography";
 import { InputContext } from "@/hooks/useInputContext";
 import {
-    useProjectForSession,
     useSessionChangesInfo,
     useSetting,
 } from "@/sync/storage";
-import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { t } from "@/text";
 import { OpenFilesTabBar } from "./OpenFilesTabBar";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
@@ -20,7 +18,6 @@ import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { useOpenFilesStack } from "./useOpenFilesStack";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelSessionTab } from "./SidePanelSessionTab";
-import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { SidePanelClaudeTab } from "./SidePanelClaudeTab";
 import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
@@ -51,13 +48,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
         const openFilesStack = useOpenFilesStack();
         const inputContext = React.useContext(InputContext);
-        const project = useProjectForSession(sessionId);
-        const { config: knowledgeConfig } = useProjectKnowledgeConfig(
-            project?.serverId ?? undefined,
-        );
-        // Default to true while config is loading so the tab does not flicker
-        // out; once the GET returns, the flag reflects the real project setting.
-        const knowledgeBaseEnabled = knowledgeConfig?.enabled ?? true;
 
         const handleFilePress = React.useCallback(
             (fullPath: string, repoPath?: string) => {
@@ -80,12 +70,12 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         const changesInfo = useSessionChangesInfo(sessionId);
 
         const tabDefinitions = React.useMemo(
-            () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),
-            [enablePreviewTab, knowledgeBaseEnabled],
+            () => getSessionPanelTabDefinitions({ enablePreviewTab }),
+            [enablePreviewTab],
         );
         const tabs = React.useMemo(
-            () => getSessionPanelTabs({ enablePreviewTab, knowledgeBaseEnabled }),
-            [enablePreviewTab, knowledgeBaseEnabled],
+            () => getSessionPanelTabs({ enablePreviewTab }),
+            [enablePreviewTab],
         );
         const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
 
@@ -97,7 +87,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
 
         // "+" in the overlay → minimize. Force-switch to the Files tab only
         // when the user is on a tab that doesn't surface a file browser
-        // (Session/Preview/Terminal/Claude/Knowledge). When they're already
+        // (Session/Preview/Terminal/Claude). When they're already
         // on Files or Changes, leave the tab alone — both expose a usable
         // file source and overriding their choice is more disruptive than
         // helpful (e.g. they were inspecting changed files and the next
@@ -228,9 +218,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     )}
                     {effectiveActiveTab === "preview" && (
                         <SidePanelPreviewTab sessionId={sessionId} />
-                    )}
-                    {effectiveActiveTab === "knowledge" && (
-                        <SidePanelSummaryTab sessionId={sessionId} />
                     )}
                     {effectiveActiveTab === "terminal" && (
                         <SidePanelTerminalTab sessionId={sessionId} />

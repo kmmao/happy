@@ -233,17 +233,6 @@ const HeaderRight = React.memo(
       return (
         <View style={styles.headerButtonRow}>
           <Pressable
-            onPress={() => router.push("/knowledge/search" as any)}
-            hitSlop={15}
-            style={styles.headerButton}
-          >
-            <Ionicons
-              name="search-outline"
-              size={22}
-              color={theme.colors.header.tint}
-            />
-          </Pressable>
-          <Pressable
             onPress={() => router.push("/project/add")}
             hitSlop={15}
             style={styles.headerButton}

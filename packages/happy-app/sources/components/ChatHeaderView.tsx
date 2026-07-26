@@ -30,8 +30,6 @@ interface ChatHeaderViewProps {
   isConnected?: boolean;
   flavor?: string | null;
   provider?: string | null;
-  knowledgeCount?: number;
-  onKnowledgePress?: () => void;
   onResumePress?: () => void;
   onForkPress?: () => void;
   devButtonState?: DevButtonState;
@@ -53,8 +51,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   isConnected = true,
   flavor,
   provider,
-  knowledgeCount,
-  onKnowledgePress,
   onResumePress,
   onForkPress,
   devButtonState,
@@ -148,19 +144,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 faint line. It now sits above AgentInput as a small label
                 (see SessionCwdBadge) so the header stays compact. */}
           </View>
-
-          {knowledgeCount != null && knowledgeCount > 0 && (
-            <Pressable
-              style={[styles.knowledgeBadge, { backgroundColor: theme.colors.primary + "20" }]}
-              onPress={onKnowledgePress}
-              hitSlop={6}
-            >
-              <Ionicons name="bulb-outline" size={11} color={theme.colors.primary} />
-              <Text style={[styles.knowledgeBadgeText, { color: theme.colors.primary }]}>
-                {knowledgeCount}
-              </Text>
-            </Pressable>
-          )}
 
           {devButtonState && devButtonState !== "hidden" && onDevPress && (
             <DevButton
@@ -317,18 +300,5 @@ const styles = StyleSheet.create((_, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     marginRight: Platform.select({ ios: -8, default: -8 }),
-  },
-  knowledgeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 4,
-    gap: 2,
-  },
-  knowledgeBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
   },
 }));

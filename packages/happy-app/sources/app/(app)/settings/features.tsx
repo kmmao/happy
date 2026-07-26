@@ -41,7 +41,6 @@ function FeaturesSettingsScreen() {
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
-  const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
   const [webNotifications, setWebNotifications] =
     useSettingMutable("webNotifications");
   const [webNotificationsPersistent, setWebNotificationsPersistent] =
@@ -152,26 +151,6 @@ function FeaturesSettingsScreen() {
               value={expResumeSession}
               onValueChange={setExpResumeSession}
             />
-          }
-          showChevron={false}
-        />
-      </ItemGroup>
-
-      {/* Knowledge Base — global kill-switch + Tab visibility. Per-project details live in the project Config tab. */}
-      <ItemGroup
-        title={t("settingsFeatures.knowledgeBase")}
-        footer={t("settingsFeatures.knowledgeBaseFooter")}
-      >
-        <Item
-          title={t("settingsFeatures.knowledgeBase")}
-          subtitle={
-            knowledgeBase
-              ? t("settingsFeatures.knowledgeBaseEnabled")
-              : t("settingsFeatures.knowledgeBaseDisabled")
-          }
-          icon={<Ionicons name="bulb-outline" size={29} color={theme.colors.accentOrange} />}
-          rightElement={
-            <Switch value={knowledgeBase} onValueChange={setKnowledgeBase} />
           }
           showChevron={false}
         />

@@ -7,7 +7,7 @@
  * No storage mutations are required for the broadcast contract (ephemerals
  * do not reconcile), but **the seam still mutates storage for the variants
  * that today land directly there** — `machine-activity`, `rpc-ready`,
- * `usage`, `knowledge-count`, `knowledge-access-update`. These mutations
+ * `usage`. These mutations
  * are not deferable into subscribers without losing the per-event delta
  * (same reasoning as ADR-0026 Decision A's "Hybrid"). The output is the
  * event stream subscribers consume; the side-effect cleanup happens
@@ -21,8 +21,6 @@
  *     - `rpc-ready` (machine) → storage.applyMachines
  *     - `rpc-ready` (session) → ctx.applySessions
  *     - `usage`               → ctx.applySessions
- *     - `knowledge-count`     → storage.setState
- *     - `knowledge-access-update` → storage.setState
  *     - `webhook-issue-linked` / `webhook-pr-merged` → fire-and-forget
  *       module call (issueHandleWebhookXxx). No event.
  *
@@ -127,34 +125,6 @@ export function ingestSyncEphemeral(
                 };
                 ctx.applySessions([updatedSession]);
             }
-            return events;
-        }
-
-        case "knowledge-count": {
-            const state = storage.getState();
-            storage.setState({
-                sessionKnowledgeCount: {
-                    ...state.sessionKnowledgeCount,
-                    [update.id]: update.count,
-                },
-                sessionKnowledgeChangesRevision: {
-                    ...state.sessionKnowledgeChangesRevision,
-                    [update.id]:
-                        (state.sessionKnowledgeChangesRevision[update.id] ?? 0) + 1,
-                },
-            });
-            return events;
-        }
-
-        case "knowledge-access-update": {
-            const state = storage.getState();
-            storage.setState({
-                sessionKnowledgeAccessRevision: {
-                    ...state.sessionKnowledgeAccessRevision,
-                    [update.sessionId]:
-                        (state.sessionKnowledgeAccessRevision[update.sessionId] ?? 0) + 1,
-                },
-            });
             return events;
         }
 

@@ -7,9 +7,7 @@ const { machineRPCMock, sessionRPCMock, requestMock, storageState } = vi.hoisted
     requestMock: vi.fn(),
     storageState: {
       sessions: {} as Record<string, { rpcReady: boolean } | undefined>,
-      settings: {
-        knowledgeBase: false,
-      },
+      settings: {},
     },
   }),
 );

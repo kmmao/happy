@@ -8,47 +8,31 @@ import {
 
 describe("sessionPanelTabs", () => {
     it("returns session first", () => {
-        const tabs = getSessionPanelTabs({
-            enablePreviewTab: true,
-            knowledgeBaseEnabled: true,
-        });
+        const tabs = getSessionPanelTabs({ enablePreviewTab: true });
 
         expect(tabs[0]).toBe("session");
     });
 
     it("includes preview only when enabled", () => {
         expect(
-            getSessionPanelTabs({ enablePreviewTab: true, knowledgeBaseEnabled: true }),
+            getSessionPanelTabs({ enablePreviewTab: true }),
         ).toContain("preview");
         expect(
-            getSessionPanelTabs({ enablePreviewTab: false, knowledgeBaseEnabled: true }),
+            getSessionPanelTabs({ enablePreviewTab: false }),
         ).not.toContain("preview");
-    });
-
-    it("includes knowledge only when the project knowledge base is enabled", () => {
-        expect(
-            getSessionPanelTabs({ enablePreviewTab: true, knowledgeBaseEnabled: true }),
-        ).toContain("knowledge");
-        expect(
-            getSessionPanelTabs({ enablePreviewTab: true, knowledgeBaseEnabled: false }),
-        ).not.toContain("knowledge");
     });
 
     it("no longer exposes 'code' as a top-level tab", () => {
         expect(
-            getSessionPanelTabs({ enablePreviewTab: true, knowledgeBaseEnabled: true }),
+            getSessionPanelTabs({ enablePreviewTab: true }),
         ).not.toContain("code" as never);
     });
 
     it("returns shared label keys for each tab", () => {
         expect(
-            getSessionPanelTabDefinitions({
-                enablePreviewTab: true,
-                knowledgeBaseEnabled: true,
-            }),
+            getSessionPanelTabDefinitions({ enablePreviewTab: true }),
         ).toEqual([
             { key: "session", labelKey: "sidePanel.session" },
-            { key: "knowledge", labelKey: "sidePanel.knowledge" },
             { key: "changes", labelKey: "sidePanel.changes" },
             { key: "files", labelKey: "sidePanel.files" },
             { key: "preview", labelKey: "sidePanel.preview" },
@@ -61,10 +45,7 @@ describe("sessionPanelTabs", () => {
         expect(
             resolveSessionPanelActiveTab(
                 "preview",
-                getSessionPanelTabs({
-                    enablePreviewTab: false,
-                    knowledgeBaseEnabled: true,
-                }),
+                getSessionPanelTabs({ enablePreviewTab: false }),
             ),
         ).toBe("session");
     });
@@ -72,24 +53,9 @@ describe("sessionPanelTabs", () => {
     it("keeps current tab when still available", () => {
         expect(
             resolveSessionPanelActiveTab(
-                "knowledge",
-                getSessionPanelTabs({
-                    enablePreviewTab: true,
-                    knowledgeBaseEnabled: true,
-                }),
+                "changes",
+                getSessionPanelTabs({ enablePreviewTab: true }),
             ),
-        ).toBe("knowledge");
-    });
-
-    it("falls back from knowledge to session when knowledge base is disabled", () => {
-        expect(
-            resolveSessionPanelActiveTab(
-                "knowledge",
-                getSessionPanelTabs({
-                    enablePreviewTab: false,
-                    knowledgeBaseEnabled: false,
-                }),
-            ),
-        ).toBe("session");
+        ).toBe("changes");
     });
 });

@@ -3,7 +3,6 @@ export type SessionPanelTab =
     | "files"
     | "changes"
     | "preview"
-    | "knowledge"
     | "terminal"
     | "claude";
 
@@ -12,7 +11,6 @@ export type SessionPanelTabTranslationKey =
     | "sidePanel.files"
     | "sidePanel.changes"
     | "sidePanel.preview"
-    | "sidePanel.knowledge"
     | "sidePanel.terminal"
     | "sidePanel.claude";
 
@@ -23,7 +21,6 @@ export interface SessionPanelTabDefinition {
 
 export interface SessionPanelTabOptions {
     enablePreviewTab: boolean;
-    knowledgeBaseEnabled: boolean;
 }
 
 export function getSessionPanelTabs(
@@ -35,12 +32,9 @@ export function getSessionPanelTabs(
 export function getSessionPanelTabDefinitions(
     options: SessionPanelTabOptions,
 ): SessionPanelTabDefinition[] {
-    const { enablePreviewTab, knowledgeBaseEnabled } = options;
+    const { enablePreviewTab } = options;
     return [
         { key: "session", labelKey: "sidePanel.session" },
-        ...(knowledgeBaseEnabled
-            ? ([{ key: "knowledge", labelKey: "sidePanel.knowledge" }] as const)
-            : []),
         { key: "changes", labelKey: "sidePanel.changes" },
         { key: "files", labelKey: "sidePanel.files" },
         ...(enablePreviewTab

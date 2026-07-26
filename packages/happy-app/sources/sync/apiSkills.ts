@@ -10,7 +10,6 @@ export interface ServerSkill {
     content: string;
     contentVersion: number;
     attachments: string[];
-    sourceKnowledgeId: string | null;
     archived: boolean;
     createdAt: number;
     updatedAt: number;
@@ -69,7 +68,6 @@ export async function createSkill(
         description?: string;
         content: string;
         projectId?: string;
-        sourceKnowledgeId?: string;
     },
 ): Promise<ServerSkill> {
     const API_ENDPOINT = getServerUrl();

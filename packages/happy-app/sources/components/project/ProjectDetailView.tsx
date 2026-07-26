@@ -9,7 +9,6 @@ import { ProjectGitTab } from "./ProjectGitTab";
 import { ProjectSupervisorTab } from "./ProjectSupervisorTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
-import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectActionTraceTab } from "./ProjectActionTraceTab";
@@ -38,7 +37,6 @@ const TAB_LABELS: Record<TabKey, () => string> = {
     health: () => t("projects.tabHealth"),
     events: () => t("projects.tabEvents"),
     research: () => t("projects.tabResearch"),
-    knowledge: () => t("projects.tabKnowledge"),
     traces: () => t("projects.tabTraces"),
     config: () => t("projects.tabConfig"),
 };
@@ -57,7 +55,6 @@ export const ProjectDetailView = React.memo(
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
         const [pendingEventsCount, setPendingEventsCount] = React.useState(0);
-        const knowledgeBaseEnabled = useSetting("knowledgeBase");
 
         React.useEffect(() => {
             if (!project.serverId) return;
@@ -90,17 +87,16 @@ export const ProjectDetailView = React.memo(
         React.useEffect(() => {
             const nextTab = resolveProjectDetailInitialTab({
                 requestedTab: initialTab,
-                knowledgeBaseEnabled,
             });
             setActiveTab(nextTab);
-        }, [initialTab, knowledgeBaseEnabled]);
+        }, [initialTab]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => {
-                const tabKeys = resolveProjectDetailTabs({ knowledgeBaseEnabled });
+                const tabKeys = resolveProjectDetailTabs();
                 return tabKeys.map((key) => ({ key, label: TAB_LABELS[key]() }));
             },
-            [knowledgeBaseEnabled],
+            [],
         );
         const useCompactTabs = !isTablet && (tabs.length >= 5 || viewportWidth < 420);
 
@@ -280,17 +276,6 @@ export const ProjectDetailView = React.memo(
                             onSyncStatusChange={setResearchSyncStatus}
                         />
                     </View>
-                    {knowledgeBaseEnabled && (
-                        <View
-                            style={
-                                activeTab === "knowledge"
-                                    ? styles.tabVisible
-                                    : styles.tabHidden
-                            }
-                        >
-                            <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
-                        </View>
-                    )}
                     <View
                         style={
                             activeTab === "traces"
