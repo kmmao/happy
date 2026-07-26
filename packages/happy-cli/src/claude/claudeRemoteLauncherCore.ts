@@ -105,7 +105,6 @@ import { createAppliedSettingsState } from "./utils/applyFlagSettings";
 import { createMcpServerState } from "./utils/mcpServerManager";
 import packageJson from "../../package.json";
 import { createContextDetailRpcHandler } from "./contextDetailRpc";
-import { buildWorldConfigPrefix } from "./remoteWorldHelpers";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 
 interface PermissionsField {
@@ -690,17 +689,6 @@ export async function claudeRemoteLauncher(
   // Track current PTY controller for runtime control (interrupt, stopTask).
   // Most methods are stub no-ops (TUI has no equivalent) — see ClaudePtyController.
   let currentQuery: ClaudePtyController | null = null;
-  let worldConfig: { narrative: string; laws: string; policy: string } | null = null;
-  let worldConfigInjected = false;
-
-  // Pre-fetch global world config (narrative/laws) for injection (non-blocking).
-  session.client.fetchWorldConfig().then((cfg) => {
-    if (cfg && (cfg.narrative || cfg.laws)) {
-      worldConfig = cfg;
-      logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
-    }
-  }).catch(() => {});
-
   // Project CONTEXT.md: load once per session for injection into the first message.
   // File lives at <workingDir>/.happy/CONTEXT.md — created by the user or via the App.
   let contextMdContent: string | null = null;
@@ -2616,8 +2604,6 @@ export async function claudeRemoteLauncher(
         logger.debug(
           `[remote]: New session detected (previous: ${previousSessionId}, current: ${session.sessionId})`,
         );
-        // Reset injection state for the new session (/clear creates a new session)
-        worldConfigInjected = false;
         // Reset CONTEXT.md injection and re-read for the new session
         contextMdInjected = false;
         contextMdContent = null;
@@ -3088,15 +3074,6 @@ export async function claudeRemoteLauncher(
               // claudeRemote.ts buildSystemReminderPrefix(). Do NOT inject here
               // — it causes the same content to appear twice in each message.
 
-              // World config injection: inject narrative/laws once per session
-              const worldConfigPrefix = !worldConfigInjected && worldConfig
-                ? buildWorldConfigPrefix(worldConfig)
-                : "";
-              if (!worldConfigInjected && worldConfig && worldConfigPrefix) {
-                worldConfigInjected = true;
-                logger.debug("[world-config] Injected world narrative/laws into first message");
-              }
-
               // Project CONTEXT.md: inject once per session before all other prefixes
               const contextMdPrefix = !contextMdInjected && contextMdContent
                 ? `<project-context>\n${contextMdContent}\n</project-context>\n\n`
@@ -3108,7 +3085,7 @@ export async function claudeRemoteLauncher(
 
               nextPromptSource = msg.source;
               return {
-                message: contextMdPrefix + worldConfigPrefix + msg.message,
+                message: contextMdPrefix + msg.message,
                 mode: msg.mode,
               };
             }
@@ -3245,8 +3222,8 @@ export async function claudeRemoteLauncher(
           // payload, including any once-per-session prefixes the launcher
           // prepended) as the in-flight prompt. If a tier-1 Esc recovery has
           // to clear the composer before this turn ever ran, the watchdog
-          // re-delivers this verbatim — preserving CONTEXT.md/world-config
-          // that raw msg.message would lose (their *Injected flags
+          // re-delivers this verbatim — preserving CONTEXT.md that raw
+          // msg.message would lose (its *Injected flag
           // suppress re-injection). `mode` is the launcher's current turn mode,
           // which matches currentColdHash at strand time so the re-pushed
           // message is accepted by the still-alive mid-turn drain.

@@ -209,10 +209,6 @@ export interface ClientToServerEvents {
       suggestedFix?: string;
     }[];
   }) => void;
-  "fetch-world-config": (
-    data: { sid: string },
-    callback: (response: { narrative: string; laws: string; policy: string } | null) => void,
-  ) => void;
   "task-log": (data: {
     sid: string;
     taskId: string;
