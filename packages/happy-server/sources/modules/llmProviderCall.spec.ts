@@ -102,6 +102,27 @@ describe("llmProviderCall", () => {
 
             await expect(llmProviderCall(creds, "USER", OPTIONS)).resolves.toBeNull();
         });
+
+        it("skips a leading thinking block and returns the first text block", async () => {
+            // Thinking-capable models (claude-opus-5) intermittently lead with a
+            // `thinking` block that has no `text` field. Reading content[0].text
+            // returned undefined and surfaced as "LLM returned empty response"
+            // for a random subset of requests.
+            mockFetchOnce({
+                content: [
+                    { type: "thinking", thinking: "deliberating", signature: "sig" },
+                    { type: "text", text: '["a","b"]' },
+                ],
+            });
+
+            await expect(llmProviderCall(creds, "USER", OPTIONS)).resolves.toBe('["a","b"]');
+        });
+
+        it("returns null when every block is non-text", async () => {
+            mockFetchOnce({ content: [{ type: "thinking", thinking: "only thought" }] });
+
+            await expect(llmProviderCall(creds, "USER", OPTIONS)).resolves.toBeNull();
+        });
     });
 
     describe("openai", () => {

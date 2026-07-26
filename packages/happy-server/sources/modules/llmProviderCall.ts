@@ -69,8 +69,15 @@ async function callAnthropic(
         throw new Error(`Anthropic API error ${response.status}: ${errBody.slice(0, 300)}`);
     }
 
-    const data = (await response.json()) as { content: { type: string; text: string }[] };
-    return data.content[0]?.text ?? null;
+    // Take the first TEXT block, not the first block. Thinking-capable models
+    // (claude-opus-5 and friends) intermittently lead with a `thinking` block,
+    // which carries no `text` field — blindly reading content[0].text then
+    // yields undefined and the caller reports "LLM returned empty response".
+    // The failure is intermittent because whether the model emits a thinking
+    // block varies per request, which is what kept this hidden.
+    const data = (await response.json()) as { content: { type: string; text?: string }[] };
+    const textBlock = data.content?.find((block) => block.type === "text");
+    return textBlock?.text ?? null;
 }
 
 async function callOpenAI(
