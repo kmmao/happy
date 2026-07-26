@@ -165,6 +165,7 @@ model Session {
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
     @@index([projectId])
+    @@index([parentSessionId])
 }
 
 model SessionMessage {
