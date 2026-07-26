@@ -2,7 +2,7 @@
 
 Two layers:
 
-- **Agent-facing canonical source**: `CONTEXT.md` (glossary) + `docs/adr/` (21 ADRs)
+- **Agent-facing canonical source**: `CONTEXT.md` (glossary) + `docs/adr/` (76 ADRs)
 - **Human-facing detail**: this folder + sub-folders below
 
 ## Architecture & Protocol
@@ -41,7 +41,7 @@ Two layers:
 - UPSTREAM_TRACKING.md: Upstream PR tracking (slopus/happy fork).
 
 ## Decisions (ADR)
-21 ADRs under `docs/adr/`. Start with **ADR-0001** (E2E zero-knowledge — root security model) and **ADR-0014** (custom session protocol). See `docs/agents/domain.md` for how agents should consume ADRs.
+76 ADRs under `docs/adr/`. Start with **ADR-0001** (E2E zero-knowledge — root security model) and **ADR-0014** (custom session protocol). See `docs/agents/domain.md` for how agents should consume ADRs.
 
 ## Active Plans (in flight)
 - plans/cli-v3-messages-api.md: CLI migration to v3 HTTP messages (not shipped).
