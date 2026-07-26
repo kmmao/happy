@@ -84,7 +84,7 @@ System: `Mobile/Web ←→ Server (Fastify+Socket.IO) ←→ CLI Daemon ←→ C
 - File naming: match function name to file name (e.g., `sessionCreate.ts` exports `sessionCreate`)
 - Use `inTx` for database transactions, `afterTx` for post-commit events
 - Never run non-transactional operations (file uploads) inside transactions
-- Never create Prisma migrations manually — only `yarn generate` when schema changes
+- Never hand-write migration DDL from scratch — always derive it from `prisma migrate diff`. Note `yarn generate` only regenerates the client (it produces NO migration), and `yarn migrate` (migrate dev) cannot run in this repo. See the "Database migrations" section in `packages/happy-server/CLAUDE.md` for the working procedure
 - Use `privacyKit.decodeBase64`/`encodeBase64` instead of Buffer
 - All API operations must be idempotent
 - Prefix action files with entity type then action (e.g., `friendAdd.ts`)
