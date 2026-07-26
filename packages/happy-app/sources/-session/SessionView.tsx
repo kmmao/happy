@@ -1282,10 +1282,14 @@ function SessionViewInner({
     [latestOptions.items],
   );
   React.useEffect(() => {
+    // Passive LLM scoring used to run here whenever a turn offered 2+ options,
+    // regardless of whether AutoOptionSend was armed — it existed only to paint
+    // an AI-scored badge in OptionsPopover, and cost one LLM call per option set
+    // (30s cooldown). Scoring that actually decides an auto-send still runs, from
+    // autoOptionSendService's armed path. Generation stays here: it only fires
+    // when a turn produced NO options, which is a different trade.
     const run = () => {
-      if (latestOptions.items.length >= 2) {
-        autoOptionSendService.triggerScoringIfNeeded(sessionId, latestOptions.items, latestOptionsHash);
-      } else if (latestOptions.items.length === 0) {
+      if (latestOptions.items.length === 0) {
         autoOptionSendService.triggerGenerationIfNeeded(sessionId);
       }
     };
