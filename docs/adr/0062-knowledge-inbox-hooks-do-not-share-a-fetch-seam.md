@@ -1,12 +1,22 @@
 ---
-status: accepted
+status: superseded
 amended-by: 0068
+superseded-on: 2026-07-26
 ---
 
-> **Amended by ADR-0068**: the latest-request-wins *guard* was later extracted
-> into `useLatestRequest` once a fourth adapter appeared (the trigger this ADR
-> named). The core ruling below — do NOT merge the data hooks themselves — still
-> stands; only the "one adapter, don't extract the guard" premise is superseded.
+> **Superseded — two of the three subject hooks no longer exist.** The knowledge
+> base subsystem was removed on 2026-07-26 (see
+> `docs/plans/knowledge-removal-plan.md`), deleting `useSessionKnowledge` and
+> `useProjectKnowledge`. Only `useInboxData` survives, so the ruling below — "do
+> not unify these three hooks" — has nothing left to rule on. Kept as a record of
+> the reasoning: the general principle it defends (surface similarity between
+> fetch-and-hold-list hooks is not a shared invariant) still applies to any future
+> proposal to unify data hooks.
+>
+> **Amended by ADR-0068** (itself now superseded): the latest-request-wins *guard*
+> was later extracted into `useLatestRequest` once a fourth adapter appeared (the
+> trigger this ADR named). That guard has since lost all four adapters and was
+> deleted.
 
 # The knowledge / inbox data hooks deliberately do NOT share a fetch/dedup seam
 

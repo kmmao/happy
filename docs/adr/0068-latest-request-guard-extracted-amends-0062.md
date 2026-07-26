@@ -1,7 +1,20 @@
 ---
-status: accepted
+status: superseded
 amends: 0062
+superseded-on: 2026-07-26
 ---
+
+> **Superseded — all four adapters are gone.** The knowledge base subsystem was
+> removed on 2026-07-26 (see `docs/plans/knowledge-removal-plan.md`), taking
+> `useSessionKnowledge`, `useSessionKnowledgeAccesses` and `useKnowledgeSearch`
+> with it. The fourth adapter, `useProjectScopedAsyncData`, was itself only
+> consumed by knowledge-base tabs and became unreachable; it and
+> `useLatestRequest.ts` were deleted in the same sweep. The guard this ADR
+> extracted now has ZERO adapters, so the extraction it argued for no longer
+> describes any code. Kept as a record of the reasoning — if a future hook needs
+> a latest-request-wins guard, `createRequestGuard()` is recoverable from git
+> history, but per the project's "one adapter is a hypothetical seam" rule it
+> should be inlined until a second adapter appears.
 
 # The latest-request-wins guard is extracted (amends ADR-0062)
 
