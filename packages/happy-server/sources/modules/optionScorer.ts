@@ -1,19 +1,23 @@
 import { log } from "@/utils/log";
 import { createHash } from "crypto";
+import {
+    llmProviderCall,
+    resolveLlmModel,
+    type LlmCallOptions,
+    type ScoringCredentials,
+    type ScoringProvider,
+} from "./llmProviderCall";
+
+// Re-exported so the existing consumers (scoringCredentials, optionGenerator,
+// the four LLM routes) keep importing these from here. The definitions live in
+// llmProviderCall, which owns the provider wire contract.
+export { detectProviderFromEnv } from "./llmProviderCall";
+export type { ScoringCredentials, ScoringProvider };
 
 const SYSTEM_PROMPT =
     "You are an option relevance scorer. Given conversation context and candidate follow-up options, " +
     "rate each option's relevance as a next step from 0-100. Consider: task continuity, logical sequencing, " +
     "specificity to current work. Output ONLY a JSON array of integers, one score per option, in the same order as the input.";
-
-export type ScoringProvider = "anthropic" | "openai" | "ollama";
-
-export interface ScoringCredentials {
-    provider: ScoringProvider;
-    apiKey: string;
-    baseUrl?: string;
-    model?: string;
-}
 
 const DEFAULT_SCORING_MODELS: Record<ScoringProvider, string> = {
     anthropic: "claude-sonnet-4-6",
@@ -21,123 +25,13 @@ const DEFAULT_SCORING_MODELS: Record<ScoringProvider, string> = {
     ollama: "llama3",
 };
 
-export function detectProviderFromEnv(env: Record<string, string>): ScoringCredentials | null {
-    if (env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY) {
-        return {
-            provider: "anthropic",
-            apiKey: env.ANTHROPIC_AUTH_TOKEN ?? env.ANTHROPIC_API_KEY,
-            baseUrl: env.ANTHROPIC_BASE_URL,
-        };
-    }
-    if (env.OPENAI_API_KEY) {
-        return {
-            provider: "openai",
-            apiKey: env.OPENAI_API_KEY,
-            baseUrl: env.OPENAI_BASE_URL,
-        };
-    }
-    if (env.OLLAMA_URL) {
-        return {
-            provider: "ollama",
-            apiKey: "",
-            baseUrl: env.OLLAMA_URL,
-        };
-    }
-    return null;
-}
-
-async function callAnthropic(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
-    const baseUrl = (creds.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "");
-    const model = creds.model || DEFAULT_SCORING_MODELS.anthropic;
-
-    const response = await fetch(`${baseUrl}/v1/messages`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-api-key": creds.apiKey,
-            "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-            model,
-            max_tokens: 64,
-            system: SYSTEM_PROMPT,
-            messages: [{ role: "user", content: userMessage }],
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-        const errBody = await response.text();
-        throw new Error(`Anthropic API error ${response.status}: ${errBody.slice(0, 300)}`);
-    }
-
-    const data = (await response.json()) as { content: { type: string; text: string }[] };
-    return data.content[0]?.text ?? null;
-}
-
-async function callOpenAI(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
-    const baseUrl = (creds.baseUrl || "https://api.openai.com").replace(/\/+$/, "");
-    const model = creds.model || DEFAULT_SCORING_MODELS.openai;
-
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${creds.apiKey}`,
-        },
-        body: JSON.stringify({
-            model,
-            max_tokens: 64,
-            messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: userMessage },
-            ],
-            temperature: 0.1,
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-        const errBody = await response.text();
-        throw new Error(`OpenAI API error ${response.status}: ${errBody.slice(0, 300)}`);
-    }
-
-    const data = (await response.json()) as { choices: { message: { content: string } }[] };
-    return data.choices[0]?.message?.content ?? null;
-}
-
-async function callOllama(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
-    const url = creds.baseUrl || "http://localhost:11434";
-    const model = creds.model || DEFAULT_SCORING_MODELS.ollama;
-
-    const response = await fetch(`${url}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model,
-            messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: userMessage },
-            ],
-            stream: false,
-            options: { temperature: 0.1 },
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-        const errBody = await response.text();
-        throw new Error(`Ollama API error ${response.status}: ${errBody.slice(0, 300)}`);
-    }
-
-    const data = (await response.json()) as { message: { content: string } };
-    return data.message?.content ?? null;
-}
-
-const CALL_FNS: Record<ScoringProvider, (creds: ScoringCredentials, msg: string) => Promise<string | null>> = {
-    anthropic: callAnthropic,
-    openai: callOpenAI,
-    ollama: callOllama,
+/** Scoring wants terse, near-deterministic output on a short leash. */
+const SCORING_CALL_OPTIONS: LlmCallOptions = {
+    systemPrompt: SYSTEM_PROMPT,
+    defaultModels: DEFAULT_SCORING_MODELS,
+    maxTokens: 64,
+    timeoutMs: 15000,
+    temperature: 0.1,
 };
 
 interface CacheEntry {
@@ -221,8 +115,7 @@ export async function scoreOptionsWithLLM(
 
     const userMessage = buildUserMessage(options, contextSummary, sessionTitle);
 
-    const callFn = CALL_FNS[credentials.provider];
-    const raw = await callFn(credentials, userMessage);
+    const raw = await llmProviderCall(credentials, userMessage, SCORING_CALL_OPTIONS);
     if (!raw) {
         throw new Error("LLM returned empty response");
     }
@@ -241,7 +134,7 @@ export async function scoreOptionsWithLLM(
         }
     }
 
-    const modelUsed = credentials.model || DEFAULT_SCORING_MODELS[credentials.provider];
+    const modelUsed = resolveLlmModel(credentials, DEFAULT_SCORING_MODELS);
     cache.set(key, { scores, expiresAt: Date.now() + CACHE_TTL_MS, modelUsed, provider: credentials.provider });
 
     return { scores, cached: false, modelUsed, provider: credentials.provider };
