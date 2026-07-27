@@ -56,10 +56,6 @@ vi.mock("./autoOptionFeedback", () => ({
     recordAutoOptionFeedback: vi.fn(),
 }));
 
-vi.mock("./apiOptionScore", () => ({
-    scoreOptionsRemote: vi.fn(),
-}));
-
 vi.mock("./sync", () => ({
     sync: {
         getCredentials: () => credentials,
@@ -215,35 +211,27 @@ describe("AutoOptionSendService timer", () => {
         const { createAutoOptionSendServiceForTesting } = await import("./autoOptionSendService");
         const service = createAutoOptionSendServiceForTesting();
         const abortSpy = vi.spyOn(AbortController.prototype, "abort");
-        const semanticController = new AbortController();
-        const passiveController = new AbortController();
         const generationController = new AbortController();
         const autoGenerationController = new AbortController();
         // Per-session state now lives in one record per session (see SessionAosRecord);
         // disposeSession drops the whole record in one delete.
         const internals = service as unknown as {
             sessions: Map<string, {
-                semanticController?: AbortController;
-                passiveScoringController?: AbortController;
                 generationController?: AbortController;
                 autoGenerationController?: AbortController;
             }>;
         };
 
         internals.sessions.set("session-1", {
-            semanticController,
-            passiveScoringController: passiveController,
             generationController,
             autoGenerationController,
         });
 
         service.disposeSession("session-1");
 
-        expect(semanticController.signal.aborted).toBe(true);
-        expect(passiveController.signal.aborted).toBe(true);
         expect(generationController.signal.aborted).toBe(true);
         expect(autoGenerationController.signal.aborted).toBe(true);
-        expect(abortSpy).toHaveBeenCalledTimes(4);
+        expect(abortSpy).toHaveBeenCalledTimes(2);
         expect(internals.sessions.has("session-1")).toBe(false);
     });
 });

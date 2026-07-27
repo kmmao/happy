@@ -1314,8 +1314,7 @@ function SessionViewInner({
   const rankedLatestOptions = React.useMemo(
     () => {
       if (latestOptions.items.length < 2) return null;
-      const semanticScores = autoOptionSendService.getSemanticScores(latestOptionsHash);
-      return rankAndSelectOptions(latestOptions.items, optionStatsResolver, sessionContextKeywords, semanticScores ?? undefined);
+      return rankAndSelectOptions(latestOptions.items, optionStatsResolver, sessionContextKeywords);
     },
     [latestOptions.items, optionStatsResolver, autoOptionFeedbackRevision, sessionContextKeywords, latestOptionsHash, autoOptionSend],
   );
@@ -1325,11 +1324,6 @@ function SessionViewInner({
       ? latestOptions.items[recommendedOptionIndex] ?? null
       : null;
   const optionScores = rankedLatestOptions?.allScores ?? null;
-  const llmScoredIndices = React.useMemo(() => {
-    const semantic = autoOptionSendService.getSemanticScores(latestOptionsHash);
-    if (!semantic) return null;
-    return new Set(semantic.keys());
-  }, [latestOptionsHash, autoOptionSend]);
   const hasPendingAskUserQuestionVisible = React.useMemo(
     () => hasPendingAskUserQuestion(messages),
     [messages],
@@ -2355,7 +2349,6 @@ function SessionViewInner({
           recommendedIndex={recommendedOptionIndex}
           recommendedRemainingMs={autoOptionSendControl.remainingMs}
           scores={optionScores}
-          llmScoredIndices={llmScoredIndices}
         />
         <OptionsPopover
           visible={showBookmarksPopover && bookmarks.length > 0}

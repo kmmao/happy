@@ -84,8 +84,6 @@ export function useSessionAutoOptionActions(sessionId: string) {
             ) => autoOptionSendService.recordManualSend(sessionId, optionText, optionsHash, edited, source),
             recordDismiss: (optionText: string | null, optionsHash: string | null) =>
                 autoOptionSendService.recordDismiss(sessionId, optionText, optionsHash),
-            triggerScoringIfNeeded: (items: string[], optionsHash: string) =>
-                autoOptionSendService.triggerScoringIfNeeded(sessionId, items, optionsHash),
             triggerGenerationIfNeeded: () =>
                 autoOptionSendService.triggerGenerationIfNeeded(sessionId),
             updateUIContext: (
