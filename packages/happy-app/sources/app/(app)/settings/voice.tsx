@@ -110,11 +110,84 @@ function formatResetTime(unix: number): string {
     return `${minutes}m`;
 }
 
+/** Show that an env default exists without printing the whole secret. */
+function maskSecret(secret: string): string {
+    return secret.length <= 6 ? "••••••" : `${secret.slice(0, 6)}••••••`;
+}
+
+function GatewayField(props: {
+    label: string;
+    placeholder: string;
+    value: string;
+    onChangeText: (text: string) => void;
+    secure?: boolean;
+}) {
+    const { theme } = useUnistyles();
+    return (
+        <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{props.label}</Text>
+            <TextInput
+                style={{
+                    fontSize: 16,
+                    color: theme.colors.input.text,
+                    borderWidth: 1,
+                    borderColor: theme.colors.divider,
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                }}
+                placeholder={props.placeholder}
+                placeholderTextColor={theme.colors.input.placeholder}
+                value={props.value}
+                onChangeText={props.onChangeText}
+                secureTextEntry={props.secure}
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+        </View>
+    );
+}
+
 function VoiceSettingsScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const [voiceAssistantLanguage] = useSettingMutable("voiceAssistantLanguage");
     const [savedApiKey, setSavedApiKey] = useSettingMutable("elevenLabsApiKey");
+
+    // Voice provider selection
+    const [voiceProvider, setVoiceProvider] = useSettingMutable("voiceProvider");
+    const activeProvider = voiceProvider ?? "elevenlabs";
+
+    // Realtime gateway configuration
+    const [gatewayUrl, setGatewayUrl] = useSettingMutable("realtimeGatewayUrl");
+    const [gatewayKey, setGatewayKey] = useSettingMutable("realtimeGatewayApiKey");
+    const [realtimeVoice, setRealtimeVoice] = useSettingMutable("realtimeVoice");
+
+    // Drafts so every keystroke does not trigger a settings sync
+    const [gatewayDraft, setGatewayDraft] = useState({
+        url: gatewayUrl ?? "",
+        key: gatewayKey ?? "",
+        voice: realtimeVoice ?? "",
+    });
+
+    useEffect(() => {
+        setGatewayDraft({
+            url: gatewayUrl ?? "",
+            key: gatewayKey ?? "",
+            voice: realtimeVoice ?? "",
+        });
+    }, [gatewayUrl, gatewayKey, realtimeVoice]);
+
+    const gatewayDirty =
+        gatewayDraft.url !== (gatewayUrl ?? "") ||
+        gatewayDraft.key !== (gatewayKey ?? "") ||
+        gatewayDraft.voice !== (realtimeVoice ?? "");
+
+    const handleGatewaySave = useCallback(() => {
+        setGatewayUrl(gatewayDraft.url.trim() || null);
+        setGatewayKey(gatewayDraft.key.trim() || null);
+        setRealtimeVoice(gatewayDraft.voice.trim() || null);
+    }, [gatewayDraft, setGatewayUrl, setGatewayKey, setRealtimeVoice]);
 
     // ElevenLabs draft state
     const [draftKey, setDraftKey] = useState(savedApiKey ?? "");
@@ -188,7 +261,89 @@ function VoiceSettingsScreen() {
                 />
             </ItemGroup>
 
+            {/* Voice provider */}
+            <ItemGroup
+                title={t("settingsVoice.providerTitle")}
+                footer={t("settingsVoice.providerDescription")}
+            >
+                <Item
+                    title={t("settingsVoice.providerElevenLabs")}
+                    subtitle={t("settingsVoice.providerElevenLabsSubtitle")}
+                    icon={<Ionicons name="mic-outline" size={29} color={theme.colors.accentBlue} />}
+                    selected={activeProvider === "elevenlabs"}
+                    onPress={() => setVoiceProvider("elevenlabs")}
+                />
+                <Item
+                    title={t("settingsVoice.providerRealtime")}
+                    subtitle={t("settingsVoice.providerRealtimeSubtitle")}
+                    icon={<Ionicons name="flash-outline" size={29} color={theme.colors.accentBlue} />}
+                    selected={activeProvider === "openai-realtime"}
+                    onPress={() => setVoiceProvider("openai-realtime")}
+                />
+            </ItemGroup>
+
+            {/* Realtime gateway configuration */}
+            {activeProvider === "openai-realtime" && (
+                <ItemGroup
+                    title={t("settingsVoice.realtimeGatewayConfig")}
+                    footer={t("settingsVoice.realtimeGatewayDescription")}
+                >
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+                        <GatewayField
+                            label={t("settingsVoice.realtimeGatewayUrl")}
+                            placeholder={
+                                config.realtimeGatewayUrl ||
+                                t("settingsVoice.realtimeGatewayUrlPlaceholder")
+                            }
+                            value={gatewayDraft.url}
+                            onChangeText={(url) => setGatewayDraft((draft) => ({ ...draft, url }))}
+                        />
+                        <GatewayField
+                            label={t("settingsVoice.realtimeGatewayApiKey")}
+                            placeholder={
+                                config.realtimeGatewayApiKey
+                                    ? maskSecret(config.realtimeGatewayApiKey)
+                                    : t("settingsVoice.realtimeGatewayApiKeyPlaceholder")
+                            }
+                            value={gatewayDraft.key}
+                            onChangeText={(key) => setGatewayDraft((draft) => ({ ...draft, key }))}
+                            secure
+                        />
+                        <GatewayField
+                            label={t("settingsVoice.realtimeVoice")}
+                            placeholder={
+                                config.realtimeVoice || t("settingsVoice.realtimeVoicePlaceholder")
+                            }
+                            value={gatewayDraft.voice}
+                            onChangeText={(voice) => setGatewayDraft((draft) => ({ ...draft, voice }))}
+                        />
+
+                        <Pressable
+                            onPress={handleGatewaySave}
+                            disabled={!gatewayDirty}
+                            style={({ pressed }) => ({
+                                backgroundColor: !gatewayDirty
+                                    ? theme.colors.divider
+                                    : pressed ? "#0066CC" : "#007AFF",
+                                borderRadius: 8,
+                                paddingVertical: 10,
+                                alignItems: "center",
+                                flexDirection: "row",
+                                justifyContent: "center",
+                                gap: 6,
+                            })}
+                        >
+                            <Ionicons name="save-outline" size={18} color="#fff" />
+                            <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
+                                {t("common.save")}
+                            </Text>
+                        </Pressable>
+                    </View>
+                </ItemGroup>
+            )}
+
             {/* ElevenLabs API Key */}
+            {activeProvider === "elevenlabs" && (
             <ItemGroup
                 title={t("settingsVoice.elevenLabsConfig")}
                 footer={t("settingsVoice.elevenLabsApiKeyDescription")}
@@ -338,6 +493,7 @@ function VoiceSettingsScreen() {
                     </View>
                 )}
             </ItemGroup>
+            )}
         </ItemList>
     );
 }

@@ -154,6 +154,26 @@ export const SettingsSchema = z.object({
     .regex(/^[a-zA-Z0-9]{10,30}$/)
     .nullable()
     .describe("ElevenLabs voice ID (null for default 'Rachel')"),
+  voiceProvider: z
+    .enum(["elevenlabs", "openai-realtime"])
+    .nullable()
+    .describe(
+      "Voice assistant backend (null defaults to 'elevenlabs')",
+    ),
+  realtimeGatewayUrl: z
+    .string()
+    .nullable()
+    .describe(
+      "Base URL of an OpenAI Realtime compatible gateway, e.g. a sub2api instance exposing POST /v1/live",
+    ),
+  realtimeGatewayApiKey: z
+    .string()
+    .nullable()
+    .describe("API key sent as Bearer token to the realtime gateway"),
+  realtimeVoice: z
+    .string()
+    .nullable()
+    .describe("Realtime output voice name (null for the gateway default)"),
   preferredLanguage: z
     .string()
     .nullable()
@@ -444,6 +464,10 @@ export const settingsDefaults: Settings = {
   voiceInputLanguage: null,
   elevenLabsApiKey: null,
   elevenLabsVoiceId: null,
+  voiceProvider: null,
+  realtimeGatewayUrl: null,
+  realtimeGatewayApiKey: null,
+  realtimeVoice: null,
   preferredLanguage: null,
   recentMachinePaths: [],
   recentRemoteRepos: [],

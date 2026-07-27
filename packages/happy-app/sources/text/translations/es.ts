@@ -714,6 +714,7 @@ export const es: TranslationStructure = {
     voiceSessionFailed: "Falló al iniciar sesión de voz",
     voiceServiceUnavailable:
       "El servicio de voz no está disponible temporalmente",
+    voiceRealtimeFallback: "Pasarela Realtime no disponible: esta conversación cambió a ElevenLabs",
     oauthInitializationFailed: "Falló al inicializar el flujo OAuth",
     tokenStorageFailed: "Falló al almacenar los tokens de autenticación",
     oauthStateMismatch: "Falló la validación de seguridad. Inténtalo de nuevo",
@@ -1761,6 +1762,20 @@ export const es: TranslationStructure = {
     elevenLabsSetupChecking: "Configurando...",
     elevenLabsSetupReady: "Listo",
     elevenLabsSetupSuccess: "Asistente de voz configurado y listo para usar",
+    providerTitle: "Proveedor de voz",
+    providerDescription: "Elige qué backend impulsa las conversaciones por voz.",
+    providerElevenLabs: "ElevenLabs",
+    providerElevenLabsSubtitle: "Agente gestionado, disponible en todas las plataformas",
+    providerRealtime: "Pasarela Realtime",
+    providerRealtimeSubtitle: "Endpoint compatible con OpenAI Realtime",
+    realtimeGatewayConfig: "Pasarela Realtime",
+    realtimeGatewayDescription: "URL base de una pasarela compatible con OpenAI Realtime, como una instancia de sub2api. La API Key se envía como Bearer token.",
+    realtimeGatewayUrl: "URL base",
+    realtimeGatewayUrlPlaceholder: "https://gateway.example.com",
+    realtimeGatewayApiKey: "API Key",
+    realtimeGatewayApiKeyPlaceholder: "sk-...",
+    realtimeVoice: "Voz",
+    realtimeVoicePlaceholder: "Déjalo vacío para usar el valor por defecto",
   },
 
   voiceStatusBar: {

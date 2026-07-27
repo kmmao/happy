@@ -8,6 +8,9 @@
         "./sources/*"
       ],
       "hello-world": [ "../../hello-world" ],
+      "event-target-shim/index": [
+        "../../node_modules/event-target-shim/index.d.ts"
+      ],
       "@kmmao/happy-wire": [
         "../happy-wire/src/index.ts"
       ]

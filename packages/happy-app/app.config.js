@@ -37,6 +37,9 @@ export default {
         usesNonExemptEncryption: false,
       },
       infoPlist: {
+        // Keeps the AVAudioSession alive while backgrounded so an in-progress
+        // voice conversation is not cut off when the user leaves the app.
+        UIBackgroundModes: ["audio"],
         NSMicrophoneUsageDescription:
           "Allow $(PRODUCT_NAME) to access your microphone for voice conversations with AI.",
         NSLocalNetworkUsageDescription:
@@ -188,6 +191,9 @@ export default {
         revenueCatGoogleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE,
         revenueCatStripeKey: process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE,
         elevenLabsAgentId: process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID,
+        realtimeGatewayUrl: process.env.EXPO_PUBLIC_REALTIME_GATEWAY_URL,
+        realtimeGatewayApiKey: process.env.EXPO_PUBLIC_REALTIME_GATEWAY_API_KEY,
+        realtimeVoice: process.env.EXPO_PUBLIC_REALTIME_VOICE,
       },
     },
     // 使用当前登录账号时注释 owner；若在 bulkacorp 团队内且有权限可改回 "bulkacorp"

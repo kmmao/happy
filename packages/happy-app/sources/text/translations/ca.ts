@@ -712,6 +712,7 @@ export const ca: TranslationStructure = {
     sessionNotFound: "Sessió no trobada",
     voiceSessionFailed: "Ha fallat l'inici de la sessió de veu",
     voiceServiceUnavailable: "El servei de veu no està disponible temporalment",
+    voiceRealtimeFallback: "Passarel·la Realtime no disponible: aquesta conversa ha canviat a ElevenLabs",
     oauthInitializationFailed: "Ha fallat la inicialització del flux OAuth",
     tokenStorageFailed: "Ha fallat l'emmagatzematge dels tokens d'autenticació",
     oauthStateMismatch:
@@ -1761,6 +1762,20 @@ export const ca: TranslationStructure = {
     elevenLabsSetupChecking: "Configurant...",
     elevenLabsSetupReady: "Preparat",
     elevenLabsSetupSuccess: "Assistent de veu configurat i preparat per usar",
+    providerTitle: "Proveïdor de veu",
+    providerDescription: "Tria quin backend impulsa les converses per veu.",
+    providerElevenLabs: "ElevenLabs",
+    providerElevenLabsSubtitle: "Agent gestionat, disponible a totes les plataformes",
+    providerRealtime: "Passarel·la Realtime",
+    providerRealtimeSubtitle: "Endpoint compatible amb OpenAI Realtime",
+    realtimeGatewayConfig: "Passarel·la Realtime",
+    realtimeGatewayDescription: "URL base d'una passarel·la compatible amb OpenAI Realtime, com ara una instància de sub2api. L'API Key s'envia com a Bearer token.",
+    realtimeGatewayUrl: "URL base",
+    realtimeGatewayUrlPlaceholder: "https://gateway.example.com",
+    realtimeGatewayApiKey: "API Key",
+    realtimeGatewayApiKeyPlaceholder: "sk-...",
+    realtimeVoice: "Veu",
+    realtimeVoicePlaceholder: "Deixa-ho buit per usar el valor per defecte",
   },
 
   voiceStatusBar: {

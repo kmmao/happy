@@ -8,6 +8,17 @@ export interface AppConfig {
   revenueCatStripeKey?: string;
   elevenLabsAgentId?: string;
   serverUrl?: string;
+  /** Default base URL of an OpenAI Realtime compatible gateway (sub2api Live). */
+  realtimeGatewayUrl?: string;
+  /**
+   * Default gateway API key. Convenience for local development only — every
+   * EXPO_PUBLIC_* value is inlined into the JS bundle and can be extracted from
+   * a shipped build, so leave this unset in release builds and let each user
+   * supply their own key in Settings (which is end-to-end encrypted).
+   */
+  realtimeGatewayApiKey?: string;
+  /** Default realtime output voice; empty lets the gateway pick. */
+  realtimeVoice?: string;
 }
 
 /**
@@ -98,6 +109,24 @@ export function loadAppConfig(): AppConfig {
     config.elevenLabsAgentId !== process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID
   ) {
     config.elevenLabsAgentId = process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID;
+  }
+  if (
+    process.env.EXPO_PUBLIC_REALTIME_GATEWAY_URL &&
+    config.realtimeGatewayUrl !== process.env.EXPO_PUBLIC_REALTIME_GATEWAY_URL
+  ) {
+    config.realtimeGatewayUrl = process.env.EXPO_PUBLIC_REALTIME_GATEWAY_URL;
+  }
+  if (
+    process.env.EXPO_PUBLIC_REALTIME_GATEWAY_API_KEY &&
+    config.realtimeGatewayApiKey !== process.env.EXPO_PUBLIC_REALTIME_GATEWAY_API_KEY
+  ) {
+    config.realtimeGatewayApiKey = process.env.EXPO_PUBLIC_REALTIME_GATEWAY_API_KEY;
+  }
+  if (
+    process.env.EXPO_PUBLIC_REALTIME_VOICE &&
+    config.realtimeVoice !== process.env.EXPO_PUBLIC_REALTIME_VOICE
+  ) {
+    config.realtimeVoice = process.env.EXPO_PUBLIC_REALTIME_VOICE;
   }
 
   return config as AppConfig;
