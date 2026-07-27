@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Fastify } from "../types";
 import { log } from "@/utils/log";
 import { generateOptionsWithLLM } from "@/modules/optionGenerator";
-import { detectProviderFromEnv } from "@/modules/optionScorer";
+import { detectProviderFromEnv } from "@/modules/llmProviderCall";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
 import { loadDecryptedProfile, serverEnvScoringCredentials } from "@/modules/scoringCredentials";
 

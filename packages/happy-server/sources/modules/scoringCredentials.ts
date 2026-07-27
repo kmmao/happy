@@ -1,6 +1,6 @@
 import { db } from "@/storage/db";
 import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
-import { detectProviderFromEnv, type ScoringCredentials } from "@/modules/optionScorer";
+import { detectProviderFromEnv, type ScoringCredentials } from "@/modules/llmProviderCall";
 import type { AIBackendProfile } from "@/types/aiBackendProfile";
 
 /**

@@ -8,7 +8,7 @@ import {
 } from "./llmProviderCall";
 
 /**
- * These pin the seam that optionScorer and optionGenerator now share.
+ * These pin the provider wire contract this seam owns.
  *
  * The refactor that created this module collapsed two byte-for-byte copies of
  * the provider calls into one, moving their four differences (system prompt,

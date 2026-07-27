@@ -47,7 +47,6 @@ import { triggerScheduleRoutes } from "./routes/triggerScheduleRoutes";
 import { webhookTriggerRoutes } from "./routes/webhookTriggerRoutes";
 import { inboxRoutes } from "./routes/inboxRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
-import { optionScoreRoutes } from "./routes/optionScoreRoutes";
 import { optionGenerateRoutes } from "./routes/optionGenerateRoutes";
 import { supervisorDimensionRoutes } from "./routes/supervisorDimensionRoutes";
 import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
@@ -176,7 +175,6 @@ export async function startApi() {
   webhookTriggerRoutes(typed);
   inboxRoutes(typed);
   sessionEventRoutes(typed);
-  optionScoreRoutes(typed);
   optionGenerateRoutes(typed);
   supervisorDimensionRoutes(typed);
   agentLoopSuggestRoutes(typed);

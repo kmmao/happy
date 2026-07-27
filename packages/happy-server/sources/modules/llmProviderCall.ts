@@ -1,12 +1,17 @@
 /**
  * The one place that knows how to speak to each LLM provider.
  *
- * `optionScorer` and `optionGenerator` each used to carry their own
+ * Extracted when `optionScorer` and `optionGenerator` each carried their own
  * byte-for-byte copy of `callAnthropic` / `callOpenAI` / `callOllama` — 93 lines
- * apiece, differing only in four call-site parameters. Two adapters make the
+ * apiece, differing only in four call-site parameters. Two adapters made the
  * seam real (the project's "one adapter = hypothetical seam; two = real seam"
  * rule), so the provider wire details live here once and the differences move
  * into an explicit options argument.
+ *
+ * `optionScorer` has since been deleted along with /v1/options/score, leaving
+ * `optionGenerator` as the only in-tree caller. The seam is kept as the owner of
+ * the provider wire contract; a second caller returning does not have to
+ * re-derive it.
  *
  * What stays caller-owned: the system prompt, the default-model table, the
  * token ceiling, the timeout and the sampling temperature. Those are the four

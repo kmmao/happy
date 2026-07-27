@@ -1,6 +1,6 @@
 import { type Fastify } from "../types";
 import { z } from "zod";
-import { detectProviderFromEnv } from "@/modules/optionScorer";
+import { detectProviderFromEnv } from "@/modules/llmProviderCall";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
 import { loadDecryptedProfile, serverEnvScoringCredentials } from "@/modules/scoringCredentials";
 
