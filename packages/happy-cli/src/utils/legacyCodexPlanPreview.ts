@@ -1,5 +1,5 @@
 export type LegacyCodexPlanItem = {
-  status: "completed" | "in_progress" | "pending" | "unknown";
+  status: "completed" | "in_progress" | "pending";
   text: string;
 };
 
@@ -7,6 +7,19 @@ export type LegacyCodexPlanPreview = {
   explanation: string | null;
   items: LegacyCodexPlanItem[];
 };
+
+// A legacy Codex plan message is `formatPlanLine`'s output
+// (codexNotificationEvents.ts): one explanation line followed by nothing but
+// `[status] step` rows, where status is one of Codex's three update_plan
+// states. Both halves of that shape are enforced here — a bare `[a-z_]+`
+// prefix matches every bracketed log line ever written (`[vite] …`,
+// `[error] …`), and keeping only the lines that happened to match lets one
+// incidental log line stand in for a whole prose answer.
+//
+// Kept in sync with happy-app's sources/components/tools/codexPlanCompat.ts,
+// which renders the parsed plan INSTEAD of the message body — there a false
+// positive silently deletes prose. The packages cannot import each other.
+const PLAN_ITEM_RE = /^\[(completed|in_progress|pending)\]\s+(.+)$/i;
 
 export function parseLegacyCodexPlanPreview(
   markdown: string,
@@ -20,38 +33,30 @@ export function parseLegacyCodexPlanPreview(
     return null;
   }
 
-  const explanation = lines[0] || null;
-  const items = lines
-    .slice(1)
-    .map((line) => {
-      const match = line.match(/^\[([a-z_]+)\]\s+(.+)$/i);
-      if (!match) {
-        return null;
-      }
+  const items: LegacyCodexPlanItem[] = [];
+  for (const line of lines.slice(1)) {
+    const match = line.match(PLAN_ITEM_RE);
+    if (!match) {
+      return null;
+    }
 
-      const rawStatus = match[1].toLowerCase();
-      const status: LegacyCodexPlanItem["status"] =
-        rawStatus === "completed" ||
-        rawStatus === "in_progress" ||
-        rawStatus === "pending"
-          ? rawStatus
-          : "unknown";
+    const text = match[2].trim();
+    if (!text) {
+      return null;
+    }
 
-      const text = match[2].trim();
-      if (!text) {
-        return null;
-      }
-
-      return { status, text };
-    })
-    .filter((item): item is LegacyCodexPlanItem => item !== null);
+    items.push({
+      status: match[1].toLowerCase() as LegacyCodexPlanItem["status"],
+      text,
+    });
+  }
 
   if (items.length === 0) {
     return null;
   }
 
   return {
-    explanation,
+    explanation: lines[0] || null,
     items,
   };
 }

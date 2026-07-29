@@ -643,24 +643,17 @@ function AgentTextBlock(props: {
                           dot: theme.colors.accentBlue,
                           label: theme.colors.accentBlue,
                         }
-                      : item.status === "pending"
-                        ? {
-                            dot: theme.colors.accentOrange,
-                            label: theme.colors.accentOrange,
-                          }
-                        : {
-                            dot: theme.colors.textSecondary,
-                            label: theme.colors.textSecondary,
-                          };
+                      : {
+                          dot: theme.colors.accentOrange,
+                          label: theme.colors.accentOrange,
+                        };
 
                 const statusLabel =
                   item.status === "completed"
                     ? t("supervisor.status_completed")
                     : item.status === "in_progress"
                       ? t("message.taskProgress")
-                      : item.status === "pending"
-                        ? t("supervisor.status_pending")
-                        : t("timeline.typeToolCall");
+                      : t("supervisor.status_pending");
 
                 return (
                   <View key={`${item.status}-${index}-${item.text}`} style={styles.codexPlanRow}>

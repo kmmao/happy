@@ -37,4 +37,34 @@ describe("legacyCodexPlanPreview", () => {
       ),
     ).toBe(false);
   });
+
+  it("rejects prose that merely quotes bracketed log lines", () => {
+    expect(
+      hasLegacyCodexPlanPreview(
+        [
+          "Findings so far:",
+          "",
+          "```",
+          "[vite] hmr invalidate /src/context/font-provider.tsx",
+          "[vite] hmr invalidate /src/context/layout-provider.tsx",
+          "```",
+          "",
+          "Both providers mix component and hook exports.",
+        ].join("\n"),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a plan whose rows are interrupted by prose", () => {
+    expect(
+      hasLegacyCodexPlanPreview(
+        [
+          "Current rollout",
+          "[completed] Inspect logs",
+          "Actually, hold on.",
+          "[pending] Verify UI",
+        ].join("\n"),
+      ),
+    ).toBe(false);
+  });
 });

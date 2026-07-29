@@ -79,7 +79,7 @@ describe("codexProgressPresentation", () => {
             "Current rollout",
             "[completed] Parse diff payloads",
             "[in_progress] Build Code X cards",
-            "[unknown] Follow-up validation",
+            "[pending] Follow-up validation",
           ].join("\n"),
           20,
         ),

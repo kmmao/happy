@@ -1,4 +1,7 @@
-import { parseLegacyCodexPlanPreview } from "@/components/tools/codexPlanCompat";
+import {
+  type LegacyCodexPlanItem,
+  parseLegacyCodexPlanPreview,
+} from "@/components/tools/codexPlanCompat";
 import {
   type ProgressTodo,
   type ResolvedChecklist,
@@ -19,7 +22,7 @@ export interface CodexPlanData {
 }
 
 function mapLegacyPreviewStatus(
-  status: "completed" | "in_progress" | "pending" | "unknown",
+  status: LegacyCodexPlanItem["status"],
 ): ProgressTodo["status"] {
   if (status === "completed" || status === "in_progress") {
     return status;
