@@ -7,7 +7,7 @@
  * Post-PTY-migration (Phase 6) Happy CLI no longer depends on the SDK at
  * runtime — `claudePtyRuntime` spawns `claude` TUI directly and parses
  * JSONL output. We still keep typed shapes for the messages flowing
- * through `sessionScanner` → `rawToJsonlMessage` → `messageFormatter` /
+ * through `sessionScanner` → `rawToJsonlMessage` → `messageFormatterInk` /
  * `sessionEventReporter`, because removing those types would force a
  * cascade of edits across 30+ consumer files.
  *
