@@ -47,6 +47,23 @@ agent.sangreal.code.xycloud.info {
 	import cloudflare_tls
 }
 
+fucc.sangreal.code.xycloud.info {
+	# 后端 API / WebSocket → uvicorn:8000（/api/v1/ws/... 也在 /api 前缀下）
+	handle /api/* {
+		reverse_proxy host.docker.internal:8000 {
+			flush_interval -1
+		}
+	}
+	# 其余请求 → fucc 前端 Vite dev server（宿主机进程，监听 0.0.0.0:5173）
+	handle {
+		reverse_proxy host.docker.internal:5173 {
+			# Flush immediately for Vite HMR WebSocket
+			flush_interval -1
+		}
+	}
+	import cloudflare_tls
+}
+
 # Pre-sign wildcard cert so new subdomains are instant
 *.code.xycloud.info {
 	tls {
