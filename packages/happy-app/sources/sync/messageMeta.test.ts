@@ -16,7 +16,6 @@ describe("resolveMessageModeMeta", () => {
       effort: null,
       maxBudgetUsd: null,
       taskBudget: null,
-      autoCompact: true,
     });
   });
 
@@ -36,7 +35,6 @@ describe("resolveMessageModeMeta", () => {
       effort: null,
       maxBudgetUsd: null,
       taskBudget: null,
-      autoCompact: true,
     });
   });
 
@@ -56,7 +54,6 @@ describe("resolveMessageModeMeta", () => {
       effort: null,
       maxBudgetUsd: null,
       taskBudget: null,
-      autoCompact: true,
     });
   });
 

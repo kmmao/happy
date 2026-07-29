@@ -351,7 +351,6 @@ export interface Session {
   resolvedModelId?: string | null;
   needsAttention?: boolean;
   starred?: boolean | null;
-  autoCompact?: boolean | null;
   latestUserRequestPreview?: SessionLatestUserRequestPreview | null;
   sdkSessionState?: "idle" | "running" | "requires_action" | null;
   latestUsage?: {

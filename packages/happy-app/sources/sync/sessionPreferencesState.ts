@@ -15,7 +15,6 @@ type SessionPreferenceSource = Pick<
   | "maxBudgetUsd"
   | "taskBudgetTokens"
   | "starred"
-  | "autoCompact"
 >;
 
 export function normalizeSessionPreferencesSnapshot(
