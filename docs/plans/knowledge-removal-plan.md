@@ -41,11 +41,15 @@ WHERE k.status = 'active' ORDER BY p.\"displayName\", k.\"createdAt\";
 " > /tmp/knowledge-export.tsv
 ```
 
-写一个 ~20 行脚本把 TSV 转成按项目分文件的 markdown，落到
-`docs/archive/knowledge/<project>.md`。**127 条 active 条目**值得归档；
-其余 323 条（archived/superseded）跳过。
+写一个 ~20 行脚本把 TSV 转成按项目分文件的 markdown。**127 条 active 条目**
+值得归档；其余 323 条（archived/superseded）跳过。
 
-验收：`docs/archive/knowledge/` 下有文件，条目数 = 127。
+验收：归档文件存在，条目数 = 127。
+
+> **归档位置（2026-07-29 更新）**：归档文件最初落在 `docs/archive/knowledge/`，
+> 但内容按**机器上的项目绝对路径**分文件，包含本仓库之外的私人项目
+> （量化策略、个人 Obsidian 仓库等）及本机目录结构，不适合进版本控制。
+> 已整体移出仓库到 `~/Documents/happy-knowledge-archive/`（仅本机，不再跟踪）。
 
 ---
 
