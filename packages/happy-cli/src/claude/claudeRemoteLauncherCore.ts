@@ -2876,7 +2876,12 @@ export async function claudeRemoteLauncher(
           // Write/Edit/MultiEdit/NotebookEdit/Bash into disallowedTools so the
           // Yolo+plan-mode hang documented at `planModeLockdownActive` can't
           // recur.
-          planModeLockdown: planModeLockdownActive,
+          //
+          // A THUNK, deliberately: `nextMessage` below clears the flag while
+          // this very `claudeRemote` call is in flight (it runs the callback
+          // before binding CLI flags), so a boolean snapshot taken here is
+          // read one turn too early and the release never reaches the spawn.
+          planModeLockdown: () => planModeLockdownActive,
           // Same reference the RPC handler mutates; the PTY controller's
           // mcpServerStatus() reads it live on each poll, so toggles take
           // effect without restarting the session.
@@ -3053,6 +3058,33 @@ export async function claudeRemoteLauncher(
                   permissionHandler.autoApproveAllPending();
                 }
 
+                executionGuard.requestRestart("mode_change");
+                pending = msg;
+                return null;
+              }
+
+              // Cold-only fields that live OUTSIDE `mode`. `coldModeHash` folds
+              // in `planModeLockdownActive`, a launcher-local flag that is not
+              // part of EnhancedMode — so when the lockdown flips but the mode
+              // is untouched, `msg.hash === modeHash` and the block above never
+              // runs. That is exactly the ExitPlanMode release path: the
+              // PLAN_FAKE_RESTART unshift carries the CURRENT permission mode
+              // (bypassPermissions → bypassPermissions), so the hashes match,
+              // no restart is requested, and the lockdown release silently
+              // never reaches a spawn. Compare the cold hash on its own so any
+              // spawn-bound field can force the restart regardless of `mode`.
+              //
+              // The thunk passed as `planModeLockdown` already covers the
+              // common case (release lands before the flags are bound); this is
+              // the belt-and-braces path for a flip that happens once the PTY
+              // is already up, where only a real cold restart can apply it.
+              if (
+                currentColdHash &&
+                coldModeHash(msg.mode) !== currentColdHash
+              ) {
+                logger.debug(
+                  `[remote]: cold-only field changed with mode unchanged (planLockdown=${planModeLockdownActive}) → cold restart`,
+                );
                 executionGuard.requestRestart("mode_change");
                 pending = msg;
                 return null;

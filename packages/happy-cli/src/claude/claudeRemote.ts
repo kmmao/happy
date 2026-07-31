@@ -721,8 +721,20 @@ export async function claudeRemote(opts: {
    * `disallowedTools` so the model is forced down the proper ExitPlanMode
    * path. The launcher clears the flag (and cold-restarts again) once the
    * picker-driven approval keystroke has been delivered.
+   *
+   * Pass a THUNK, not a bare boolean, whenever the value can change during
+   * this `claudeRemote` call. The launcher clears its lockdown flag from
+   * inside the `nextMessage()` callback — which runs at line ~897, BEFORE
+   * the `disallowedTools` list is built (~982) and the PTY is spawned
+   * (~1062). A boolean captured at call time is therefore stale by 13ms
+   * (observed in PID 9364 / session 47787c26): the flag read `false` in the
+   * launcher while the spawned process still got
+   * `--disallowedTools …,Write,Edit,MultiEdit,NotebookEdit,Bash`, wedging
+   * the whole session — and every subagent under it — read-only until exit.
+   * The thunk is evaluated at list-build time so the spawn sees the flag as
+   * it stands the moment the flags are bound.
    */
-  planModeLockdown?: boolean;
+  planModeLockdown?: boolean | (() => boolean);
 
   // Dynamic parameters
   nextMessage: () => Promise<{ message: string; mode: EnhancedMode } | null>;
@@ -975,15 +987,25 @@ export async function claudeRemote(opts: {
   // `buildPtyDisallowedTools` (see that helper for the rationale of each
   // entry). Keeps this constructor narrow and lets the tool-deny logic be
   // unit-tested without standing up a real PTY.
+  // Resolved HERE rather than at call time: `opts.nextMessage()` above is the
+  // launcher hook that clears the lockdown, so reading it any earlier hands
+  // the spawn a stale `true`. See the `planModeLockdown` doc comment.
+  const planModeLockdownNow =
+    typeof opts.planModeLockdown === "function"
+      ? opts.planModeLockdown()
+      : (opts.planModeLockdown ?? false);
   const flagMode: EnhancedMode = {
     ...initial.mode,
     model: model ?? initial.mode.model,
     appendSystemPrompt: mergedAppendSystemPrompt,
     disallowedTools: buildPtyDisallowedTools({
       base: initial.mode.disallowedTools,
-      planModeLockdown: opts.planModeLockdown,
+      planModeLockdown: planModeLockdownNow,
     }),
   };
+  logger.debug(
+    `[claudeRemote] plan-mode lockdown at spawn: ${planModeLockdownNow} → disallowedTools=${flagMode.disallowedTools?.join(",") ?? "none"}`,
+  );
 
   const flagsResult = buildClaudeCliFlags({
     mode: flagMode,
