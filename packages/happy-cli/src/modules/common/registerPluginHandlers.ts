@@ -117,7 +117,7 @@ async function readPluginMeta(pluginName: string, pluginPath: string): Promise<P
  */
 export function registerPluginHandlers(
   rpcHandlerManager: RpcHandlerManager,
-  workingDirectory: string,
+  workingDirectory: string | null,
 ) {
   // ── Discover installed Claude Code plugins ──
   rpcHandlerManager.registerHandler("discoverPlugins", async () => {
@@ -136,20 +136,23 @@ export function registerPluginHandlers(
       // ~/.claude/plugins/marketplaces/ may not exist
     }
 
-    // Scan project-level .claude/plugins/
-    const projectPluginsDir = join(workingDirectory, ".claude", "plugins");
-    try {
-      const entries = await readdir(projectPluginsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          dirs.push({
-            name: `${entry.name} (project)`,
-            path: join(projectPluginsDir, entry.name),
-          });
+    // Scan project-level .claude/plugins/ (session scope only — machine scope
+    // has no project workspace to scan).
+    if (workingDirectory !== null) {
+      const projectPluginsDir = join(workingDirectory, ".claude", "plugins");
+      try {
+        const entries = await readdir(projectPluginsDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            dirs.push({
+              name: `${entry.name} (project)`,
+              path: join(projectPluginsDir, entry.name),
+            });
+          }
         }
+      } catch {
+        // .claude/plugins/ may not exist in project
       }
-    } catch {
-      // .claude/plugins/ may not exist in project
     }
 
     // Read metadata for all discovered plugins in parallel

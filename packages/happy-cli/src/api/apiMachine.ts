@@ -457,9 +457,11 @@ export class ApiMachineClient {
       logger: (msg, data) => logger.debug(msg, data),
     });
 
+    // null = unrestricted: the daemon serves the whole machine, and its
+    // process.cwd() is an accident of where it was started, not a workspace.
     registerCommonHandlers(
       this.rpcHandlerManager,
-      process.cwd(),
+      null,
       this.machine.id,
     );
   }

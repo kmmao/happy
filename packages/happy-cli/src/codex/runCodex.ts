@@ -525,12 +525,12 @@ export async function runCodex(opts: {
   let currentAppendSystemPrompt: string | undefined = undefined;
 
   // Reset live mode tracking back to configured defaults. Called from the
-  // abort path below so the next turn doesn't inherit one-message overrides
-  // from the aborted turn (e.g. user picked xhigh for one tough question).
+  // abort path below so the next turn doesn't inherit one-message overrides.
+  // Model and effort are deliberately NOT reset here. The app sends them
+  // only when the user changes the picker, so resetting them on abort
+  // silently desyncs the picker from what the next turn actually runs.
   const resetCurrentModeDefaults = () => {
     currentPermissionMode = initialPermissionMode;
-    currentModel = DEFAULT_CODEX_MODEL;
-    currentReasoningEffort = DEFAULT_CODEX_EFFORT;
     currentAppendSystemPrompt = undefined;
     logger.debug("[Codex] Reset current mode defaults after abort");
   };

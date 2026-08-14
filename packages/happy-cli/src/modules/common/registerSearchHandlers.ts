@@ -36,8 +36,11 @@ interface DifftasticResponse {
  */
 export function registerSearchHandlers(
   rpcHandlerManager: RpcHandlerManager,
-  workingDirectory: string,
+  workingDirectory: string | null,
 ) {
+  // null = machine scope: no workspace boundary (see registerCommonHandlers).
+  const checkCwd = (cwd: string) =>
+    workingDirectory === null ? { valid: true as const } : validatePath(cwd, workingDirectory);
   // Ripgrep handler - raw interface to ripgrep
   rpcHandlerManager.registerHandler<RipgrepRequest, RipgrepResponse>(
     "ripgrep",
@@ -46,7 +49,7 @@ export function registerSearchHandlers(
 
       // Validate cwd if provided
       if (data.cwd) {
-        const validation = validatePath(data.cwd, workingDirectory);
+        const validation = checkCwd(data.cwd);
         if (!validation.valid) {
           return { success: false, error: validation.error };
         }
@@ -84,7 +87,7 @@ export function registerSearchHandlers(
 
       // Validate cwd if provided
       if (data.cwd) {
-        const validation = validatePath(data.cwd, workingDirectory);
+        const validation = checkCwd(data.cwd);
         if (!validation.valid) {
           return { success: false, error: validation.error };
         }

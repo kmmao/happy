@@ -67,10 +67,15 @@ export interface SpawnSessionOptions {
  * and (where needed) caches in a dedicated `register*Handlers` module. The split
  * keeps each group's complexity local and lets every group be reasoned about —
  * and tested — through its own register entry point.
+ *
+ * `workingDirectory` scopes file/shell RPCs to a workspace. Session-scoped
+ * callers pass the session's path; machine-scoped (daemon) callers pass
+ * null — the daemon serves the whole machine and its process.cwd() is just
+ * wherever it happened to be started from, not a meaningful boundary.
  */
 export function registerCommonHandlers(
   rpcHandlerManager: RpcHandlerManager,
-  workingDirectory: string,
+  workingDirectory: string | null,
   sessionId: string,
 ) {
   // Sanitize sessionId to prevent path traversal when used in filesystem paths

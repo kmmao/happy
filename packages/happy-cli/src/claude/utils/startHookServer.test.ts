@@ -28,6 +28,7 @@ type Calls = {
   fileChanged: Array<{ filePath: string; event: string }>;
   worktreeCreate: Array<{ name: string }>;
   worktreeRemove: Array<{ path: string }>;
+  directoryAdded: Array<{ newDirectory: string | undefined }>;
   instructionsLoaded: Array<{ filePath: string; memoryType: string }>;
   permissionDenied: Array<{ toolName: string; reason: string }>;
   postToolBatch: Array<{ count: number }>;
@@ -41,6 +42,7 @@ function newCalls(): Calls {
     fileChanged: [],
     worktreeCreate: [],
     worktreeRemove: [],
+    directoryAdded: [],
     instructionsLoaded: [],
     permissionDenied: [],
     postToolBatch: [],
@@ -63,6 +65,8 @@ function optionsFor(calls: Calls): HookServerOptions {
       calls.worktreeCreate.push({ name: data.name }),
     onWorktreeRemove: (data) =>
       calls.worktreeRemove.push({ path: data.worktree_path }),
+    onDirectoryAdded: (data) =>
+      calls.directoryAdded.push({ newDirectory: data.new_directory }),
     onInstructionsLoaded: (data) =>
       calls.instructionsLoaded.push({
         filePath: data.file_path,
@@ -103,6 +107,21 @@ describe("startHookServer dispatch", () => {
 
     expect(status).toBe(200);
     expect(calls.cwdChanged).toEqual([{ old: "/a", next: "/b" }]);
+    expect(calls.sessionHook).toEqual([]); // critical: do not poison sessionId
+  });
+
+  it("routes DirectoryAdded to onDirectoryAdded (NOT to onSessionHook fallback)", async () => {
+    const calls = newCalls();
+    server = await startHookServer(optionsFor(calls));
+
+    const status = await postHook(server.port, {
+      hook_event_name: "DirectoryAdded",
+      session_id: "s1",
+      new_directory: "/extra/repo",
+    });
+
+    expect(status).toBe(200);
+    expect(calls.directoryAdded).toEqual([{ newDirectory: "/extra/repo" }]);
     expect(calls.sessionHook).toEqual([]); // critical: do not poison sessionId
   });
 

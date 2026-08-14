@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-coder",
-  "version": "0.107.1",
+  "version": "0.108.0",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "kmmao",
   "license": "MIT",
@@ -91,10 +91,10 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.20.0",
-    "@anthropic-ai/sandbox-runtime": "0.0.54",
+    "@anthropic-ai/sandbox-runtime": "0.0.73",
     "@anthropic-ai/sdk": "^0.100.1",
     "@kmmao/happy-wire": "^0.40.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/hex": "^2.0.1",

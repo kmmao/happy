@@ -103,6 +103,8 @@ export function buildHookSettings(port: number): Record<string, unknown> {
       // dispatch table in startHookServer.ts decides what to do with each.
       CwdChanged: hookEntry,
       FileChanged: hookEntry,
+      // 2.1.221+: fires after /add-dir or SDK register_repo_root. Non-blocking.
+      DirectoryAdded: hookEntry,
       WorktreeCreate: hookEntry,
       WorktreeRemove: hookEntry,
       // Observability hooks verified present in claude-code 2.1.157's

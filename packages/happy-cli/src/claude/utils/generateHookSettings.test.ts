@@ -65,6 +65,8 @@ describe("buildHookSettings", () => {
     for (const key of [
       "CwdChanged",
       "FileChanged",
+      // 2.1.221+: /add-dir / register_repo_root adds a working directory.
+      "DirectoryAdded",
       "WorktreeCreate",
       "WorktreeRemove",
     ]) {

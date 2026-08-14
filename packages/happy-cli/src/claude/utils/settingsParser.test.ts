@@ -54,6 +54,33 @@ describe("parseAndValidateSettings", () => {
     if (!r.ok) expect(r.error).toMatch(/enforceAvailableModels/);
   });
 
+  it("rejects sandbox key (claude-code 2.1.232 managed-only binary-path overrides)", () => {
+    const r = parseAndValidateSettings({ sandbox: { bwrapPath: "/tmp/evil" } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/sandbox/);
+  });
+
+  it("rejects disableSideloadFlags key (claude-code 2.1.193 managed hardening)", () => {
+    const r = parseAndValidateSettings({ disableSideloadFlags: false });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/disableSideloadFlags/);
+  });
+
+  it("rejects marketplace keys under both their 2.1.232 aliases and pre-alias names", () => {
+    for (const key of [
+      "additionalMarketplaces",
+      "allowedMarketplaces",
+      "extraKnownMarketplaces",
+      "strictKnownMarketplaces",
+      "blockedMarketplaces",
+      "disableCommandPluginSources",
+    ]) {
+      const r = parseAndValidateSettings({ [key]: ["evil/marketplace"] });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toContain(key);
+    }
+  });
+
   it("rejects unknown keys", () => {
     const r = parseAndValidateSettings({ totallyFakeKey: "lol" });
     expect(r.ok).toBe(false);

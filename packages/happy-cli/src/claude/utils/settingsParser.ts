@@ -20,6 +20,19 @@
  *   (claude-code 2.1.175+); user/project scope must not be able to set or
  *   extend it via the App RPC
  * - `cleanupPeriodDays` — destructive (deletes old sessions)
+ * - `sandbox` — carries `bwrapPath` / `socatPath` / `ripgrep` binary-path
+ *   overrides that run OUTSIDE the sandbox (claude-code 2.1.232 restricts
+ *   them to managed scope for exactly this reason); a remote-supplied path
+ *   would be arbitrary code execution
+ * - `disableSideloadFlags` — managed hardening toggle (claude-code 2.1.193+);
+ *   the App RPC must not be able to flip plugin/agent sideloading protection
+ *   in either direction
+ * - marketplace keys (`additionalMarketplaces` / `allowedMarketplaces` and
+ *   their pre-2.1.232 names `extraKnownMarketplaces` /
+ *   `strictKnownMarketplaces`, `blockedMarketplaces`,
+ *   `disableCommandPluginSources`) — marketplace sources resolve to plugins
+ *   that execute code; there is no legitimate reason for the App to configure
+ *   them per-session
  *
  * ## Null semantics
  *
@@ -44,6 +57,14 @@ const BLOCKED_KEYS = new Set([
   "disableBundledSkills",
   "enforceAvailableModels",
   "cleanupPeriodDays",
+  "sandbox",
+  "disableSideloadFlags",
+  "additionalMarketplaces",
+  "allowedMarketplaces",
+  "extraKnownMarketplaces",
+  "strictKnownMarketplaces",
+  "blockedMarketplaces",
+  "disableCommandPluginSources",
 ]);
 
 // ─── Type validators ──────────────────────────────────────────────────────────

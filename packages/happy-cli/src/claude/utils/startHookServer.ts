@@ -119,6 +119,20 @@ export interface FileChangedHookData {
     [key: string]: unknown;
 }
 
+/**
+ * Fired when a working directory is added mid-session via `/add-dir` or the
+ * SDK `register_repo_root` control request (Claude Code 2.1.221+). Cannot
+ * block — the directory is already added when the hook fires. The
+ * `new_directory` field name is verified against the 2.1.232 binary's hook
+ * payload table; the index signature keeps us safe if it ever shifts.
+ */
+export interface DirectoryAddedHookData {
+    hook_event_name: 'DirectoryAdded';
+    session_id?: string;
+    new_directory?: string;
+    [key: string]: unknown;
+}
+
 /** Fired when Claude creates a managed worktree (Claude Code 2.1.157+). */
 export interface WorktreeCreateHookData {
     hook_event_name: 'WorktreeCreate';
@@ -262,6 +276,8 @@ export interface HookServerOptions {
     /** Called for each FileChanged event (high-frequency; consumer must
      *  debounce / cap). Claude Code 2.1.121+, optional. */
     onFileChanged?: (data: FileChangedHookData) => void;
+    /** Called when a working directory is added via /add-dir (Claude Code 2.1.221+, optional). */
+    onDirectoryAdded?: (data: DirectoryAddedHookData) => void;
     /** Called when Claude creates a managed worktree (Claude Code 2.1.157+, optional). */
     onWorktreeCreate?: (data: WorktreeCreateHookData) => void;
     /** Called when Claude removes a managed worktree (Claude Code 2.1.157+, optional). */
@@ -305,6 +321,7 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         onStopFailure,
         onCwdChanged,
         onFileChanged,
+        onDirectoryAdded,
         onWorktreeCreate,
         onWorktreeRemove,
         onInstructionsLoaded,
@@ -416,6 +433,7 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         StopFailure: (data) => handleStopFailure(data as StopFailureHookData),
         CwdChanged: (data) => onCwdChanged?.(data as CwdChangedHookData),
         FileChanged: (data) => onFileChanged?.(data as FileChangedHookData),
+        DirectoryAdded: (data) => onDirectoryAdded?.(data as DirectoryAddedHookData),
         WorktreeCreate: (data) => onWorktreeCreate?.(data as WorktreeCreateHookData),
         WorktreeRemove: (data) => onWorktreeRemove?.(data as WorktreeRemoveHookData),
         InstructionsLoaded: (data) => onInstructionsLoaded?.(data as InstructionsLoadedHookData),

@@ -103,6 +103,7 @@ export type HookEvent =
   | "InstructionsLoaded"
   | "CwdChanged"
   | "FileChanged"
+  | "DirectoryAdded"
   // MessageDisplay (Claude Code 2.1.152+): display-only hook that replaces the
   // assistant message delta on the TUI screen without altering the stored
   // JSONL message or what the model sees. Happy CLI reads JSONL, so this hook

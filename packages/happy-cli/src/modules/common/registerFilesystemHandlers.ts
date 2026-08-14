@@ -11,7 +11,7 @@ import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
 import { runWorkflowInDir, workflowsDirFor } from "@/workflow/runWorkflowInDir";
 import { execFileLocal } from "@/webhook/execFileLocal";
 import { removeWorktreeForced } from "@/webhook/createWorktreeLocal";
-import { validatePath } from "./pathSecurity";
+import { validatePath, PathValidationResult } from "./pathSecurity";
 import { summarizeShellCommandForLog } from "@/utils/securityRedaction";
 import { checkBlockedBashCommand } from "@/utils/bashCommandPolicy";
 
@@ -163,9 +163,27 @@ interface GetUploadDirResponse {
  */
 export function registerFilesystemHandlers(
   rpcHandlerManager: RpcHandlerManager,
-  workingDirectory: string,
+  workingDirectory: string | null,
   safeSessionId: string,
 ) {
+  // null = machine scope. The daemon serves the whole machine and its
+  // process.cwd() is an accident of where it was started, not a workspace
+  // boundary — validating against it made every out-of-tree machine RPC fail
+  // with "Access denied". Only the account owner can invoke machine RPCs, and
+  // the same daemon already exposes spawn-session in any directory. Session
+  // scope passes the session's workspace and keeps full path validation.
+  const checkPath = (
+    targetPath: string,
+    additionalAllowedDirs?: string[],
+  ): PathValidationResult =>
+    workingDirectory === null
+      ? { valid: true }
+      : validatePath(targetPath, workingDirectory, additionalAllowedDirs);
+  const resolveWorkspacePath = (targetPath: string): string =>
+    workingDirectory === null
+      ? resolve(targetPath)
+      : resolve(workingDirectory, targetPath);
+
   // In-flight Dynamic Workflow runs, keyed by workflow id, so `workflowCancel`
   // can abort a run and kill its sub-agent processes (Phase 5).
   const runningWorkflows = new Map<string, AbortController>();
@@ -190,7 +208,7 @@ export function registerFilesystemHandlers(
       // Special case: "/" means "use shell's default cwd" (used by CLI detection)
       // Security: Still validate all other paths to prevent directory traversal
       if (data.cwd && data.cwd !== "/") {
-        const validation = validatePath(data.cwd, workingDirectory);
+        const validation = checkPath(data.cwd);
         if (!validation.valid) {
           return { success: false, error: validation.error };
         }
@@ -280,15 +298,13 @@ export function registerFilesystemHandlers(
 
       // Validate path — scoped to this session's upload subdirectory (not the global upload dir)
       const sessionUploadDir = join(UPLOAD_TEMP_DIR, safeSessionId);
-      const validation = validatePath(data.path, workingDirectory, [
-        sessionUploadDir,
-      ]);
+      const validation = checkPath(data.path, [sessionUploadDir]);
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
 
       try {
-        const resolvedPath = resolve(workingDirectory, data.path);
+        const resolvedPath = resolveWorkspacePath(data.path);
         const buffer = await readFile(resolvedPath);
         const content = buffer.toString("base64");
         return { success: true, content };
@@ -318,16 +334,14 @@ export function registerFilesystemHandlers(
 
       // Validate path — scoped to this session's upload subdirectory
       const sessionUploadDir = join(UPLOAD_TEMP_DIR, safeSessionId);
-      const validation = validatePath(data.path, workingDirectory, [
-        sessionUploadDir,
-      ]);
+      const validation = checkPath(data.path, [sessionUploadDir]);
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
 
       try {
         // Resolve path relative to working directory
-        const resolvedPath = resolve(workingDirectory, data.path);
+        const resolvedPath = resolveWorkspacePath(data.path);
 
         // If expectedHash is provided (not null), verify existing file
         if (data.expectedHash !== null && data.expectedHash !== undefined) {
@@ -412,7 +426,7 @@ export function registerFilesystemHandlers(
     logger.debug("List directory request:", data.path);
 
     // Validate path is within working directory
-    const validation = validatePath(data.path, workingDirectory);
+    const validation = checkPath(data.path);
     if (!validation.valid) {
       return { success: false, error: validation.error };
     }
@@ -476,6 +490,11 @@ export function registerFilesystemHandlers(
   rpcHandlerManager.registerHandler<WorkflowRunRequest, WorkflowRunResponse>(
     "workflowRun",
     async (data) => {
+      // Workflows run inside a session's workspace; the machine-scoped
+      // (daemon) registration has no workspace to run them in.
+      if (workingDirectory === null) {
+        return { success: false, error: "workflow RPCs require a session workspace" };
+      }
       const withDefaults = {
         id: data.spec?.id || `wf_${randomUUID().slice(0, 8)}`,
         createdAt: typeof data.spec?.createdAt === "number" ? data.spec.createdAt : Date.now(),
@@ -523,6 +542,9 @@ export function registerFilesystemHandlers(
   rpcHandlerManager.registerHandler<WorkflowIdRequest, SimpleSuccessResponse>(
     "workflowDelete",
     async (data) => {
+      if (workingDirectory === null) {
+        return { success: false, error: "workflow RPCs require a session workspace" };
+      }
       const dir = workflowsDirFor(workingDirectory);
       for (const ext of [".json", ".js"]) {
         await unlink(join(dir, `${data.workflowId}${ext}`)).catch(() => {});
@@ -536,6 +558,9 @@ export function registerFilesystemHandlers(
     WorkflowBranchActionRequest,
     SimpleSuccessResponse
   >("workflowBranchAction", async (data) => {
+    if (workingDirectory === null) {
+      return { success: false, error: "workflow RPCs require a session workspace" };
+    }
     if (!/^[\w./-]+$/.test(data.branch)) {
       return { success: false, error: "invalid_branch" };
     }
@@ -561,6 +586,9 @@ export function registerFilesystemHandlers(
     WorkflowBranchDiffRequest,
     WorkflowBranchDiffResponse
   >("workflowBranchDiff", async (data) => {
+    if (workingDirectory === null) {
+      return { success: false, error: "workflow RPCs require a session workspace" };
+    }
     if (!/^[\w./-]+$/.test(data.branch)) {
       return { success: false, error: "invalid_branch" };
     }
@@ -588,7 +616,7 @@ export function registerFilesystemHandlers(
     );
 
     // Validate path is within working directory
-    const validation = validatePath(data.path, workingDirectory);
+    const validation = checkPath(data.path);
     if (!validation.valid) {
       return { success: false, error: validation.error };
     }

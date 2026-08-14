@@ -85,19 +85,62 @@
 
 ---
 
-## 运行时依赖对齐（2026-07-06 更新）
+## 运行时依赖对齐（2026-08-14 更新）
 
 | 包 | 项目当前 | npm 最新 | 状态 |
 |---|---|---|---|
-| `@anthropic-ai/sandbox-runtime` | `0.0.54` | `0.0.63` | 🔍 落后 9 补丁；0.0.55→63 均补丁，`0.0.63` 移除 `shell-quote` 依赖、无破坏性 API 变更；列入 P2 可选跟进（dev 分支验证后再升） |
-| `@modelcontextprotocol/sdk` | `^1.29.0` | `1.29.0` | ✅ 跟上 |
+| `@anthropic-ai/sandbox-runtime` | `0.0.73` | `0.0.73` | ✅ 2026-08-14 升级（0.0.54→0.0.73，见当期执行记录） |
+| `@modelcontextprotocol/sdk` | `^1.30.0` | `1.30.0` | ✅ 2026-08-14 升级；**勿升 2.x**（breaking） |
 | `node-pty` | `^1.1.0` | `1.1.0` | ✅ 跟上 |
 | `fastify-type-provider-zod`（happy-cli） | `5` | `6.1.0` | ✅ 本期升 `4.0.2 → 5` 修 zod 4 兼容（与 happy-server 对齐）；后续若升 server 到 6.x 再统一 |
 | `fastify-type-provider-zod`（happy-server） | `5` | `6.1.0` | ✅ 监视 6.x |
-| `@anthropic-ai/claude-code`（用户运行时 TUI 基线） | `2.1.165` | `2.1.177` | ⚠️ 本期对齐 2.1.166→2.1.177 的形态变化（见上方"已在本地实现 / 不适用"补录）；本机 `claude --version` = 2.1.173；PTY 测试套件已在 2.1.173 上跑通无回归 |
+| `@anthropic-ai/claude-code`（用户运行时 TUI 基线） | — | `2.1.232` | ✅ 2026-08-14 对齐至 2.1.232（DirectoryAdded hook + BLOCKED_KEYS 扩充，见当期执行记录）；本机 `claude --version` = 2.1.232 |
 | `@anthropic-ai/claude-code`（codium 内嵌） | `2.1.177` | `2.1.177` | ✅ 本期升 `2.1.165 → 2.1.177`；`@anthropic-ai/claude-agent-sdk` 同步至 `^0.3.177`；codium typecheck + 4 测试文件 100 用例全过 |
 
 > 注：本项目走 PTY 模式，**不追踪** `@anthropic-ai/claude-agent-sdk` 与 `claude -p` headless 路径。
+
+---
+
+## 2026-08-14 sdk-watch 执行记录
+
+本机 `claude --version` = **2.1.232**（npm 最新亦为 2.1.232）。本期完成以下升级与 backport（全部带测试验证）：
+
+### 已 port 的上游修复
+
+| Upstream commit | 标题 | 本地落点 | 备注 |
+|---|---|---|---|
+| #1553 `abdcfff8c` | fix(cli): keep the session alive when the API rejects a turn | `claude/types.ts`（`service_tier: nullish` + `usage .catch(undefined)`）、`claude/types.test.ts`（新建）、`__fixtures__/api-error/rate-limit.jsonl`（新建）、`sessionScanner.test.ts` 回归测试 | 本地确认同病：合成 API 错误消息带 `service_tier: null` 会使 Zod 解析失败丢消息。上游 mapper 归一化部分不适用 —— 本地 usage 消费只取 token 字段，不经 wire 传 `service_tier` |
+| #1595 `29ca2e435` | fix: keep the picked model and effort across an abort | `claude/runClaude.ts` + `codex/runCodex.ts` 的 `resetCurrentModeDefaults` 不再重置 model/effort | 本地无 runClaude 测试 harness（上游 harness 数百行），两行删除由 typecheck/构建覆盖 |
+| `d1cdc796c` | fix(cli): don't scope machine RPC paths to the daemon's accidental cwd | `registerCommonHandlers.ts`/`registerFilesystemHandlers.ts`/`registerSearchHandlers.ts`/`registerPluginHandlers.ts` 接受 `workingDirectory: string \| null`；`apiMachine.ts` 传 `null` | 本地架构已拆分 handler 模块，采用等价适配而非照抄；workflow/worktree 类 RPC 在 machine 作用域返回明确错误（App 端本就走 session 作用域调用） |
+| #1578 `990d385de` | fix(cli): surface the real launch error instead of a bare notice | `claude/utils/launchFailureMessage.ts` + 测试（新建）；接入 `claudeLocalLauncher.ts` 与 `claudeRemoteLauncherCore.ts`（后者原先裸拼 `err.message`，现在有 ANSI 剥离/换行折叠/300 字符截断） | codex 侧已有 `trimIdent` 等价处理，未改 |
+
+### PTY 形态对齐（2.1.202 → 2.1.232）
+
+| 形态变更 | 版本 | 本地落点 | 结论 |
+|---|---|---|---|
+| `DirectoryAdded` hook（`/add-dir` / `register_repo_root` 后触发，不可阻断） | 2.1.221 | `jsonlMessageTypes.ts` HookEvent union、`generateHookSettings.ts` 订阅、`startHookServer.ts` 接口+分发+测试 | ✅ 本期补录；payload 字段 `new_directory` 经 2.1.232 二进制字符串验证 |
+| `sandbox.bwrapPath`/`socatPath`/`ripgrep` 覆盖收紧为 managed-only | 2.1.232 | `settingsParser.ts` `BLOCKED_KEYS` 加入 `sandbox` | ✅ 本期拦截（远程注入二进制路径 = 任意代码执行） |
+| `disableSideloadFlags` | 2.1.193 | `BLOCKED_KEYS` | ✅ 本期拦截 |
+| marketplace 键（`additionalMarketplaces`/`allowedMarketplaces` 别名 + 旧名 + `blockedMarketplaces` + `disableCommandPluginSources`） | 2.1.223-232 | `BLOCKED_KEYS` | ✅ 本期拦截 |
+| `crossSessionInbound`/`dialogExpiry`/`askUserQuestionTimeout`/`autoCompactWindow`/`advisorModel`/`axScreenReader` | 2.1.181-225 | 白名单本就拒绝未知键 | 🔍 P2 — 如需在 App 暴露再加入 ALLOWED_KEYS |
+| hook `terminalSequence` 允许列表 OSC 0/1/2/9/**99/777**+BEL | — | `pty/terminalSequences.ts` 已结构化 0/1/2/9，99/777 落入 `other` | 🔍 P2 — 可选扩展 kitty/urxvt 通知解码 |
+| `@` mention 跨会话（SendMessage 路由） | 2.1.232 | JSONL 中的实际形态待观察 | 🔍 监视 |
+| fullscreen streaming 不再逐更新重新规范化 | 2.1.232 | PTY 透传层 | ✅ 本期全量测试在 2.1.232 上跑通 |
+
+### 运行时依赖升级
+
+| 包 | 变更 | 验证 |
+|---|---|---|
+| `@anthropic-ai/sandbox-runtime` | `0.0.54 → 0.0.73`（含 0.0.55 TLS 代理修复、0.0.66 Linux bwrap 加固、0.0.72 macOS denyRead 修复；0.0.62 要求 Node ≥ 20.11、0.0.64/0.0.67 Windows breaking 不影响本项目用面） | typecheck + sandbox 测试通过；本地仅用 `SandboxManager.initialize/reset/wrapWithSandbox` 稳定 API |
+| `@modelcontextprotocol/sdk` | `^1.29.0 → ^1.30.0`（维护版：stdio 缓冲上限、SSE keep-alive；**勿升 2.x**，同日发布的 2.0.0 有 breaking） | typecheck + 测试通过 |
+
+### 本期跳过 / 排期项
+
+- **#1556/#1564/#1561 套餐限额状态栏**（cli+app 整块功能，含 9 语言 i18n）— 排期为独立功能移植，涉及本地缺失的 `usageLimits.ts`/`SessionStatusBar` 整条链
+- **`1862c2c88` 推送抑制"活跃证明"**（server+cli+app）— 本地 `focusTracker.ts` 注释已预告此扩展方向，实现已分叉需独立适配
+- **Rig / agy / gemini 3.6** — 上游专属后端生态，继续跳过
+- **Side-chat 面板套件** — 继续监视，等上游稳定
+- App bug-fix 篮子（#1476 列表跳动、unread 徽章、thinking 保留等）— 待逐个复现后 cherry-pick
 
 ---
 

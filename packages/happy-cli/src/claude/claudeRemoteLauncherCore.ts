@@ -17,6 +17,7 @@ import {
 } from "./strandPolicy";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
+import { launchFailureMessage } from "./utils/launchFailureMessage";
 import {
   readExitPlanApprovalTimeoutMs,
   shouldAutoApproveExitPlanInBypass,
@@ -3435,9 +3436,11 @@ export async function claudeRemoteLauncher(
         if (!exitReason) {
           session.client.closeClaudeSessionTurn("failed", lastResultData ?? undefined);
           lastResultData = null;
+          // launchFailureMessage strips ANSI noise, collapses newlines and
+          // caps the detail — the message renders verbatim in the app.
           session.client.sendSessionEvent({
             type: "message",
-            message: `Process exited unexpectedly: ${err.message}`,
+            message: launchFailureMessage(err),
           });
           continue;
         }

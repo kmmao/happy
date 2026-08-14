@@ -4,6 +4,7 @@ import { Session } from "./session";
 import { Future } from "@/utils/future";
 import { createSessionScanner } from "./utils/sessionScanner";
 import { createThinkingTracker } from "./utils/thinkingTracker";
+import { launchFailureMessage } from "./utils/launchFailureMessage";
 import type { SessionTurnEndStatus } from "@kmmao/happy-wire";
 
 export type LauncherResult =
@@ -220,7 +221,7 @@ export async function claudeLocalLauncher(
         if (!exitReason) {
           session.client.sendSessionEvent({
             type: "message",
-            message: "Process exited unexpectedly",
+            message: launchFailureMessage(e),
           });
           continue;
         } else {

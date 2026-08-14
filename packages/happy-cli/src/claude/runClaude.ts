@@ -952,14 +952,15 @@ export async function runClaude(
   // separate session preference to preserve here. See the `autoCompact`
   // protocol removal notes for context.
   const resetCurrentModeDefaults = () => {
+    // Model and effort are deliberately NOT reset here. The app sends them
+    // only when the user changes the picker, so resetting them on abort
+    // silently desyncs the picker from what the next turn actually runs.
     currentPermissionMode = initialPermissionMode;
-    currentModel = options.model ?? DEFAULT_CLAUDE_MODEL;
     currentFallbackModel = undefined;
     currentCustomSystemPrompt = undefined;
     currentAppendSystemPrompt = undefined;
     currentAllowedTools = undefined;
     currentDisallowedTools = undefined;
-    currentEffort = DEFAULT_CLAUDE_EFFORT;
     logger.debug("[loop] Reset current mode defaults after abort");
   };
 
